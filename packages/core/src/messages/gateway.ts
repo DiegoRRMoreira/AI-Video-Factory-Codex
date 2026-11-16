@@ -80,4 +80,5 @@ export const GATEWAY_MESSAGES = {
   "agent.failed": { tr: "{agent}: {subtype}{detail} (maliyet ${cost})", en: "{agent}: {subtype}{detail} (cost ${cost})" },
   "agent.apiError": { tr: "{agent}: API hatası{status}: {result}", en: "{agent}: API error{status}: {result}" },
   "agent.schema": { tr: "{agent}: şemaya uymayan çıktı: {detail}", en: "{agent}: output does not match the schema: {detail}" },
+  "err.ledger.changed": { tr: "Maliyet defteri okuma sırasında değişti; yeniden deneyin", en: "Cost ledger changed during reading; try again" },
 } as const;

@@ -52,6 +52,15 @@ afterEach(() => {
 });
 
 describe("TimelinePlayer: bölümü render etmeden oynatır", () => {
+  it("reloads an already open player when the completed timeline revision changes", async () => {
+    let current = TIMELINE;
+    const request = vi.fn(async () => json(current)); vi.stubGlobal("fetch", request);
+    const view = renderIn(<TimelinePlayer id="e1" version="first" />);
+    await reactAct(async () => {}); expect(await screen.findByTestId("player")).toBeTruthy();
+    current = { ...TIMELINE, durationInFrames: 600 };
+    await reactAct(async () => { view.rerender(<LocaleProvider locale="tr"><TimelinePlayer id="e1" version="second" /></LocaleProvider>); });
+    expect(request).toHaveBeenCalledTimes(2); expect(played.at(-1)!.durationInFrames).toBe(600);
+  });
   it("zaman çizelgesini yükler, statik kökü ayarlar ve oynatıcıya bölümün boyutlarını verir", async () => {
     const fetchMock = vi.fn(async () => json(TIMELINE));
     vi.stubGlobal("fetch", fetchMock);
@@ -78,6 +87,8 @@ describe("TimelinePlayer: bölümü render etmeden oynatır", () => {
     const scrolled = vi.fn();
     const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(scrolled);
     const view = renderIn(<TimelinePlayer id="e1" shot="sh2" seek={1} />);
+    // Oynatıcı DOM'a girdikten sonra atlama/oynatma passive effect'te çalışır; onu da tamamla.
+    await reactAct(async () => {});
     await screen.findByTestId("player");
     expect(controls.calls).toEqual(["seek:150", "play"]);
     expect(scrolled).toHaveBeenCalledTimes(1);

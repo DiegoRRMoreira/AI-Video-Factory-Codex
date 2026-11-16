@@ -1,5 +1,12 @@
 import type { CostGroup, Quota } from "@ys/media-gateway";
-import type { EpisodeEstimate, EpisodeState, LibraryCharacter, MotionMode, Progress, RunStatus, Stage } from "@ys/pipeline/light";
+import type { EpisodeEstimate, EpisodeState, EpisodeSummary, LibraryCharacter, MotionMode, Progress, RunStatus, Stage } from "@ys/pipeline/light";
+export type EpisodePanel = "overview" | "script" | "concept" | "shots" | "costs" | "activity";
+export interface EpisodeStatusResponse {
+  revision: string;
+  summary: EpisodeSummary;
+  status: EpisodeResponse["status"];
+  progress: Progress | null;
+}
 
 /** Sunucu ile istemci arasında paylaşılan yanıt tipleri (sadece tip; çalışma anı kodu yok). */
 
@@ -19,6 +26,9 @@ export interface QuotaView {
 }
 
 export interface EpisodeResponse {
+  revision?: string;
+  panel?: EpisodePanel;
+  counts?: EpisodeSummary["counts"];
   /** Render kaynakları yalnız CLI'da kullanılır; sık sorgulanan Studio yanıtına girmez. */
   state: Omit<EpisodeState, "timeline">;
   /** Bu bölümün stilinde kütüphanedeki onaylı karakterler (tekrar kullanmak için). */

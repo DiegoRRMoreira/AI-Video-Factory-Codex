@@ -64,6 +64,27 @@ const series: SeriesSummary[] = [
 describe("NewEpisodeForm", () => {
   beforeEach(() => vi.useFakeTimers());
 
+  it("keeps advanced options mounted and applies a series preset without creating an episode", async () => {
+    const api = mockApi();
+    renderIn(<NewEpisodeForm series={[{ ...series[0]!, defaults: { ...series[0]!.defaults, lineStyle: "ink" } }]} />);
+    const details = [...document.querySelectorAll("details")];
+    expect(details.filter(d => !d.open).length).toBeGreaterThanOrEqual(2);
+    expect(field<HTMLSelectElement>("stylePack").querySelectorAll("option")).toHaveLength(STYLE_PACKS.length + 2);
+    await act(async () => void fireEvent.click(screen.getByRole("button", { name: tr("form.preset", { name: series[0]!.name }) })));
+    await tick(400);
+    expect(field("series").value).toBe(series[0]!.name);
+    expect(field("minutes").value).toBe("5");
+    expect(field<HTMLSelectElement>("lang").value).toBe("en");
+    expect(mode()).toBe("vector");
+    expect(field<HTMLSelectElement>("stylePack").value).toBe("flat-explainer");
+    expect(field<HTMLSelectElement>("lineStyle").value).toBe("ink");
+    expect(field("budgetUsd").value).toBe("7");
+    expect(api.creates).toEqual([]);
+    expect(api.estimates).toHaveLength(1);
+    await submit();
+    expect(api.creates[0]).toMatchObject({ series: series[0]!.name, motionMode: "vector", lineStyle: "ink", minutes: 5, budgetUsd: 7 });
+  });
+
   it("açılışta 400 ms sonra tahmin ister; tahmin, mod karşılaştırması ve uyarılar görünür", async () => {
     const estimates = makeEstimates();
     estimates.animated = makeEstimate("animated", {

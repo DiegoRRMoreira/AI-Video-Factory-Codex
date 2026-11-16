@@ -19,6 +19,7 @@ import { fakeProvider } from "./fakes.ts";
 
 const fake = vi.hoisted(() => ({
   episodes: [] as EpisodeState[],
+  notices: [] as { id: string; reason: "unreadable" }[],
   entries: [] as CostEntry[],
   providers: [] as ProviderAdapter[],
   skipped: [] as Text[],
@@ -48,6 +49,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("../../src/lib/server", () => ({
   repo: () => ({
+    summaries: async () => ({ episodes: fake.episodes.map((await import("@ys/pipeline/light")).summarizeEpisode), notices: fake.notices }),
     list: async () => fake.episodes,
     load: async (id: string) => {
       const e = fake.episodes.find((x) => x.id === id);
@@ -127,6 +129,7 @@ const img = (key: string) => ({ key, mimeType: "image/png" });
 
 beforeEach(() => {
   fake.episodes = [];
+  fake.notices = [];
   fake.entries = [];
   fake.providers = [];
   fake.skipped = [];
@@ -138,6 +141,51 @@ beforeEach(() => {
 });
 
 describe("Ana sayfa", () => {
+  it("finds the newest failed episode and scopes costs to matching cards", async () => {
+    fake.episodes = [ep("old", { lastError: { stage: "script", message: "failed", at: "t" } }, { topic: "Space", series: "Science" }),
+      ep("new", { createdAt: "2026-11-16T12:00:00Z", lastError: { stage: "script", message: "failed", at: "t" } }, { topic: "Space mission", series: "Science" }), ep("other")];
+    fake.entries = [entry({ episodeId: "new" }), entry({ episodeId: "new", capability: "llm", estimateMicros: 500_000 }), entry({ episodeId: "other", estimateMicros: 9_000_000 })];
+    const h = await html(Home({ searchParams: Promise.resolve({ q: "mission", queue: "failed", series: "Science" }) }));
+    expect(h).toContain('href="/episodes/new"');
+    expect(h).not.toContain('href="/episodes/old"');
+    expect(h).not.toContain('href="/episodes/other"');
+    expect(text(h)).toContain("$1.50");
+    expect(text(h)).not.toContain("$10.50");
+    expect(h).toContain('name="q"');
+  });
+  it("preserves combined filters on pages and series changes, and displays the real empty state", async () => {
+    fake.episodes = Array.from({ length: 23 }, (_, i) => ep(`e-combined-${String(i).padStart(2, "0")}`, { lastError: { stage: "script", message: "error", at: "t" } }, { topic: "Space", series: "Science", stylePack: "flat-explainer" }));
+    const filters = { q: "Space", series: "Science", style: "flat-explainer", queue: "failed", status: "error", sort: "oldest" };
+    const h = await html(Home({ searchParams: Promise.resolve(filters) }));
+    expect(h.match(/href="\/episodes\/e-combined-/g)).toHaveLength(20);
+    expect(h).toContain('q=Space&amp;series=Science&amp;style=flat-explainer&amp;status=error&amp;queue=failed&amp;sort=oldest&amp;page=1');
+    expect(h).toContain('name="queue" value="failed"');
+    expect(h.indexOf('/episodes/e-combined-00')).toBeLessThan(h.indexOf('/episodes/e-combined-01'));
+    const empty = await html(Home({ searchParams: Promise.resolve({ ...filters, q: "Absent" }) }));
+    expect(text(empty)).toContain("Bu filtrelere uygun bölüm yok");
+    const duplicate = await html(Home({ searchParams: Promise.resolve({ q: ["a", "b"], page: ["1", "2"] }) }));
+    expect(duplicate.match(/href="\/episodes\/e-combined-/g)).toHaveLength(20);
+    fake.cookie = "en";
+    const english = await html(Home({ searchParams: Promise.resolve({ style: "custom" }) }));
+    expect(text(english)).toContain("No episodes match");
+    const legacy = await html(Home({ searchParams: Promise.resolve({ style: "legacy-style" }) }));
+    expect(legacy).toContain('<option value="legacy-style" selected="">legacy-style</option>');
+  });
+  it("paginates indexed cards, preserves series links and discloses unreadable records", async () => {
+    fake.episodes = Array.from({ length: 23 }, (_, i) => ep(`e-page-${String(i).padStart(2, "0")}`, {}, { series: "Series" }));
+    fake.notices = [{ id: "bad", reason: "unreadable" }];
+    const first = await html(Home({ searchParams: Promise.resolve({ series: "Series", page: "0" }) }));
+    expect(first.match(/href="\/episodes\/e-page-/g)).toHaveLength(20);
+    expect(text(first)).toContain("1 / 2"); expect(text(first)).toContain("1 bölüm kaydı");
+    expect(first).toContain("series=Series&amp;page=1");
+    const last = await html(Home({ searchParams: Promise.resolve({ series: "Series", page: "999" }) }));
+    expect(last.match(/href="\/episodes\/e-page-/g)).toHaveLength(3);
+    expect(last).toContain("series=Series&amp;page=0");
+    for (const page of ["NaN", "-1", "1.5"]) {
+      const invalid = await html(Home({ searchParams: Promise.resolve({ page }) }));
+      expect(invalid.match(/href="\/episodes\/e-page-/g)).toHaveLength(20);
+    }
+  });
   const all = () => [
     ep("e-calisan", { stats: { style: { startedAt: new Date().toISOString() } }, heartbeatAt: new Date().toISOString(), shots: [{ id: "sh1" }] as EpisodeState["shots"], keyframes: { sh1: img("kf.png") } }, { series: "Osmanlı" }),
     ep("e-video", { story: { title: "Bitmiş Başlık" } as EpisodeState["story"], render: { path: "v.mp4" } as EpisodeState["render"], done: { style: "t", story: "t" }, shots: [{ id: "sh2" }] as EpisodeState["shots"], stills: { sh2: img("still.png") } }, { series: "osmanlı " }),
@@ -162,7 +210,7 @@ describe("Ana sayfa", () => {
     expect(t).toMatch(/Tümü 4/);
     expect(t).toMatch(/Osmanlı 2/);
     expect(t).toMatch(/Serisiz 2/);
-    expect(t).toMatch(/Bölüm 4 Bitmiş video 1 Toplam harcama \$3\.00 Şu an çalışan 1/);
+    expect(t).toMatch(/Bölüm 4 Bitmiş video 1 Medya harcaması \$3\.00 Ajan kullanımı \$0 Toplam harcama \$3\.00 Şu an çalışan 1/);
     expect(h).toContain('data-refresh="4000"');
     expect(h).toContain('src="/api/assets/kf.png"');
     expect(h).toContain('src="/api/assets/still.png"');

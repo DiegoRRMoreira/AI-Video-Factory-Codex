@@ -8,57 +8,86 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorKey } from "../../../lib/errors";
 import type { MessageKey } from "../../../lib/i18n";
-import type { EpisodeResponse } from "../../../lib/types";
+import type { EpisodeResponse, EpisodeStatusResponse } from "../../../lib/types";
 import { useI18n } from "../../locale-provider";
 import { ActivityLine, ActivityTab } from "./activity";
 import { CostsTab } from "./costs-panel";
 import { OverviewTab } from "./overview";
-import { Badge, Bar, gateTab, modeOf, STAGE_GROUPS, STATUS_TONE, StatusIcon, stageKey, TABS, type Act, type Tab } from "./parts";
+import { Badge, Bar, gateTab, modeOf, nextWork, STAGE_GROUPS, STATUS_TONE, StatusIcon, stageKey, TABS, type Act, type Tab } from "./parts";
 import { ConceptTab, ScriptTab, ShotsTab } from "./steps";
 
 export function EpisodeView({ id }: { id: string }) {
   const { t } = useI18n();
   const [data, setData] = useState<EpisodeResponse>();
   const [error, setError] = useState<string>();
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [pending, setPending] = useState(false);
   const [tab, setTabState] = useState<Tab>();
   const [logStage, setLogStage] = useState<Stage>();
   const [, tick] = useState(0);
   const requestId = useRef(0);
   const inFlight = useRef<AbortController | undefined>(undefined);
+  const loadedResponse = useRef<EpisodeResponse | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     const request = ++requestId.current;
     inFlight.current?.abort();
     const controller = new AbortController();
     inFlight.current = controller;
+    setRefreshing(true);
     const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
-      const res = await fetch(`/api/episodes/${id}`, { cache: "no-store", signal: controller.signal });
-      if (res.ok) {
-        const next = (await res.json()) as EpisodeResponse;
-        if (request === requestId.current) setData(next);
+      const headers = { "x-ys-status": "1", "x-ys-panel": tab ?? "auto" };
+      const res = await fetch(`/api/episodes/${id}`, { cache: "no-store", signal: controller.signal, headers });
+      if (!res.ok) throw new Error("Episode request failed");
+      const response = (await res.json()) as EpisodeResponse | EpisodeStatusResponse;
+      if (request !== requestId.current) return;
+      let next: EpisodeResponse;
+      if ("state" in response) next = response;
+      else {
+        if (typeof response.revision !== "string" || !response.status) throw new Error("Invalid episode status response");
+        const cached = loadedResponse.current;
+        if (cached && response.revision === cached.revision) {
+          setData({ ...cached, status: response.status, progress: response.progress });
+          setLoadFailed(false);
+          return;
+        }
+        const detail = await fetch(`/api/episodes/${id}`, { cache: "no-store", signal: controller.signal, headers: { "x-ys-panel": tab ?? "auto" } });
+        if (!detail.ok) throw new Error("Episode panel request failed");
+        next = await detail.json() as EpisodeResponse;
+        if (!next.state) throw new Error("Invalid episode panel response");
       }
+      if (request === requestId.current) {
+        setData(next);
+        loadedResponse.current = next;
+        setLoadFailed(false);
+      }
+    } catch {
+      // Eski veya kaldırılmış isteğin hatası güncel ekranı bozamaz; sunucunun ham hatasını göstermeyiz.
+      if (request === requestId.current) setLoadFailed(true);
     } finally {
       clearTimeout(timeout);
       if (inFlight.current === controller) inFlight.current = undefined;
+      if (request === requestId.current) setRefreshing(false);
     }
-  }, [id]);
+  }, [id, tab]);
 
   // Önceki bölümün ya da kaldırılan bileşenin yanıtı sonradan durumu değiştiremez.
-  useEffect(() => () => { requestId.current++; inFlight.current?.abort(); }, [id]);
+  useEffect(() => () => { requestId.current++; loadedResponse.current = undefined; inFlight.current?.abort(); }, [id]);
 
   const live = data?.status.status === "running";
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
-      try { await refresh(); } catch { /* Ağ hatasında sonraki yoklamada yeniden denenir. */ }
+      await refresh();
       if (active) timer = setTimeout(() => void poll(), live ? 1500 : 5000);
     };
     void poll();
     return () => { active = false; clearTimeout(timer); };
-  }, [refresh, live]);
+  }, [refresh, live, retry]);
   // "x sn önce" ve geçen süre her saniye güncellensin.
   useEffect(() => {
     const timer = setInterval(() => tick((n) => n + 1), 1000);
@@ -102,14 +131,22 @@ export function EpisodeView({ id }: { id: string }) {
         setError(t("common.actionFailed"));
         return false;
       } finally {
-        await refresh().catch(() => {});
+        await refresh();
         setPending(false);
       }
     },
     [id, refresh, t],
   );
 
-  if (!data) return <p className="text-muted">{t("common.loading")}</p>;
+  const connection = loadFailed ? (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm">
+      <p>{t(data ? "episode.stale" : "episode.loadFailed")}</p>
+      <button type="button" className="btn-ghost" disabled={refreshing} onClick={() => setRetry((n) => n + 1)}>
+        {t(refreshing ? "common.retrying" : "common.retry")}
+      </button>
+    </div>
+  ) : null;
+  if (!data) return connection ?? <p className="text-muted">{t("common.loading")}</p>;
   const { state, status } = data;
   const busy = pending || status.status === "running" || data.job?.status === "running";
   // Sekme seçilmediyse bölümün durumuna göre en anlamlı olanı aç.
@@ -120,6 +157,7 @@ export function EpisodeView({ id }: { id: string }) {
       : status.status === "running"
         ? "activity"
         : "overview");
+  const panelReady = !data.panel || data.panel === active;
   const openStage = (s: Stage) => {
     setLogStage(s);
     setTab("activity");
@@ -127,9 +165,10 @@ export function EpisodeView({ id }: { id: string }) {
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-5">
+      {connection}
       <Header data={data} act={act} />
-      <PipelineRail data={data} onStage={openStage} />
       <LivePanel data={data} busy={busy} act={act} onTab={setTab} />
+      <PipelineRail data={data} onStage={openStage} />
       {error && <div className="rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad">{error}</div>}
 
       <section className="card min-w-0 p-0">
@@ -143,21 +182,23 @@ export function EpisodeView({ id }: { id: string }) {
               className={`relative shrink-0 cursor-pointer px-3 py-3 text-sm transition ${active === k ? "text-white" : "text-muted hover:text-white"}`}
             >
               {t(`tab.${k}` as MessageKey)}
-              {k === "shots" && state.shots && <span className="ml-1.5 text-xs text-muted">{state.shots.length}</span>}
-              {k === "activity" && (state.activity?.length ?? 0) > 0 && (
-                <span className="ml-1.5 text-xs text-muted">{state.activity!.length}</span>
+              {k === "shots" && (data.counts?.shots ?? state.shots?.length) !== undefined && <span className="ml-1.5 text-xs text-muted">{data.counts?.shots ?? state.shots!.length}</span>}
+              {k === "activity" && (data.counts?.activity ?? state.activity?.length ?? 0) > 0 && (
+                <span className="ml-1.5 text-xs text-muted">{data.counts?.activity ?? state.activity!.length}</span>
               )}
               {active === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent" />}
             </button>
           ))}
         </nav>
         <div className="p-5">
+          {!panelReady ? <p className="text-muted">{t("common.loading")}</p> : <>
           {active === "overview" && <OverviewTab data={data} busy={busy} act={act} />}
           {active === "script" && <ScriptTab data={data} busy={busy} act={act} />}
           {active === "concept" && <ConceptTab data={data} busy={busy} act={act} />}
           {active === "shots" && <ShotsTab data={data} busy={busy} act={act} />}
           {active === "costs" && <CostsTab data={data} />}
           {active === "activity" && <ActivityTab activity={state.activity ?? []} job={data.job} stage={logStage} onStage={setLogStage} />}
+          </>}
         </div>
       </section>
     </div>
@@ -219,7 +260,7 @@ function Header({ data, act }: { data: EpisodeResponse; act: Act }) {
         <div className="min-w-0 flex-1">
           <SeriesTag series={state.input.series} act={act} />
           <div className="mt-1 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{state.story?.title ?? state.input.topic}</h1>
+            <h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight">{state.story?.title ?? state.input.topic}</h1>
             <Badge status={status.status}>{statusLabel(t, status)}</Badge>
           </div>
           <p className="mt-1.5 flex flex-wrap gap-x-2 text-sm text-muted">
@@ -227,7 +268,7 @@ function Header({ data, act }: { data: EpisodeResponse; act: Act }) {
             <span>{t(`motion.${mode}` as MessageKey)}</span>·<span>{t(`form.tier.${state.input.tier}` as MessageKey)}</span>
           </p>
         </div>
-        <div className="w-60 text-right text-sm">
+        <div className="w-full text-sm sm:w-60 sm:text-right">
           <div className="text-xs text-muted">{t("ep.spentCap")}</div>
           <div className="font-semibold tabular-nums">
             {fmt.usd(spentUsd)} <span className="font-normal text-muted">/ {fmt.usd(state.input.budgetUsd)}</span>
@@ -235,6 +276,7 @@ function Header({ data, act }: { data: EpisodeResponse; act: Act }) {
           <div className="text-[11px] text-muted" title={t("ep.claudeHint")}>
             {t("ep.claude", { usd: fmt.usd(claudeUsd) })}
           </div>
+          <div className="text-xs font-medium">{t("next.total", { usd: fmt.usd(spentUsd + claudeUsd) })}</div>
           <Bar value={pct} tone={pct > 90 ? "bg-bad" : "bg-accent"} className="mt-1.5" />
         </div>
       </div>
@@ -258,14 +300,15 @@ function PipelineRail({ data, onStage }: { data: EpisodeResponse; onStage: (s: S
   };
 
   return (
-    <div className="card overflow-x-auto p-3">
-      <div className="flex min-w-[1040px] gap-3">
+    <details className="card min-w-0 p-3">
+      <summary className="cursor-pointer text-sm font-medium">{t("next.details")} · {Object.keys(state.done).length}/14</summary>
+      <div className="mt-3 grid gap-3">
         {STAGE_GROUPS.map((g) => (
           <div key={g.key} className="min-w-0" style={{ flex: g.stages.length }}>
             <div className="mb-1.5 px-1 text-[10px] font-semibold tracking-wider text-muted/80 uppercase">
               {t(`group.${g.key}` as MessageKey)}
             </div>
-            <ol className="flex gap-1.5">
+            <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
               {g.stages.map((s) => {
                 const st = stageStatus(s);
                 const tone = STATUS_TONE[st];
@@ -314,7 +357,7 @@ function PipelineRail({ data, onStage }: { data: EpisodeResponse; onStage: (s: S
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -329,7 +372,7 @@ function LivePanel({ data, busy, act, onTab }: { data: EpisodeResponse; busy: bo
   const stat = status.stage ? state.stats?.[status.stage] : undefined;
   const studioJob = job?.status === "running";
 
-  if (status.status === "done") return null;
+  if (status.status === "done") return <section className="card grid gap-2" aria-label={t("next.title")}><h2 className="font-semibold">{t("next.title")}</h2><p className="text-sm text-muted">{t("next.exportHint")}</p><button type="button" className="btn-primary w-fit" onClick={() => onTab("overview")}>{t("next.export")}</button></section>;
 
   let headline: string;
   let body: React.ReactNode = null;
@@ -421,11 +464,11 @@ function LivePanel({ data, busy, act, onTab }: { data: EpisodeResponse; busy: bo
       break;
     default:
       headline = t("live.idle", { stage: stageName });
-      actions = state.script && (
-        <button className="btn-ghost py-1.5 text-xs" disabled={busy} onClick={() => act({ type: "resume" })}>
+      actions = state.script ? (
+        <button className="btn-primary py-1.5 text-xs" disabled={busy} onClick={() => act({ type: "resume" })}>
           <Play size={14} /> {t("live.continue")}
         </button>
-      );
+      ) : <button className="btn-primary py-1.5 text-xs" disabled={busy} onClick={() => onTab("script")}><Play size={14} /> {t("next.openScript")}</button>;
   }
 
   return (
@@ -436,7 +479,7 @@ function LivePanel({ data, busy, act, onTab }: { data: EpisodeResponse; busy: bo
           <h2 className={`font-semibold ${tone.text}`}>{headline}</h2>
         </div>
         {body}
-        {actions && <div className="mt-1 flex flex-wrap gap-2">{actions}</div>}
+        {actions && <><p className="text-xs font-medium text-muted">{t("next.title")}</p><div className="mt-1 flex flex-wrap gap-2">{actions}</div>{status.status !== "running" && <WorkPreview data={data} />}</>}
       </div>
       <div className="min-w-0">
         <div className="mb-1 flex items-center justify-between">
@@ -457,4 +500,13 @@ function LivePanel({ data, busy, act, onTab }: { data: EpisodeResponse; busy: bo
       </div>
     </section>
   );
+}
+
+function WorkPreview({ data }: { data: EpisodeResponse }) {
+  const { t, fmt } = useI18n(), work = nextWork(data);
+  return <div className="grid gap-1 text-xs text-muted" aria-label={t("next.work", { stages: work.stages.map(s => t(stageKey(s))).join(", ") })}>
+    {data.status.status === "waiting" && <p>{t("next.reviewOnly")}</p>}
+    {data.status.status === "idle" && !data.state.script && <p>{t("next.scriptHint")}</p>}
+    {work.stages.length ? <><p>{t("next.work", { stages: work.stages.map(s => t(stageKey(s))).join(", ") })}</p><p>{t("next.estimate", { usd: fmt.usd(work.usd), time: fmt.duration(work.seconds) })}</p><p>{t(work.local ? "next.local" : "next.paid")}</p></> : <p>{t("next.gate")}</p>}
+  </div>;
 }

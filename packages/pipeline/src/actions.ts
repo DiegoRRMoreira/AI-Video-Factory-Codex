@@ -4,6 +4,7 @@ import { deletePrefix, getJson, putJson, type AssetStore } from "@ys/storage";
 import { libraryIdOf, noteCharacterUse } from "./library.ts";
 import { cleanSeries } from "./series.ts";
 import { acquireLock } from "./lock.ts";
+import { readEpisodeSummary, saveEpisodeSnapshot, type SummaryList } from "./summaries.ts";
 import { GATES, motionModeOf, STAGES, type EpisodeInput, type EpisodeState, type Gate, type MotionMode } from "./state.ts";
 
 /*
@@ -40,7 +41,31 @@ export class EpisodeRepo {
   }
 
   async save(state: EpisodeState): Promise<void> {
-    await putJson(this.store, stateKey(state.id), state);
+    await saveEpisodeSnapshot(this.store, state);
+  }
+
+  async summary(id: string) { return (await readEpisodeSummary(this.store, id)).summary; }
+
+  async summaries(rebuild = false): Promise<SummaryList> {
+    const keys = (await this.store.list("episodes/")).filter((k) => /^episodes\/[^/]+\/state\.json$/.test(k));
+    const result: SummaryList = { episodes: [], notices: [] };
+    for (let i = 0; i < keys.length; i += 4) {
+      const rows = await Promise.all(keys.slice(i, i + 4).map(async (key) => {
+        const id = key.split("/")[1]!;
+        let release: (() => Promise<void>) | undefined;
+        try {
+          if (rebuild) release = await acquireLock(this.store, id);
+          const row = await readEpisodeSummary(this.store, id, rebuild);
+          return { id, ...row };
+        } catch { return { id, summary: undefined, pending: false }; } finally { await release?.(); }
+      }));
+      for (const row of rows) {
+        if (row.summary) result.episodes.push(row.summary);
+        if (!row.summary || row.pending) result.notices.push({ id: row.id, reason: row.summary ? "pending" : "unreadable" });
+      }
+    }
+    result.episodes.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+    return result;
   }
 
   async list(options: { includeTimeline?: boolean } = {}): Promise<EpisodeState[]> {

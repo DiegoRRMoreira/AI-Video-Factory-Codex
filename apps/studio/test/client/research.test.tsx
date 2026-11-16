@@ -75,7 +75,9 @@ describe("research panel", () => {
     expect(post[1].mutation.claim).toMatchObject({ kind: "estimate", links: [{ sourceId: "source-2", relation: "supports" }, { sourceId: "source-1", relation: "context" }] });
     const item = screen.getByText("The rig completed 48 cycles").closest("li")!;
     fireEvent.click(within(item).getByRole("button", { name: en("research.edit") })); fireEvent.click(within(claimForm).getByRole("button", { name: en("research.cancel") }));
-    fireEvent.click(within(item).getByRole("button", { name: en("research.status.disputed") }));
+    const disputed = () => within(screen.getByText("The rig completed 48 cycles").closest("li")!).getByRole("button", { name: en("research.status.disputed") });
+    await waitFor(() => expect(disputed()).toHaveProperty("disabled", false));
+    fireEvent.click(disputed());
     await waitFor(() => expect(fetcher.mock.calls.filter(([, opts]) => opts?.method === "POST")).toHaveLength(3));
     expect(screen.getByText(/missing-source/)).toBeTruthy();
   });

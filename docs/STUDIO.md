@@ -32,7 +32,46 @@ Anyone who can reach that address can start paid jobs and delete episodes.
 Click **New episode** at the start of the top menu; the form has its own full-width page. Enter a topic, then
 choose the language, length, motion mode, line style, voice, budget, whether the reality check is on and
 whether subtitles are burned into the video. Each motion-mode card shows its estimated cost; the panel on the
-right breaks the chosen mode down by stage.
+right breaks the chosen mode down by stage. Start with the brief, series, language
+and duration. **Appearance and style options** and **Budget and advanced production
+options** are collapsed initially; expanding them preserves every style and control.
+Their inputs remain part of the form, including when collapsed.
+
+Recent-series buttons apply the latest recorded settings without creating an
+episode: language, duration, mode, style, line style, voice, tier and media budget.
+The series field still lists every series. Previewing a preset or cost estimate
+does not start generation; submitting the episode form does.
+
+## Find episodes and pending work
+
+The Episodes page searches titles/topics and combines production status, series,
+resolved style pack, oldest/newest sorting and 20-card pagination. Apply the search
+form to update the URL. Shared links and refresh retain the filters; changing a
+filter or series resets pagination. **Clear filters** returns to the full library.
+
+The work queue opens script, concept and preview approvals, failed/stalled jobs,
+missing output records and recorded outputs ready for inspection. Queue counts
+respect the other filters. These labels describe stored production state: they do
+not check physical output files or grant publishing approval. A missing output
+record means timeline/render completion was recorded without a current render
+record; early episodes without a video are not automatically classified as broken.
+
+Counts, media spend, agent usage, total spend and combined media budgets cover
+every matching episode across all pages. Cached calls and episodes outside the
+matching set are excluded; billed failed attempts count. Agent usage is outside
+the media budget caps. Orphan ledger entries remain visible on Costs rather than
+being assigned to unrelated library cards.
+
+## Follow the next action
+
+The episode's next-action panel precedes the expandable 14-stage detail. It opens
+the actual waiting approval, resumes interrupted work, opens a missing script or
+opens the recorded output for review. Opening an approval does not approve it or
+start generation. Its displayed estimate describes the work after approval, up to
+the next unapproved gate; completed stages are excluded. Resume/generation actions
+may use paid media or agents. A local-only label is used only when all affected
+stages are timeline, render or Short processing. Estimates remain approximate and
+provider warnings on Costs still apply; this is not a guaranteed quote.
 
 ## Review the script
 

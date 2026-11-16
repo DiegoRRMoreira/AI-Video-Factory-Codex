@@ -15,7 +15,7 @@ export const STATIC_BASE = "/api/assets";
  * düzey ayarını (loudnorm) almaz. Bileşen yalnız tarayıcıda yüklenir (three, pixi ve paper `window` ister).
  * `shot` verilince oynatıcı o çekimin ilk karesine atlar ve oynar; `seek` her istekte artar, aynı çekim yeniden istenebilir.
  */
-export default function TimelinePlayer({ id, shot, seek }: { id: string; shot?: string; seek?: number }) {
+export default function TimelinePlayer({ id, shot, seek, version }: { id: string; shot?: string; seek?: number; version?: string }) {
   const { t } = useI18n();
   const [timeline, setTimeline] = useState<Timeline>();
   const [error, setError] = useState<string>();
@@ -52,7 +52,7 @@ export default function TimelinePlayer({ id, shot, seek }: { id: string; shot?: 
       }
     })();
     return () => controller.abort();
-  }, [id, t]);
+  }, [id, t, version]);
 
   if (error) return <p className="text-sm text-red-400" role="alert">{error}</p>;
   if (!timeline) return <p className="text-sm text-muted">{t("shots.play.loading")}</p>;

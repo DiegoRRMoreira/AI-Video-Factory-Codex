@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 
 /** Yeni bölüm sayfası: form tam genişlikte. "?series=Ad" ile açılırsa ayarlar o serinin son bölümünden dolar. */
 export default async function NewEpisodePage({ searchParams }: { searchParams: Promise<{ series?: string }> }) {
-  const [all, { t }, params, library, samples] = await Promise.all([repo().list({ includeTimeline: false }), getI18n(), searchParams, listLibraryCharacters(store()), loadStyleSamples(store())]);
-  const series = summarizeSeries(all.filter((e) => e.input.topic !== "render demo"));
+  const [list, { t }, params, library, samples] = await Promise.all([repo().summaries(), getI18n(), searchParams, listLibraryCharacters(store()), loadStyleSamples(store())]);
+  const series = summarizeSeries(list.episodes.filter((e) => e.input.topic !== "render demo"));
   // Karakter bankasından seçilebilenler: stili bir paketle yeniden kurulabilenler.
   const bank = library.filter((c) => c.pack && stylePackOf(c.pack));
   return (

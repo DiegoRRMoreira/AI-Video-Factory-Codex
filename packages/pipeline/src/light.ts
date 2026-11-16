@@ -14,3 +14,4 @@ export * from "./research.ts";
 export * from "./editing.ts";
 export * from "./voice-audit.ts";
 export * from "./pronunciation-settings.ts";
+export * from "./summaries.ts";

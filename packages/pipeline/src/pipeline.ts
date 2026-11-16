@@ -416,7 +416,7 @@ export class EpisodePipeline {
     }
     state.heartbeatAt = new Date().toISOString();
     const write = this.saving.then(async () => {
-      await putJson(this.deps.store, this.stateKey(state.id), state);
+      await new EpisodeRepo(this.deps.store).save(state);
     });
     this.saving = write.catch(() => {});
     await write;

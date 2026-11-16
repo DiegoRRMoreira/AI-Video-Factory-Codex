@@ -258,9 +258,9 @@ describe("EpisodeRepo", () => {
     for (const key of ["episodes/e1/run.lock.json", "assets/stills/e1/s1-ab.jpg", "assets/sfx/e1/x.wav", "assets/music/e1/y.wav", "assets/stills/e10/s1.jpg", "assets/abc123", "library/vector/ada.svg"]) {
       await store.put(key, bytes);
     }
-    expect(await deleteEpisode(store, "e1")).toBe(5);
+    expect(await deleteEpisode(store, "e1")).toBe(6);
     expect((await repo.list()).map((s) => s.id)).toEqual(["e10"]);
-    expect((await store.list("")).sort()).toEqual(["assets/abc123", "assets/stills/e10/s1.jpg", "episodes/e10/state.json", "library/vector/ada.svg"]);
+    expect((await store.list("")).sort()).toEqual(["assets/abc123", "assets/stills/e10/s1.jpg", "episodes/e10/state.json", "episodes/e10/summary.json", "library/vector/ada.svg"]);
     await expect(repo.load("e1")).rejects.toThrow();
     expect(await deleteEpisode(store, "e1")).toBe(0);
   });

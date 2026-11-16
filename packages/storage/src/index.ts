@@ -1,10 +1,12 @@
-import { mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
+import type { BigIntStats } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
@@ -22,7 +24,13 @@ export interface AssetStore {
   delete(key: string): Promise<void>;
   /** Atomik koşullu yazma. Beklenen null: anahtar bulunmamalı. Desteklenmiyorsa kilit alınamaz. */
   compareAndSwap?(key: string, expected: Uint8Array | null, bytes: Uint8Array, contentType: string): Promise<boolean>;
+  /** Gövdeyi okumadan değişiklik kimliği; null yalnız bulunmayan anahtardır. */
+  version?(key: string): Promise<string | null>;
+  /** Yazılan nesnenin kendi kimliği; daha sonra aynı yola yazan başka nesneninki değil. */
+  putVersioned?(key: string, bytes: Uint8Array, contentType: string): Promise<string>;
 }
+
+const fileVersion = (s: BigIntStats) => `${s.dev}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
 
 /** Önekle başlayan tüm anahtarları siler (bir bölümün klasörü gibi); silinen sayısını döner. */
 export async function deletePrefix(store: AssetStore, prefix: string): Promise<number> {
@@ -48,6 +56,16 @@ export class FsAssetStore implements AssetStore {
     this.root = resolve(root);
   }
 
+  async version(key: string): Promise<string | null> {
+    try {
+      const s = await stat(this.pathFor(key), { bigint: true });
+      return fileVersion(s);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw e;
+    }
+  }
+
   private pathFor(key: string): string {
     const p = resolve(join(this.root, ...key.split("/")));
     const internal = join(this.root, CAS_DB).toLowerCase();
@@ -59,27 +77,39 @@ export class FsAssetStore implements AssetStore {
   }
 
   async put(key: string, bytes: Uint8Array): Promise<string> {
+    return (await this.write(key, bytes, false)).uri;
+  }
+
+  async putVersioned(key: string, bytes: Uint8Array): Promise<string> {
+    return (await this.write(key, bytes, true)).revision!;
+  }
+
+  private async write(key: string, bytes: Uint8Array, track: boolean): Promise<{ uri: string; revision?: string }> {
     const p = this.pathFor(key);
     await mkdir(dirname(p), { recursive: true });
     // Geçici dosyaya yazıp yeniden adlandırma: okuyan (Stüdyo yoklaması) yarım JSON görmesin, yazarken öldürülen süreç
     // dosyayı kesik bırakmasın.
     const tmp = `${p}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
     await writeFile(tmp, bytes);
-    // Windows'ta virüs tarayıcı/dizinleyici yeni dosyayı kısa süre tutabilir (EPERM/EACCES/EBUSY): ~2 sn yeniden dene.
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await rename(tmp, p);
-        break;
-      } catch (e) {
-        const code = (e as NodeJS.ErrnoException).code;
-        if (attempt >= 8 || !["EPERM", "EACCES", "EBUSY"].includes(code ?? "")) {
-          await rm(tmp, { force: true });
-          throw e;
+    // Açık tanıtıcı yol değiştirilse de kendi dosyamızı gösterir; sonraki yazarın stat'ı alınmaz.
+    const handle = track ? await open(tmp, "r") : undefined;
+    try {
+      // Windows'ta virüs tarayıcı/dizinleyici yeni dosyayı kısa süre tutabilir (EPERM/EACCES/EBUSY): ~2 sn yeniden dene.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await rename(tmp, p);
+          break;
+        } catch (e) {
+          const code = (e as NodeJS.ErrnoException).code;
+          if (attempt >= 8 || !["EPERM", "EACCES", "EBUSY"].includes(code ?? "")) {
+            await rm(tmp, { force: true });
+            throw e;
+          }
+          await new Promise((r) => setTimeout(r, 25 * 2 ** Math.min(attempt, 6)));
         }
-        await new Promise((r) => setTimeout(r, 25 * 2 ** Math.min(attempt, 6)));
       }
-    }
-    return `file://${p.replaceAll("\\", "/")}`;
+      return { uri: `file://${p.replaceAll("\\", "/")}`, revision: handle ? fileVersion(await handle.stat({ bigint: true })) : undefined };
+    } finally { await handle?.close(); }
   }
 
   async compareAndSwap(key: string, expected: Uint8Array | null, bytes: Uint8Array): Promise<boolean> {
@@ -147,6 +177,18 @@ export class S3AssetStore implements AssetStore {
     });
   }
 
+  /** İçerik gövdesini indirmeden nesne kimliği; bilinmeyen hatalar yok sayılmaz. */
+  async version(key: string): Promise<string | null> {
+    try {
+      const result = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (!result.ETag) throw new Error("S3 sürüm okuması için ETag gerekli");
+      return JSON.stringify([result.ETag, result.VersionId]);
+    } catch (e) {
+      if ((e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
+      throw e;
+    }
+  }
+
   /** Kova yoksa oluşturur (yerel RustFS ilk kurulumu için). */
   async ensureBucket(): Promise<void> {
     try {
@@ -161,6 +203,12 @@ export class S3AssetStore implements AssetStore {
       new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: bytes, ContentType: contentType }),
     );
     return `s3://${this.bucket}/${key}`;
+  }
+
+  async putVersioned(key: string, bytes: Uint8Array, contentType: string): Promise<string> {
+    const result = await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: bytes, ContentType: contentType }));
+    if (!result.ETag) throw new Error("S3 sürümlü yazma için ETag gerekli");
+    return JSON.stringify([result.ETag, result.VersionId]);
   }
 
   async compareAndSwap(key: string, expected: Uint8Array | null, bytes: Uint8Array, contentType: string): Promise<boolean> {

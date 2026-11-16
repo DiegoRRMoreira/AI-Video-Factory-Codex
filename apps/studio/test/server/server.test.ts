@@ -45,6 +45,39 @@ afterEach(() => {
 });
 
 describe("Stüdyo sunucusu: kök ve kurulum", () => {
+  it("upgrades a pre-index repository singleton without replacing its store, ledger or jobs", async () => {
+    server.repo();
+    const shared = (globalThis as unknown as { __ys: { repo: unknown; store: unknown; ledger: unknown; jobs: unknown } }).__ys;
+    const { store, ledger, jobs } = shared;
+    shared.repo = { load: async () => ({}) };
+    expect(server.repo().summaries).toBeTypeOf("function");
+    expect((await server.repo().summaries()).episodes).toBeInstanceOf(Array);
+    expect(shared.store).toBe(store); expect(shared.ledger).toBe(ledger); expect(shared.jobs).toBe(jobs);
+  });
+  it("uses snapshot capabilities across bundled module copies instead of constructor identity", async () => {
+    server.ledger();
+    const shared = (globalThis as unknown as { __ys: { ledger: unknown } }).__ys, original = shared.ledger;
+    const foreign = { list: vi.fn(async () => { throw new Error("must use revision metadata"); }),
+      snapshot: vi.fn(async () => ({ entries: [], revision: "foreign-version" })), revision: vi.fn(async () => "foreign-version") };
+    shared.ledger = foreign;
+    try {
+      expect(await server.ledgerRevision()).toBe("foreign-version");
+      expect((await server.ledgerSnapshot()).revision).toBe("foreign-version");
+      expect(foreign.list).not.toHaveBeenCalled();
+      shared.ledger = { snapshot: foreign.snapshot, list: async () => [] };
+      expect((await server.ledgerSnapshot()).revision).toMatch(/^[a-f0-9]{64}$/);
+    } finally { shared.ledger = original; }
+  });
+  it("binds JSONL and database-compatible snapshots to stable revision identities", async () => {
+    const local = await server.ledgerSnapshot();
+    expect(local.revision).toBe(await server.ledgerRevision());
+    process.env.LEDGER = "db"; process.env.DATABASE_URL = "postgres://fake/test"; resetStudio();
+    const db = await server.ledgerSnapshot(); expect(db.entries).toEqual([]);
+    expect(await server.ledgerRevision()).toBe(db.revision);
+    vi.spyOn(server.ledger(), "list").mockResolvedValue([{ at: "now", providerId: "local", capability: "tts", cacheHit: false, estimateMicros: 1, requestHash: "h" }]);
+    expect(await server.ledgerRevision()).not.toBe(db.revision);
+    vi.restoreAllMocks();
+  });
   it("uses supplied global ledger entries without another read, including an empty snapshot", async () => {
     const read = vi.spyOn(JsonlLedger.prototype, "all").mockRejectedValue(new Error("must not read"));
     const entries = [{ at: "t", providerId: "other-provider", capability: "tts" as const, estimateMicros: 1, cacheHit: false, requestHash: "h", episodeId: "another-episode", durationMs: 1234 }];

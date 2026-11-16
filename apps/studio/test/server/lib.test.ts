@@ -44,6 +44,7 @@ describe("statusLabel", () => {
   it("bekleme onaylanacak kapıyı, diğerleri aşamayı söyler", () => {
     expect(statusLabel(t, { status: "waiting", stage: "voice" })).toBe("Onay bekliyor · Konsept");
     expect(statusLabel(t, { status: "waiting", stage: "cast" })).toBe("Onay bekliyor · Senaryo");
+    expect(statusLabel(t, { status: "waiting", stage: "render" })).toBe("Onay bekliyor · Önizleme");
     expect(statusLabel(t, { status: "running", stage: "keyframes" })).toBe("Çalışıyor · Kareler");
     expect(statusLabel(translator("en"), { status: "stalled", stage: "style" })).toBe("Stalled · Style");
   });

@@ -9,7 +9,7 @@ Start with **[Getting started](GETTING_STARTED.md)**, then follow the **[Studio 
 | Guide | What you will find |
 | --- | --- |
 | [Getting started](GETTING_STARTED.md) | Requirements, installation, optional Docker/Manim setup, configuration and updates |
-| [Studio](STUDIO.md) | Create, approve, preview, revise, render, download and delete episodes |
+| [Studio](STUDIO.md) | Search/filter the library, apply series presets, follow next actions, review and export episodes |
 | [CLI](CLI.md) | Episode commands, options, character bank and diagnostics |
 | [Environment diagnostics](DOCTOR.md) | Check local tools without generation or paid calls |
 | [Production features](FEATURES.md) | Pipeline, style packs, reference checks, reuse, sound and cost controls |
@@ -46,7 +46,9 @@ Start with **[Getting started](GETTING_STARTED.md)**, then follow the **[Studio 
 | [Continuous verification](CI.md) | Local/CI checks, retained evidence and release boundaries |
 | [Release ownership and recovery](RELEASE.md) | Release helper behavior and failed-release recovery |
 | [Episode locking](LOCKING.md) | Lock ownership, atomic acquisition and stale-lock rules |
-| [Studio reads](STUDIO_READS.md) | Bounded state reads and episode polling |
+| [Studio reads](STUDIO_READS.md) | Revisioned summary index, lazy panels, recovery and cost snapshots |
+| [System review — 16 November 2026](SYSTEM_REVIEW_2026-11-16.md) | Current verification, reproduced defects, interface review and production gaps |
+| [Development roadmap — 16 November 2026](ROADMAP_2026-11-16.md) | Prioritized work packages, dependencies, acceptance gates and a 90-day planning window |
 | [System review — 11 November 2026](SYSTEM_REVIEW_2026-11-11.md) | Dated review findings and verification scope |
 | [Project plan](PROJE_PLANI.md) (Turkish) | Architecture decisions, research and roadmap |
 | [Changelog](../CHANGELOG.md) | Release history |

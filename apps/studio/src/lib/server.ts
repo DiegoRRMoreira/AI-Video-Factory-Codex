@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -39,7 +40,11 @@ interface Studio {
 const g = globalThis as unknown as { __ys?: Studio };
 
 function init(): Studio {
-  if (g.__ys) return g.__ys;
+  if (g.__ys) {
+    // HMR eski repository örneğini tutabilir; işler ve diğer canlı kaynaklar korunur.
+    if (typeof g.__ys.repo.summaries !== "function") g.__ys.repo = new EpisodeRepo(g.__ys.store);
+    return g.__ys;
+  }
   const envFile = join(ROOT, ".env");
   if (existsSync(envFile)) process.loadEnvFile(envFile);
   const store = createStoreFromEnv(process.env, join(ROOT, ".data", "assets"));
@@ -62,6 +67,25 @@ export const catalog = () => ({ providers: init().providers, skipped: init().ski
 
 export async function ledgerEntries(episodeId?: string): Promise<CostEntry[]> {
   return init().ledger.list(episodeId);
+}
+
+type SnapshotLedger = CostLedger & { snapshot(): Promise<{ entries: CostEntry[]; revision: string }>; revision(): Promise<string> };
+function hasSnapshots(value: CostLedger): value is SnapshotLedger {
+  const candidate = value as SnapshotLedger;
+  // Next paket katmanları global örneği paylaşır; farklı kurucuların instanceof sonucu aynı değildir.
+  return typeof candidate.snapshot === "function" && typeof candidate.revision === "function";
+}
+
+export async function ledgerSnapshot(): Promise<{ entries: CostEntry[]; revision: string }> {
+  const value = init().ledger;
+  if (hasSnapshots(value)) return value.snapshot();
+  const entries = await value.list();
+  return { entries, revision: createHash("sha256").update(JSON.stringify(entries)).digest("hex") };
+}
+
+export async function ledgerRevision(): Promise<string> {
+  const value = init().ledger;
+  return hasSnapshots(value) ? value.revision() : (await ledgerSnapshot()).revision;
 }
 
 export async function episodeSpentUsd(episodeId: string): Promise<number> {

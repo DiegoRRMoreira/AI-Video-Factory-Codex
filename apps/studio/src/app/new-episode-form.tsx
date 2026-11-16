@@ -62,6 +62,7 @@ export function NewEpisodeForm({
   const router = useRouter();
   const { t, fmt, locale } = useI18n();
   const [pack, setPack] = useState<string>(STYLE_AUTO);
+  const [lineStyle, setLineStyle] = useState("");
   const [customStyleId, setCustomStyleId] = useState<string>();
   const [customStyleDirty, setCustomStyleDirty] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -87,6 +88,7 @@ export function NewEpisodeForm({
       const el = f.elements.namedItem(field) as HTMLInputElement | HTMLSelectElement | null;
       if (el && value !== undefined) el.value = String(value);
     };
+    set("series", s.name);
     set("lang", d.lang);
     set("minutes", d.minutes);
     set("tier", d.tier);
@@ -95,6 +97,7 @@ export function NewEpisodeForm({
     // Mod kartları denetimli (state): seçili kart state'ten gelir.
     if (d.motionMode) setMode(d.motionMode);
     if (d.stylePack) setPack(d.stylePack);
+    setLineStyle(d.lineStyle ?? "");
     setCustomStyleId(d.customStyleId);
     setCustomStyleDirty(false);
     scheduleEstimate();
@@ -179,6 +182,7 @@ export function NewEpisodeForm({
   return (
     <form ref={formRef} action={submit} onChange={scheduleEstimate} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="grid content-start gap-6">
+        <p className="text-sm text-muted">{t("form.briefHint")}</p>
         <Section title={t("form.section.topic")}>
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <div>
@@ -205,9 +209,10 @@ export function NewEpisodeForm({
               <textarea id="topic" name="topic" required rows={4} className="field" placeholder={t("form.topic.placeholder")} />
             </div>
           </div>
+          {series.length > 0 && <div className="grid gap-2"><h3 className="text-xs text-muted">{t("form.presets")}</h3><div className="flex flex-wrap gap-2">{series.slice(0, 6).map(s => <button key={s.name} type="button" className="chip max-w-full break-words text-left" onClick={() => applySeries(s.name)} title={t("form.presetHint", { lang: s.defaults.lang.toUpperCase(), minutes: s.defaults.minutes, mode: t(`motion.${s.defaults.motionMode ?? "animated"}`), usd: fmt.usd(s.defaults.budgetUsd) })}>{t("form.preset", { name: s.name })}</button>)}</div></div>}
         </Section>
 
-        <Section title={t("form.section.look")}>
+        <Section title={t("form.section.look")} disclosure={t("form.advancedLook")}>
           <div role="radiogroup" aria-label={t("form.motion")} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {MODES.map((m) => (
               <label
@@ -253,7 +258,7 @@ export function NewEpisodeForm({
             {mode === "vector" && (
               <div>
                 <label className="label" htmlFor="lineStyle">{t("form.lineStyle")}</label>
-                <select id="lineStyle" name="lineStyle" className="field" defaultValue="">
+                <select id="lineStyle" name="lineStyle" className="field" value={lineStyle} onChange={e => setLineStyle(e.target.value)}>
                   <option value="">{t("line.pack")}</option>
                   {(["outline", "flat", "sketch", "ink"] as const).map((s) => (
                     <option key={s} value={s}>{t(`line.${s}`)}</option>
@@ -302,7 +307,7 @@ export function NewEpisodeForm({
           </div>
         </Section>
 
-        <Section title={t("form.section.checks")}>
+        <Section title={t("form.section.checks")} disclosure={t("form.advancedChecks")}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="budgetUsd">{t("form.budget")}</label>
@@ -327,6 +332,7 @@ export function NewEpisodeForm({
       </div>
 
       <aside className="grid content-start gap-4 lg:sticky lg:top-6 lg:self-start">
+        <p className="text-xs text-muted">{t("library.budget", { usd: fmt.usd(budget) })}</p>
         {est && estimates ? (
           <div className={`card grid gap-1 text-sm ${overBudget ? "border-bad/50 bg-bad/10" : ""}`}>
             <div className="flex items-baseline justify-between">
@@ -368,7 +374,8 @@ export function NewEpisodeForm({
 }
 
 /** Formun başlıklı bölümü. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, disclosure }: { title: string; children: ReactNode; disclosure?: string }) {
+  if (disclosure) return <details className="card min-w-0"><summary className="cursor-pointer text-sm font-semibold">{disclosure}</summary><div className="mt-4 grid gap-4">{children}</div></details>;
   return (
     <section className="card grid gap-4">
       <h2 className="text-sm font-semibold tracking-wide text-muted uppercase">{title}</h2>

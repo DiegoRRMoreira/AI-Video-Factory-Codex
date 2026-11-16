@@ -1,0 +1,34 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, expect, it, vi } from "vitest";
+import { S3Client, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { FsAssetStore, S3AssetStore } from "../src/index.ts";
+const roots: string[] = [];
+afterEach(async () => { vi.restoreAllMocks(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+it("versions filesystem replacement/deletion without reading content and preserves path/error guards", async () => {
+  const root = await mkdtemp(join(tmpdir(), "ys-version-")); roots.push(root);
+  const store = new FsAssetStore(root);
+  expect(await store.version("a/state.json")).toBeNull();
+  await store.put("a/state.json", new Uint8Array([1])); const a = await store.version("a/state.json");
+  expect(await store.version("a/state.json")).toBe(a);
+  const own = await store.putVersioned("a/state.json", new Uint8Array([2])); expect(await store.version("a/state.json")).not.toBe(a);
+  expect(await store.version("a/state.json")).toBe(own);
+  await store.delete("a/state.json"); expect(await store.version("a/state.json")).toBeNull();
+  await expect(store.version("../outside")).rejects.toThrow("Geçersiz");
+});
+it("uses S3 HEAD identity, distinguishes absent objects and fails closed on unknown metadata", async () => {
+  const send = vi.spyOn(S3Client.prototype, "send");
+  const store = new S3AssetStore({ endpoint: "http://localhost:9000", region: "auto", bucket: "test", accessKeyId: "test", secretAccessKey: "test" });
+  send.mockResolvedValueOnce({ ETag: '"a"', VersionId: "v1" } as never);
+  expect(await store.version("state")).toBe(JSON.stringify(['"a"', "v1"]));
+  expect(send.mock.calls[0]![0]).toBeInstanceOf(HeadObjectCommand);
+  send.mockResolvedValueOnce({ ETag: '"b"' } as never);
+  expect(await store.version("state")).toBe(JSON.stringify(['"b"', undefined]));
+  send.mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } }); expect(await store.version("state")).toBeNull();
+  send.mockRejectedValueOnce(new Error("denied")); await expect(store.version("state")).rejects.toThrow("denied");
+  send.mockResolvedValueOnce({} as never); await expect(store.version("state")).rejects.toThrow("ETag");
+  send.mockResolvedValueOnce({ ETag: '"put"', VersionId: "v2" } as never);
+  expect(await store.putVersioned("state", new Uint8Array([1]), "application/json")).toBe(JSON.stringify(['"put"', "v2"]));
+  send.mockResolvedValueOnce({} as never); await expect(store.putVersioned("state", new Uint8Array(), "application/json")).rejects.toThrow("ETag");
+});

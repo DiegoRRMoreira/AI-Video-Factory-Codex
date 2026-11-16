@@ -19,6 +19,11 @@ body {
   color: #ececf0;
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 @utility card {
   @apply rounded-2xl border border-line bg-panel p-5;
 }

@@ -11,4 +11,5 @@ export * from "./library.ts";
 export * from "./samples.ts";
 export * from "./settings.ts";
 export * from "./series.ts";
+export * from "./summaries.ts";
 export * from "./lock.ts";

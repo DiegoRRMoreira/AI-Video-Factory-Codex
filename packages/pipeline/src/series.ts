@@ -40,8 +40,9 @@ export interface SeriesSummary {
 }
 
 /** Bölümlerden seri özetleri (en son bölümü olan seri önce). */
-export function summarizeSeries(states: readonly EpisodeState[]): SeriesSummary[] {
-  const map = new Map<string, { summary: SeriesSummary; latest: EpisodeState }>();
+type SeriesEpisode = Pick<EpisodeState, "id" | "createdAt" | "input"> & { render?: unknown; style?: { pack?: string } };
+export function summarizeSeries(states: readonly SeriesEpisode[]): SeriesSummary[] {
+  const map = new Map<string, { summary: SeriesSummary; latest: SeriesEpisode }>();
   for (const s of states) {
     const name = seriesOf(s);
     if (!name) continue;
@@ -62,7 +63,7 @@ export function summarizeSeries(states: readonly EpisodeState[]): SeriesSummary[
   return [...map.values()].map((e) => e.summary).sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
 
-function defaultsOf(s: EpisodeState): SeriesDefaults {
+function defaultsOf(s: SeriesEpisode): SeriesDefaults {
   const { input } = s;
   return {
     lang: input.lang,

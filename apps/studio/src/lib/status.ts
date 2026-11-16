@@ -6,6 +6,6 @@ export function statusLabel(t: Translate, st: { status: RunStatus; stage?: Stage
   const base = t(`status.${st.status}` as MessageKey);
   if (!st.stage || st.status === "done" || st.status === "idle") return base;
   // Bekleme, kapının açtığı aşamada görünür; rozet onaylanacak şeyi söylesin.
-  const what = st.status === "waiting" ? t(st.stage === "voice" ? "step.concept" : "step.script") : t(`stage.${st.stage}` as MessageKey);
+  const what = st.status === "waiting" ? t(st.stage === "render" ? "step.preview" : st.stage === "voice" ? "step.concept" : "step.script") : t(`stage.${st.stage}` as MessageKey);
   return `${base} · ${what}`;
 }

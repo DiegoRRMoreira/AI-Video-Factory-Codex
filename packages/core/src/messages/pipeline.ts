@@ -427,4 +427,6 @@ export const PIPELINE_MESSAGES = {
     tr: "Bu karakter gerçeklik denetimi kapalıyken geçti; gerçeklik açık bölümde kullanılamaz",
     en: "This character passed with the realism check off; it cannot be used in an episode with realism on",
   },
+  "err.summary.changed": { tr: "{id}: bölüm özeti okuma sırasında değişti; yeniden deneyin", en: "{id}: episode summary changed during reading; try again" },
+  "err.summary.identity": { tr: "{id}: bölüm kaydının kimliği klasörüyle eşleşmiyor", en: "{id}: episode identity does not match its folder" },
 } as const;

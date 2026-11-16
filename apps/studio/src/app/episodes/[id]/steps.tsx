@@ -635,7 +635,7 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
           )}
         </div>
       )}
-      {playing && state.done.timeline && <TimelinePlayer id={state.id} shot={playing.shot} seek={playing.seek} />}
+      {playing && state.done.timeline && <TimelinePlayer id={state.id} shot={playing.shot} seek={playing.seek} version={state.done.timeline} />}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">{t("shots.count", { n: shots.length })}</span>
         {state.done.timeline && (

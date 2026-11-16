@@ -146,6 +146,14 @@ Tüm pazar haritası ve konumlandırma için bkz. **§17**.
 
 ### 3.1 Monorepo yapısı (pnpm + Turborepo)
 
+Implementation note (16 November 2026): episode `state.json` remains the authoritative
+production record. Studio now uses a rebuildable per-episode summary manifest with
+source-object identity and conditional publication; it is not a second episode
+database. Detail polling uses revisions and loads only the selected panel. The
+JSONL ledger caches stable parsed snapshots while database ledger queries retain
+their existing behavior. See [Studio read contracts](STUDIO_READS.md) for recovery,
+compatibility, tests and isolated scale measurements.
+
 ```
 AI-Video-Factory/
 ├─ apps/

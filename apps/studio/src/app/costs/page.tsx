@@ -13,7 +13,8 @@ const dollars = (g: CostGroup) => g.micros / 1_000_000;
 const byCost = (a: CostGroup, b: CostGroup) => b.micros - a.micros;
 
 export default async function CostsPage() {
-  const [entries, episodes, { t, fmt, locale }] = await Promise.all([ledgerEntries(), repo().list({ includeTimeline: false }), getI18n()]);
+  const [entries, list, { t, fmt, locale }] = await Promise.all([ledgerEntries(), repo().summaries(), getI18n()]);
+  const episodes = list.episodes;
   const { usd, duration, number } = fmt;
   const stageName = (k: string) => (k.startsWith("cli:") || k === "—" ? k : t(`stage.${k}` as MessageKey));
   const total = groupCosts(entries, () => "total")[0];
@@ -28,7 +29,7 @@ export default async function CostsPage() {
   const finished = episodes
     .filter((e) => e.render && e.input.topic !== "render demo")
     .map((e) => {
-      const sec = Object.values(e.voice ?? {}).reduce((n, v) => n + v.durationMs, 0) / 1000;
+      const sec = e.voiceSec;
       return { sec, usd: (byEpisode.get(e.id)?.micros ?? 0) / 1_000_000 };
     })
     .filter((f) => f.sec > 0);
@@ -74,12 +75,12 @@ export default async function CostsPage() {
               .filter((e) => byEpisode.has(e.id))
               .map((e) => {
                 const g = byEpisode.get(e.id)!;
-                const sec = Object.values(e.voice ?? {}).reduce((n, v) => n + v.durationMs, 0) / 1000;
+                const sec = e.voiceSec;
                 return (
                   <tr key={e.id} className="border-b border-line/50">
                     <td className="py-2 pr-3">
                       <Link href={`/episodes/${e.id}`} className="hover:text-accent">
-                        {e.story?.title ?? e.input.topic}
+                        {e.title ?? e.input.topic}
                       </Link>
                       {e.render && <span className="ml-2 text-xs text-ok">{t("costs.videoReady")}</span>}
                     </td>

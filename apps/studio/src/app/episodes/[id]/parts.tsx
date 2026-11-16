@@ -5,6 +5,7 @@ import { scenesBelow } from "@ys/core/rules";
 import { AlertTriangle, Check, CircleDashed, Hourglass, Loader2, PauseCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Formatters, MessageKey } from "../../../lib/i18n";
+import type { EpisodeResponse } from "../../../lib/types";
 
 export const asset = (key: string) => `/api/assets/${key}`;
 export const stageKey = (s: string) => `stage.${s}` as MessageKey;
@@ -45,6 +46,24 @@ export const STAGE_GROUPS: { key: "pre" | "prod" | "post"; stages: Stage[] }[] =
 
 export const AFTER_SCRIPT: Stage[] = ["cast", "concept"];
 export const AFTER_CONCEPT: Stage[] = ["voice", "shots", "keyframes", "clips", "timeline", "render", "package", "short", "review"];
+
+/** Onaydan/devamdan sonraki ilk kapıya kadar; tamamlanmış aşamalar yeniden fiyatlanmaz. */
+export function nextWork(data: EpisodeResponse) {
+  const { state, status } = data, stages = STAGE_GROUPS.flatMap(g => g.stages);
+  const start = status.stage ? stages.indexOf(status.stage) : stages.findIndex(s => !state.done[s]);
+  const affected: Stage[] = [];
+  for (let i = start; i >= 0 && i < stages.length; i++) {
+    const stage = stages[i]!;
+    if (state.done[stage]) continue;
+    const gate = stage === "cast" ? "script" : stage === "voice" ? "concept" : stage === "render" ? "preview" : undefined;
+    const cleared = gate === "preview" && data.counts?.draftBelow ? Boolean(state.approvals?.preview) : gate ? approved(state, gate) : true;
+    if (!cleared && !(i === start && status.status === "waiting")) break;
+    affected.push(stage);
+  }
+  const rows = data.estimates[modeOf(state.input)].rows.filter(r => affected.includes(r.stage));
+  return { stages: affected, usd: rows.reduce((n, r) => n + r.costUsd, 0), seconds: rows.reduce((n, r) => n + r.seconds, 0),
+    local: affected.length > 0 && affected.every(s => ["timeline", "render", "short"].includes(s)) };
+}
 
 /** Verilen aşamaların tahmini toplamı: "~$1.20 · ~4 dk". */
 export function costOf(est: EpisodeEstimate, stages: Stage[], { usd, duration }: Formatters): string {

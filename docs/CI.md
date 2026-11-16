@@ -12,6 +12,11 @@
 
 The default test run deliberately skips the two database/S3 integration cases. The separate integration job enables them with `--mode integration`; its failure is independent of the unit/coverage result. Existing coverage thresholds remain 100% for statements, branches, functions and lines.
 
+Normal test discovery is limited to `apps/*/test`, `packages/*/test` and `scripts`
+(`*.test.ts[x]` / `*.spec.ts[x]`). Retained evidence and partial source copies in
+`.temp_files`, output directories or other scratch locations do not join that suite.
+Special targets such as real-Git release integration keep their explicit configuration.
+
 FFmpeg and ffprobe are installed explicitly so real encoded-video audit tests run. These fixtures exercise moving footage, black frames, freezes, silence and shot-level audio gaps, including negative assertions. The media job also exercises the actual Remotion bundler/browser/encoder with the existing offline demo. Its store and ledger are created under `out/ci/render`, away from a developer's episodes and `.env`.
 
 The media job supplies no provider credentials. It checks that the render ledger is empty. The quality fixture separately asserts zero generation charges, persists a decision against a main export, audits a portrait Short and rejects carrying that decision to another export identity. Downloading dependencies and Remotion's browser requires network access; no paid generation is part of these jobs.
@@ -19,6 +24,15 @@ The media job supplies no provider credentials. It checks that the render ledger
 Technical audit completion is not editorial approval. This smoke test does not certify every vector style, GPU backend, external provider or a complete newly authored episode. HyperFrames production integration is outside this workflow.
 
 ## Run the same gates locally
+
+Run these heavyweight stages sequentially, waiting for each command to finish. Avoid
+overlapping coverage and Studio builds on a busy development machine. A November
+2026 Windows build failed during 31-worker page-data collection while other work was
+active; the identical serial build passed. This does not establish a memory leak or
+prove a worker-count repair. The installed Next.js build supports
+`experimental.cpus` as an explicit worker override; evaluate a lower count against
+the same source and workload before adopting it. No build-worker override or larger
+heap is enabled by default.
 
 ```sh
 pnpm install --frozen-lockfile

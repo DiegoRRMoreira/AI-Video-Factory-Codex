@@ -1,20 +1,38 @@
 import { rm } from "node:fs/promises";
 import { msg } from "@ys/core/messages";
 import { groupCosts, mediaSpentMicros } from "@ys/media-gateway";
-import { deleteEpisode, estimateEpisode, lineStyleOf, listLibraryCharacters, motionModeOf, progressOf, runStatusOf, type MotionMode } from "@ys/pipeline/light";
+import { deleteEpisode, episodeRevision, estimateEpisode, lineStyleOf, listLibraryCharacters, motionModeOf, progressOf, runStatusOf, summarizeEpisode, summaryProgress, summaryStatus, type MotionMode } from "@ys/pipeline/light";
+import { panelPayload, responseRevision, selectedPanel } from "../../../../lib/episode-payload";
 import { apiError, errorResponse, isMissingEpisode, textResponse } from "../../../../lib/api";
-import { episodeBusy, estimateContext, forgetJob, getJob, ledgerEntries, quotaOf, repo, store, workDirOf } from "../../../../lib/server";
+import { episodeBusy, estimateContext, forgetJob, getJob, ledgerRevision, ledgerSnapshot, quotaOf, repo, store, workDirOf } from "../../../../lib/server";
 import type { EpisodeResponse, QuotaView } from "../../../../lib/types";
 
 const MODES: MotionMode[] = ["animated", "mixed", "still", "vector"];
 const EPISODE_ID = /^[a-z0-9][a-z0-9-]{0,120}$/;
 
+async function liveStatus(id: string, state: { heartbeatAt?: string }, status: EpisodeResponse["status"]) {
+  if (getJob(id)?.status === "running") await episodeBusy(id, state, status.status);
+  const job = getJob(id) ?? null;
+  if (job?.status === "running" && status.status === "stalled" && await episodeBusy(id, state, "stalled")) status.status = "running";
+  if (status.status === "stalled" && await episodeBusy(id, state, "stalled")) status.status = "running";
+  else if (status.status === "running" && !await episodeBusy(id, state, "running")) status.status = job?.status === "error" ? "error" : "idle";
+  return { job, status };
+}
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   if (!EPISODE_ID.test(id)) return textResponse(req, msg("api.badEpisode"), 400);
   try {
+    if (req.headers.get("x-ys-status") === "1") {
+      const [summary, costs] = await Promise.all([repo().summary(id), ledgerRevision()]);
+      const { status, job } = await liveStatus(id, summary, { ...summaryStatus(summary) });
+      const panel = selectedPanel(req.headers.get("x-ys-panel"), status);
+      const revision = responseRevision(summary.revision, costs, job, panel, !summary.done.voice);
+      return Response.json({ revision, summary, status, progress: summaryProgress(summary) ?? null }, { headers: { "cache-control": "no-store" } });
+    }
     // Harcama, dökümler ve tüm sağlayıcıların gecikmeleri aynı tek snapshot'tan hesaplanır.
-    const [state, allEntries] = await Promise.all([repo().load(id), ledgerEntries()]);
+    const [state, costSnapshot] = await Promise.all([repo().load(id), ledgerSnapshot()]);
+    const allEntries = costSnapshot.entries;
     const entries = allEntries.filter((e) => e.episodeId === id);
     const estimateCtx = await estimateContext(allEntries);
     const estimates = Object.fromEntries(MODES.map((m) => [m, estimateEpisode(state, estimateCtx, m)])) as EpisodeResponse["estimates"];
@@ -33,16 +51,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       }
     }
 
-    const status = runStatusOf(state);
-    // Pipeline'ı bitmiş ama süreci kapanmamış iş (ölü iş) burada da temizlenir: aksi halde "devam" düğmesi kilitli kalır.
-    if (getJob(id)?.status === "running") await episodeBusy(id, state, status.status);
-    const job = getJob(id) ?? null;
-    // Stüdyo'nun başlattığı süreç yaşıyorsa (ör. uzun bir ajan çağrısında) takılmış sayılmaz.
-    if (job?.status === "running" && status.status === "stalled" && (await episodeBusy(id, state, "stalled"))) status.status = "running";
-    // İptal edilen/çöken Stüdyo işi aşamayı kapatamadı: dosyadaki "sürüyor" bayat, kullanıcı devam ettirebilsin.
-    // Kilidin sahibi yaşıyorsa (uzun bir ajan çağrısı) "takıldı" değil; ölmüşse "sürüyor" bayat (iptal, çökme).
-    if (status.status === "stalled" && (await episodeBusy(id, state, "stalled"))) status.status = "running";
-    else if (status.status === "running" && !(await episodeBusy(id, state, "running"))) status.status = job?.status === "error" ? "error" : "idle";
+    const { status, job } = await liveStatus(id, state, runStatusOf(state));
     // Konsept sekmesinde "Kütüphaneden kullan": aynı stil ve çizgi stilindeki onaylı karakterler.
     const library =
       motionModeOf(state.input) === "vector" && state.style && state.cast && !state.approvals?.concept
@@ -65,6 +74,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       progress: progressOf(state) ?? null,
       quota,
     };
+    if (req.headers.has("x-ys-panel")) {
+      const panel = selectedPanel(req.headers.get("x-ys-panel"), status);
+      body.revision = responseRevision(episodeRevision(state), costSnapshot.revision, job, panel, !state.done.voice);
+      body.counts = summarizeEpisode(state).counts;
+      return Response.json(panelPayload(body, panel), { headers: { "cache-control": "no-store" } });
+    }
     return Response.json(body);
   } catch (e) {
     // Yalnız "bölüm yok" 404'tür; okunamayan defter ya da tahmin hatası "bulunamadı" gibi görünmesin.

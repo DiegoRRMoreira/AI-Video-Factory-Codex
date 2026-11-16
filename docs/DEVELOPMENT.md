@@ -26,6 +26,11 @@ The checked-in GitHub workflow runs coverage, types, the Studio build, an offlin
 disposable PostgreSQL/RustFS integration. See [Continuous verification](CI.md) for local commands, retained
 evidence and release boundaries.
 
+Run coverage and production builds sequentially. Normal Vitest discovery includes
+the workspace `test` directories and `scripts` only, so retained scratch/staging
+copies can stay on disk. Use an explicit runner configuration for audit proofs
+outside those locations.
+
 | Command | What it does |
 |---|---|
 | `pnpm studio` / `studio:build` / `studio:start` | Studio in development or production mode |

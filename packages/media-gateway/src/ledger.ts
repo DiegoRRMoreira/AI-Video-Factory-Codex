@@ -1,6 +1,8 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { dirname } from "node:path";
 import type { Capability, Micros } from "@ys/core";
+import { LocalizedError, msg } from "@ys/core";
 
 export interface CostEntry {
   at: string;
@@ -51,7 +53,20 @@ export class InMemoryLedger implements CostLedger {
 
 /** Veritabanı olmadan da maliyet geçmişi kalsın diye JSONL dosyası. */
 export class JsonlLedger implements CostLedger {
+  private cached?: { revision: string; entries: CostEntry[] };
+  private reading?: Promise<{ revision: string; entries: CostEntry[] }>;
+  private readonly versions = new WeakMap<CostEntry[], string>();
   constructor(private readonly path: string) {}
+
+  async revision(): Promise<string> {
+    try {
+      const s = await stat(this.path, { bigint: true });
+      return `${s.dev}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return "missing";
+      throw e;
+    }
+  }
 
   async record(entry: CostEntry): Promise<void> {
     await mkdir(dirname(this.path), { recursive: true });
@@ -59,16 +74,33 @@ export class JsonlLedger implements CostLedger {
   }
 
   async all(): Promise<CostEntry[]> {
-    try {
-      const text = await readFile(this.path, "utf8");
-      return text
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as CostEntry);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
-      throw e;
+    const revision = await this.revision();
+    let snapshot = this.cached;
+    if (snapshot?.revision !== revision) {
+      if (!this.reading) this.reading = this.readStable().finally(() => { this.reading = undefined; });
+      snapshot = await this.reading;
     }
+    const entries = structuredClone(snapshot.entries);
+    this.versions.set(entries, snapshot.revision);
+    return entries;
+  }
+
+  private async readStable(): Promise<{ revision: string; entries: CostEntry[] }> {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const before = await this.revision();
+      const text = await readFile(this.path, "utf8").catch((e: NodeJS.ErrnoException) => { if (e.code === "ENOENT") return ""; throw e; });
+      const after = await this.revision();
+      if (before !== after) continue;
+      const entries = text.split("\n").filter(Boolean).map((line) => JSON.parse(line) as CostEntry);
+      this.cached = { revision: after, entries };
+      return this.cached;
+    }
+    throw new LocalizedError(msg("err.ledger.changed"));
+  }
+
+  async snapshot(): Promise<{ revision: string; entries: CostEntry[] }> {
+    const entries = await this.all();
+    return { revision: this.versions.get(entries) ?? createHash("sha256").update(JSON.stringify(entries)).digest("hex"), entries };
   }
 
   async spent(episodeId: string): Promise<Micros> {

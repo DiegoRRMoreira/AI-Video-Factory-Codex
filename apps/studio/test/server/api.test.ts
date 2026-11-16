@@ -28,6 +28,7 @@ const root = await vi.hoisted(async () => {
 const server = await import("../../src/lib/server.ts");
 const assets = await import("../../src/app/api/assets/[...key]/route.ts");
 const episodes = await import("../../src/app/api/episodes/route.ts");
+const episodeIndex = await import("../../src/app/api/episodes/index/route.ts");
 const episode = await import("../../src/app/api/episodes/[id]/route.ts");
 const action = await import("../../src/app/api/episodes/[id]/action/route.ts");
 const video = await import("../../src/app/api/episodes/[id]/video/route.ts");
@@ -81,6 +82,82 @@ beforeEach(() => {
   registry.skipped = [];
 });
 afterEach(() => vi.restoreAllMocks());
+
+describe("revisioned episode summaries and panel reads", () => {
+  it("combines style and approval queue filters without starting generation or modifying state", async () => {
+    const state = await saveEpisode("c-queue", { done: { style: "t", story: "t", script: "t" } }, { topic: "Queue test", stylePack: "flat-explainer" });
+    const get = vi.spyOn(server.store(), "get");
+    const response = await episodes.GET(new Request("http://localhost/api/episodes?q=Queue&style=flat-explainer&queue=script&sort=oldest"));
+    expect((await response.json()).episodes.map((e: EpisodeState) => e.id)).toEqual([state.id]);
+    expect(get.mock.calls.some(([key]) => key.endsWith("/state.json"))).toBe(false);
+    expect(spawn).not.toHaveBeenCalled();
+    expect((await episodes.GET(new Request("http://localhost/api/episodes?queue=invalid"))).status).toBe(400);
+    expect(await load(state.id)).toEqual(state);
+  });
+  it("updates live progress estimates without changing or reloading the source revision", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const now = Date.UTC(2026, 10, 16, 12, 0, 10); vi.setSystemTime(now);
+    try {
+      const scene = { id: "s1", beatId: "b", narration: "Speech", emotion: "calm", visualIntent: "", location: "room" };
+      await saveEpisode("progress-clock", { stats: { voice: { startedAt: new Date(now - 2000).toISOString() } }, heartbeatAt: new Date(now).toISOString(),
+        script: { scenes: [scene, { ...scene, id: "s2" }] }, voice: { s1: { key: "voice", mimeType: "audio/wav", durationMs: 1000, words: [], estimatedTiming: false } } });
+      const request = () => episode.GET(new Request("http://localhost/api", { headers: { "x-ys-status": "1" } }), params({ id: "progress-clock" }));
+      const first = await (await request()).json(); expect(first.progress.etaSec).toBe(2);
+      vi.setSystemTime(now + 8000);
+      const next = await (await request()).json(); expect(next.revision).toBe(first.revision); expect(next.progress.etaSec).toBe(10);
+    } finally { vi.useRealTimers(); }
+  });
+  it("returns a bounded warm status without parsing state and binds it to the actual panel response", async () => {
+    const id = "summary-heavy";
+    await saveEpisode(id, { done: { voice: "t" }, timeline: { vectorAssets: { svg: "x".repeat(500_000) } } as any,
+      script: { scenes: [{ id: "s1", beatId: "b", narration: "Narration", emotion: "calm", visualIntent: "", location: "room" }] },
+      shots: [{ id: "sh1", sceneId: "s1", kind: "still_motion", startMs: 0, endMs: 1000, description: "Description", imagePrompt: "", motionPrompt: "", camera: "static", vector: { layers: [], texts: [], large: "x".repeat(200_000) } as any }] }, { topic: "t".repeat(100_000) });
+    const read = vi.spyOn(server.store(), "get");
+    const headers = { "x-ys-status": "1", "x-ys-panel": "script" };
+    const status = await episode.GET(new Request("http://localhost/api", { headers }), params({ id }));
+    const text = await status.text(), compact = JSON.parse(text);
+    expect(text.length).toBeLessThan(25 * 1024); expect(compact.summary.counts.shots).toBe(1);
+    expect(read.mock.calls.some(([key]) => key.endsWith("/state.json"))).toBe(false);
+    const detail = await (await episode.GET(new Request("http://localhost/api", { headers: { "x-ys-panel": "script" } }), params({ id }))).json();
+    expect(detail.revision).toBe(compact.revision); expect(detail.state.script.scenes[0].narration).toBe("Narration");
+    expect(detail.state.shots).toBeUndefined(); expect(detail.counts.shots).toBe(1); expect(detail.state.timeline).toBeUndefined();
+    const shots = await (await episode.GET(new Request("http://localhost/api", { headers: { "x-ys-panel": "shots" } }), params({ id }))).json();
+    expect(shots.state.shots[0].vector).toBeUndefined(); expect(shots.state.shots[0].description).toBe("Description");
+    const oldRevision = compact.revision;
+    await server.ledger().record({ at: "now", providerId: "local", capability: "tts", estimateMicros: 1, cacheHit: false, requestHash: "h", episodeId: id });
+    const changed = await (await episode.GET(new Request("http://localhost/api", { headers }), params({ id }))).json();
+    expect(changed.revision).not.toBe(oldRevision);
+    const missing = await episode.GET(new Request("http://localhost/api", { headers }), params({ id: "missing-summary" })); expect(missing.status).toBe(404);
+    vi.spyOn(server.repo(), "summary").mockRejectedValueOnce(new Error("injected metadata failure"));
+    expect((await episode.GET(new Request("http://localhost/api", { headers }), params({ id }))).status).toBe(500);
+  });
+
+  it("paginates/filter/sorts list queries while retaining the legacy array response", async () => {
+    for (const id of ["page-a", "page-b", "page-c"]) await saveEpisode(id, {}, { topic: id, series: id === "page-c" ? undefined : "Series" });
+    const request = (q: string) => episodes.GET(new Request(`http://localhost/api/episodes?${q}`));
+    const page = await (await request("limit=1&offset=1&sort=oldest&series=series")).json();
+    expect(page.total).toBe(2); expect(page.episodes[0].id).toBe("page-b");
+    expect((await (await request("q=page-c&status=idle")).json()).total).toBe(1);
+    expect((await (await request("series=-&q=page-")).json()).total).toBe(1);
+    for (const q of ["limit=0", "limit=101", "limit=1.5", "offset=-1", "offset=x", "status=invalid"]) expect((await request(q)).status).toBe(400);
+    expect(Array.isArray(await (await request("")).json())).toBe(true);
+    expect(Array.isArray(await (await episodes.GET()).json())).toBe(true);
+  });
+
+  it("rebuilds only the derived index and discloses unreadable records", async () => {
+    const original = await saveEpisode("rebuild-good");
+    await server.store().put("episodes/rebuild-good/summary.json", new TextEncoder().encode("bad"), "application/json");
+    await server.store().put("episodes/rebuild-bad/state.json", new TextEncoder().encode("bad"), "application/json");
+    expect((await episodeIndex.POST(post({}))).status).toBe(400);
+    expect((await episodeIndex.POST(post(null))).status).toBe(400);
+    const result = await (await episodeIndex.POST(post({ rebuild: true }))).json();
+    expect(result.notices).toEqual([{ id: "rebuild-bad", reason: "unreadable" }]);
+    expect(await load("rebuild-good")).toEqual(original); expect(spawn).not.toHaveBeenCalled();
+    await server.store().delete("episodes/rebuild-bad/state.json");
+    vi.spyOn(server.repo(), "summaries").mockRejectedValueOnce(new Error("index denied"));
+    expect((await episodeIndex.POST(post({ rebuild: true }))).status).toBe(500);
+  });
+});
 
 describe("narration impact and revision API", () => {
   it("bounds preview requests and estimates a reviewed vector edit with an available voice provider", async () => {
@@ -388,11 +465,10 @@ describe("/api/episodes", () => {
   it("GET listing retains no timelines while the stored state stays complete", async () => {
     const timeline = { vectorAssets: { svg: "x".repeat(256_000) } } as unknown as EpisodeState["timeline"];
     await saveEpisode("e-list-heavy", { timeline });
-    const list = vi.spyOn(server.repo(), "list");
+    const reads = vi.spyOn(server.store(), "get");
     const response = await episodes.GET();
     expect(response.status).toBe(200);
-    const retained = await list.mock.results[0]!.value;
-    expect(retained.every((s: EpisodeState) => !("timeline" in s))).toBe(true);
+    expect(reads.mock.calls.some(([key]) => key.endsWith("/state.json"))).toBe(false);
     expect((await load("e-list-heavy")).timeline).toEqual(timeline);
   });
 

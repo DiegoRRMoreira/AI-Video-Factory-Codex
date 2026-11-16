@@ -80,11 +80,13 @@ describe("EpisodeView: yükleme ve üst bilgi", () => {
     expect(screen.getByRole("link", { name: tr("nav.episodes") }).getAttribute("href")).toBe("/");
   });
 
-  it("başarısız GET veriyi değiştirmez (yükleniyor kalır)", async () => {
+  it("discloses an initial GET failure and offers retry instead of remaining in loading", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({ error: "x" }, 500)));
     renderIn(<EpisodeView id={ID} />);
     await act(async () => {});
-    expect(screen.getByText(tr("common.loading"))).toBeTruthy();
+    expect(screen.queryByText(tr("common.loading"))).toBeNull();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("button", { name: tr("common.retry") })).toBeTruthy();
   });
 
   it("seri etiketi bağlantıdır; kalemle düzenlenir, kaydedilir ya da vazgeçilir", async () => {
@@ -147,6 +149,9 @@ describe("EpisodeView: sekmeler", () => {
 
   it("aşama şeridinden aşamaya tıklanınca günlük o aşamaya süzülür", async () => {
     await show(makeData(makeState({ activity })));
+    const disclosure = screen.getByText(new RegExp(tr("next.details"))).closest("details")!;
+    expect(disclosure.open).toBe(false);
+    fireEvent.click(disclosure.querySelector("summary")!);
     await click(screen.getAllByTitle(tr("pipe.open"))[1]!);
     expect(window.location.hash).toBe("#activity");
     expect(screen.getByRole("button", { name: tr("stage.story") }).className).toContain("chip-on");
@@ -158,6 +163,23 @@ describe("EpisodeView: sekmeler", () => {
 });
 
 describe("EpisodeView: durum panelleri", () => {
+  it("offers script creation, discloses local-only work and opens a completed output without generation", async () => {
+    const first = await show(makeData(makeState(), { status: { status: "idle", stage: "style" } }));
+    await click(screen.getByRole("button", { name: tr("next.openScript") }));
+    expect(first.actions).toEqual([]);
+    expect(window.location.hash).toBe("#script");
+    await click(screen.getByRole("button", { name: tr("script.generate") }));
+    expect(first.actions).toEqual([{ type: "generate-script" }]);
+    cleanup(); window.location.hash = "";
+    await show(makeData(makeState({ done: { package: "t", review: "t" } }), { status: { status: "waiting", stage: "render" } }));
+    expect(screen.getByText(tr("next.local"))).toBeTruthy();
+    expect(screen.queryByText(tr("next.paid"))).toBeNull();
+    cleanup(); window.location.hash = "#costs";
+    const done = await show(makeData(makeState(), { status: { status: "done" } }));
+    await click(screen.getByRole("button", { name: tr("next.export") }));
+    expect(window.location.hash).toBe("#overview");
+    expect(done.actions).toEqual([]);
+  });
   const stats = {
     style: { startedAt: "2026-10-31T10:00:00Z", endedAt: "2026-10-31T10:00:30Z", durationMs: 30_000 },
     keyframes: { startedAt: "2026-10-31T10:08:00Z" },
@@ -270,6 +292,8 @@ describe("EpisodeView: durum panelleri", () => {
     await show(makeData(makeState(), { status: { status: "waiting", stage: "cast" } }));
     expect(screen.getByRole("tab", { name: tr("tab.script") }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByText(tr("live.waiting.script"))).toBeTruthy();
+    expect(screen.getByText(tr("next.reviewOnly"))).toBeTruthy();
+    expect(screen.getByText(tr("next.work", { stages: `${tr("stage.cast")}, ${tr("stage.concept")}` }))).toBeTruthy();
     expect(screen.getAllByText(`${tr("status.waiting")} · ${tr("step.script")}`).length).toBeGreaterThan(0);
     await click(screen.getByRole("tab", { name: tr("tab.costs") }));
     await click(screen.getByRole("button", { name: tr("live.goApprove") }));
@@ -287,6 +311,7 @@ describe("EpisodeView: durum panelleri", () => {
     await show(makeData(makeState(), { status: { status: "waiting", stage: "render" } }));
     expect(screen.getByRole("tab", { name: tr("tab.shots") }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByText(tr("live.waiting.shots"))).toBeTruthy();
+    expect(screen.getAllByText(`${tr("status.waiting")} · ${tr("step.preview")}`).length).toBeGreaterThan(0);
     await click(screen.getByRole("tab", { name: tr("tab.costs") }));
     await click(screen.getByRole("button", { name: tr("live.goApprove") }));
     expect(window.location.hash).toBe("#shots");
@@ -348,6 +373,152 @@ describe("EpisodeView: eylem hataları", () => {
 });
 
 describe("EpisodeView: yenileme aralıkları", () => {
+  it("polls only compact status for an unchanged revision and loads new panel data on demand", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    let version = "v1";
+    const request = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>;
+      const panel = headers["x-ys-panel"] === "auto" ? "overview" : headers["x-ys-panel"];
+      const revision = `${version}:${panel}`;
+      if (headers["x-ys-status"]) return json({ revision, status: { status: "idle" }, progress: null });
+      return json({ ...makeData(makeState({ story: { title: version } as EpisodeState["story"] })), panel, revision, counts: { shots: 4, activity: 9, claims: 0, draftBelow: 0 } });
+    });
+    vi.stubGlobal("fetch", request);
+    renderIn(<EpisodeView id={ID} />); await act(async () => {});
+    expect(screen.getByRole("heading", { name: "v1" })).toBeTruthy();
+    expect(request.mock.calls.filter(([, init]) => !(init!.headers as Record<string, string>)["x-ys-status"])).toHaveLength(1);
+    await act(async () => void (await vi.advanceTimersByTimeAsync(10_000)));
+    expect(request.mock.calls.filter(([, init]) => !(init!.headers as Record<string, string>)["x-ys-status"])).toHaveLength(1);
+    version = "v2";
+    await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
+    expect(screen.getByRole("heading", { name: "v2" })).toBeTruthy();
+    await click(screen.getByRole("tab", { name: new RegExp(`^${tr("tab.costs")}`) }));
+    expect(request.mock.calls.at(-1)![1]!.headers).toEqual({ "x-ys-panel": "costs" });
+    expect(screen.getByText(tr("ct.col.basis"))).toBeTruthy();
+    expect(screen.getByRole("tab", { name: new RegExp(`^${tr("tab.shots")}.*4`) })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: new RegExp(`^${tr("tab.activity")}.*9`) })).toBeTruthy();
+  });
+
+  it.each(["metadata", "invalid-status", "detail", "invalid-detail"])("reports %s errors in the revision protocol", async (failure) => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls++;
+      if (failure === "metadata") return json({});
+      if (failure === "invalid-status") return json({ revision: "invalid" });
+      if (calls === 1) return json({ revision: "new", status: { status: "idle" }, progress: null });
+      return failure === "detail" ? json({}, 500) : json({});
+    }));
+    renderIn(<EpisodeView id={ID} />); await act(async () => {});
+    expect(screen.getByRole("alert").textContent).toContain(tr("episode.loadFailed"));
+    expect(screen.queryByText(tr("common.loading"))).toBeNull();
+  });
+
+  it("waits for the newly selected panel and ignores an obsolete full-panel response", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    let version = "v1", hold = false, release!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>, panel = headers["x-ys-panel"] === "auto" ? "overview" : headers["x-ys-panel"];
+      const revision = `${version}:${panel}`;
+      if (headers["x-ys-status"]) return json({ revision, status: { status: "idle" }, progress: null });
+      if (hold && panel === "overview") return new Promise<Response>(r => { release = r; });
+      return json({ ...makeData(makeState({ story: { title: version } as EpisodeState["story"] })), panel, revision });
+    }));
+    renderIn(<EpisodeView id={ID} />); await act(async () => {});
+    version = "v2"; hold = true;
+    await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
+    await click(screen.getByRole("tab", { name: tr("tab.costs") }));
+    expect(screen.getByText(tr("ct.col.basis"))).toBeTruthy();
+    await act(async () => { release(json({ ...makeData(makeState({ story: { title: "obsolete" } as EpisodeState["story"] })), panel: "overview", revision: "old" })); });
+    expect(screen.queryByRole("heading", { name: "obsolete" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "v2" })).toBeTruthy();
+  });
+
+  it("does not render empty placeholder controls while a requested panel is loading", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    let release!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>, panel = headers["x-ys-panel"] === "auto" ? "overview" : headers["x-ys-panel"];
+      if (headers["x-ys-status"]) return json({ revision: panel, status: { status: "idle" }, progress: null });
+      if (panel === "script") return new Promise<Response>(r => { release = r; });
+      return json({ ...makeData(makeState()), panel, revision: panel });
+    }));
+    renderIn(<EpisodeView id={ID} />); await act(async () => {});
+    await click(screen.getByRole("tab", { name: tr("tab.script") }));
+    expect(screen.getByText(tr("common.loading"))).toBeTruthy();
+    expect(screen.queryByRole("button", { name: tr("script.generate") })).toBeNull();
+    await act(async () => { release(json({ ...makeData(makeState()), panel: "script", revision: "script" })); });
+    expect(screen.queryByText(tr("common.loading"))).toBeNull();
+  });
+
+  it.each(["network", "json", "http"])("shows a safe localized initial error for %s failures and retries automatically", async (failure) => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    const request = vi.fn(async (): Promise<Response> => {
+      if (failure === "network") throw new Error("private transport detail");
+      if (failure === "json") return new Response("<html>private response</html>");
+      return json({ error: "private server detail" }, 500);
+    });
+    vi.stubGlobal("fetch", request);
+    renderIn(<EpisodeView id={ID} />, "en");
+    await act(async () => {});
+    expect(screen.getByRole("alert").textContent).toContain(en("episode.loadFailed"));
+    expect(screen.getByRole("button", { name: en("common.retry") })).toBeTruthy();
+    expect(document.body.textContent).not.toContain("private");
+    expect(screen.queryByText(en("common.loading"))).toBeNull();
+    request.mockResolvedValue(json(makeData(makeState())));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
+    expect(screen.getByRole("heading", { name: makeState().input.topic })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("retries immediately without a scheduled poll interrupting the manual retry", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    const request = vi.fn().mockResolvedValueOnce(json({}, 503));
+    vi.stubGlobal("fetch", request);
+    const view = renderIn(<EpisodeView id={ID} />);
+    await act(async () => {});
+    let finish!: (response: Response) => void;
+    request.mockImplementationOnce(() => new Promise<Response>((resolve) => { finish = resolve; }));
+    await click(screen.getByRole("button", { name: tr("common.retry") }));
+    expect(request).toHaveBeenCalledTimes(2);
+    expect((screen.getByRole("button", { name: tr("common.retrying") }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => void (await vi.advanceTimersByTimeAsync(10_000)));
+    expect(request).toHaveBeenCalledTimes(2);
+    await act(async () => { finish(json(makeData(makeState()))); });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("heading", { name: makeState().input.topic })).toBeTruthy();
+    view.unmount();
+  });
+
+  it("keeps the last loaded episode visible with a stale warning until refresh recovers", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    const data = makeData(makeState());
+    const { fetchMock } = mockApi(data);
+    renderIn(<EpisodeView id={ID} />, "en");
+    await act(async () => {});
+    fetchMock.mockResolvedValueOnce(json({}, 500));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
+    expect(screen.getByRole("alert").textContent).toContain(en("episode.stale"));
+    expect(screen.getByRole("heading", { name: data.state.input.topic })).toBeTruthy();
+    await click(screen.getByRole("button", { name: en("common.retry") }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("ignores an obsolete poll failure after an action obtains a newer response", async () => {
+    vi.useRealTimers(); vi.useFakeTimers();
+    const data = makeData(makeState({ script: { scenes: [] } as EpisodeState["script"] }), { status: { status: "idle", stage: "voice" } });
+    const { fetchMock } = mockApi(data);
+    const view = renderIn(<EpisodeView id={ID} />);
+    await act(async () => {});
+    let fail!: (error: Error) => void;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((_resolve, reject) => { fail = reject; }));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
+    await click(screen.getByRole("button", { name: tr("live.continue") }));
+    await act(async () => { fail(new Error("obsolete failure")); });
+    expect(screen.queryByRole("alert")).toBeNull();
+    view.unmount();
+  });
+
   it("times out a stuck poll, retries, and aborts its request on unmount", async () => {
     vi.useRealTimers();
     vi.useFakeTimers();
@@ -361,6 +532,7 @@ describe("EpisodeView: yenileme aralıkları", () => {
     await act(async () => {});
     await act(async () => void (await vi.advanceTimersByTimeAsync(30_000)));
     expect(aborted).toBe(1);
+    expect(screen.getByRole("alert").textContent).toContain(tr("episode.loadFailed"));
     fetchMock.mockResolvedValueOnce(json(data));
     await act(async () => void (await vi.advanceTimersByTimeAsync(5000)));
     expect(screen.getByRole("heading", { name: data.state.input.topic })).toBeTruthy();

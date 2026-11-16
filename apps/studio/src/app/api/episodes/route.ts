@@ -3,15 +3,26 @@ import { cleanSeries, loadCustomStyle, newEpisodeState, withBankChoice, type Epi
 import { msg } from "@ys/core/messages";
 import { apiError, errorResponse, readJson } from "../../../lib/api";
 import { repo, startJob, store } from "../../../lib/server";
+import { filterLibrary, libraryFilters, LIBRARY_QUEUES } from "../../../lib/library";
 
-export async function GET() {
-  const episodes = await repo().list({ includeTimeline: false });
+export async function GET(req?: Request) {
+  const list = await repo().summaries();
+  const query = req && new URL(req.url).searchParams;
+  if (query?.size) {
+    const offset = Number(query.get("offset") ?? 0), limit = Number(query.get("limit") ?? 20);
+    const status = query.get("status"), queue = query.get("queue");
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100 || status && !["running", "stalled", "waiting", "error", "done", "idle"].includes(status)) return apiError(req!, msg("api.badJson"));
+    if (queue && !LIBRARY_QUEUES.includes(queue as typeof LIBRARY_QUEUES[number])) return apiError(req!, msg("api.badJson"));
+    const episodes = filterLibrary(list.episodes, libraryFilters(Object.fromEntries(query)));
+    return Response.json({ episodes: episodes.slice(offset, offset + limit), total: episodes.length, offset, limit, notices: list.notices });
+  }
+  const episodes = list.episodes;
   return Response.json(
     episodes.map((e) => ({
       id: e.id,
       createdAt: e.createdAt,
       topic: e.input.topic,
-      title: e.story?.title,
+      title: e.title,
       lang: e.input.lang,
       done: Object.keys(e.done),
       waitingFor: e.waitingFor,

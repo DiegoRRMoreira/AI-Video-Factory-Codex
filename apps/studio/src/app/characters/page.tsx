@@ -6,14 +6,14 @@ import { CharacterBank } from "./character-bank";
 export const dynamic = "force-dynamic";
 
 export default async function CharactersPage() {
-  const [characters, episodes, { t }] = await Promise.all([listLibraryCharacters(store()), repo().list({ includeTimeline: false }), getI18n()]);
+  const [characters, list, { t }] = await Promise.all([listLibraryCharacters(store()), repo().summaries(), getI18n()]);
   return (
     <div className="grid gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t("bank.title")}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted">{t("bank.intro")}</p>
       </div>
-      <CharacterBank initial={characters} series={summarizeSeries(episodes).map((s) => s.name)} initialJob={getJob(CHARACTER_BANK_ID) ?? null} />
+      <CharacterBank initial={characters} series={summarizeSeries(list.episodes).map((s) => s.name)} initialJob={getJob(CHARACTER_BANK_ID) ?? null} />
     </div>
   );
 }
