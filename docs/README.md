@@ -31,6 +31,7 @@ Start with **[Getting started](GETTING_STARTED.md)**, then follow the **[Studio 
 | Guide | What you will find |
 | --- | --- |
 | [Quality workflow and benchmarks](QUALITY_WORKFLOW.md) | Export decisions, Short audits and frozen still/clip comparisons |
+| [Quality corpus readiness — 17 November 2026](QUALITY_CORPUS_2026-11-17.md) | Verified retained samples, pending human labels and calibration gaps |
 | [Rendered-video audit](RENDER_AUDIT.md) | Black/freeze, motion, loudness and shot audio measurements |
 | [Structured shot intent](SHOT_INTENT.md) | Subjects, actions, narration ranges, reveal and readable hold |
 | [Claim sources](CLAIM_SOURCES.md) | Narration claims, supplied excerpts and review evidence |
@@ -45,8 +46,9 @@ Start with **[Getting started](GETTING_STARTED.md)**, then follow the **[Studio 
 | [Development](DEVELOPMENT.md) | Repository layout, workspace commands and release entry points |
 | [Continuous verification](CI.md) | Local/CI checks, retained evidence and release boundaries |
 | [Release ownership and recovery](RELEASE.md) | Release helper behavior and failed-release recovery |
-| [0.6.1 draft notes](releases/v0.6.1.md) | Prepared changes and update notes; publication remains a separate step |
+| [0.6.1 release notes](releases/v0.6.1.md) | Published changes and update notes |
 | [0.6.1 preparation checkpoint](releases/v0.6.1-readiness.md) | Local gates, source/publication boundaries and pending manual acceptance |
+| [0.6.1 publication and live verification](releases/v0.6.1-verification.md) | Exact-commit CI, downloaded evidence, running Studio and bounded desktop/mobile smoke |
 | [Dependency audit for 0.6.1](../security-report/dependency-audit.md) | Next.js security patch, registry results and compatibility disclosures |
 | [Episode locking](LOCKING.md) | Lock ownership, atomic acquisition and stale-lock rules |
 | [Studio reads](STUDIO_READS.md) | Revisioned summary index, lazy panels, recovery and cost snapshots |
