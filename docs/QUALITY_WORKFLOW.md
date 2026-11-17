@@ -54,7 +54,7 @@ pnpm.cmd bench run candidate --free --clips=6
 
 Runs verify the manifest and media hashes before and after execution. Source fingerprints cover dirty source content, prompts and pinned dependency files; each run also records runtime/render settings and reviewer configuration identity. A code change during execution invalidates the run. Package script entry points now participate in the root TypeScript check.
 
-Stills use the production review-moment selector. Up to six clips are selected deterministically, taking category representatives first. Each clip covers at most six seconds, including context around the selected shot's ending cut where available. Clips render a frame range of the original composition, preserving its absolute clock rather than shortening its animation recipe. Their source frames and technical audits are saved beside the run. No clips are produced with `--clips=0`; at most 30 can be requested.
+Stills use the production review-moment selector at half the composition's native resolution: 960×540 for a 1920×1080 composition, 540×960 for 1080×1920. Up to six clips are selected by default, deterministically taking category representatives first. Each clip covers at most six seconds, including context around the selected shot's ending cut where available. Clips render a frame range of the original composition, preserving its absolute clock rather than shortening its animation recipe. Their source frames and technical audits are saved beside the run. No clips are produced with `--clips=0`; at most 30 can be requested.
 
 `--free` renders and measures without a critic/model call. It saves a result with `reviewStatus: skipped`; it does not produce an editorial score or measure reviewer noise. To score the same corpus explicitly:
 
@@ -67,6 +67,52 @@ pnpm.cmd bench diff scored-baseline scored-repeat
 Scored runs invoke the configured scene critic and incur agent usage. The reviewer receives each frozen episode's style and caption context; batches remain contiguous and separate different styles/caption settings. Only complete reviews with the same fixture and reviewer configuration can produce a score comparison. Older runs without provenance, incomplete reviews and free runs are not comparable as quality gains. Compare repeats with identical source fingerprints to estimate reviewer variability before evaluating a candidate. Clip audits remain technical/advisory; no automated semantic clip critic has been added.
 
 Missing stills, failed/incomplete clip audits or incomplete scored reviews produce a nonzero exit with the partial result retained. Individual clip errors are recorded rather than counted as successful samples. Historical benchmark files are preserved.
+
+## Separate synthetic text and portrait supplement
+
+The default corpus remains `fixture-v1`. A separate, deterministic native Remotion
+fixture adds four TR/EN × landscape/portrait cells, two shots per cell:
+
+```powershell
+pnpm.cmd bench supplement
+pnpm.cmd bench run text-portrait --free --clips=4 --fixture=fixture-e-text-v2
+pnpm.cmd bench review export RUN_DIRECTORY --fixture=fixture-e-text-v2
+```
+
+`supplement` freezes the project-owned recipe into
+`.data/bench/fixture-e-text-v2/`; it refuses to replace an existing fixture.
+The initial `fixture-e-text-v1` prototype failed to render because its timeline
+used an image visual kind for an inline vector scene. Any retained prototype
+run is failed evidence, not added coverage; v2 uses the renderer's supported
+`motion_graphic` timeline kind. Existing default inputs and review packets are
+not rewritten.
+
+This is a **silent synthetic on-screen-text and framing fixture**. It has original
+inline SVG assets, native frame-time movement, a two-second landing hold, localized
+titles and the existing `paper-poster` style. It does not synthesize speech or test
+pronunciation, caption/speech alignment, cultural adaptation, RTL/CJK shaping,
+authentic archive inserts, crowd staging or editorial accuracy. JSON/SVG inputs
+remain editable in repository source; frozen fixtures stay immutable. No external
+rendering-engine conversion is involved.
+
+The first four selected clips cover the four language/aspect cells. Supplied
+sample provenance records the synthetic kind, purpose, designed coverage targets
+and language scope. These fields participate in the frozen input identity and
+are carried into the review packet/gallery. Designed targets are not reviewed
+coverage, human labels or acceptance decisions. Silent audio checks may be skipped
+and held frames may produce advisory findings; inspect each report's disclosures.
+
+`--fixture=fixture-<name>` selects an existing corpus for `run`, `diff`, and
+`review export`; the option is rejected on commands where it would be ignored.
+Each operation still verifies the selected input identity. `review import/report`
+use the packet ID and need no fixture flag. A run from another corpus cannot be
+exported as evidence for the default corpus or compared as a quality gain.
+
+The installed HyperFrames scene/motion guidance was consulted for the test's
+subject, action, payoff and readable hold. A local registry search was attempted,
+but the optional HyperFrames CLI was unavailable. No registry component was
+installed, no external schema was used as a Remotion effect kind, and no
+HyperFrames check/render or runtime-agent registry search is claimed.
 
 ## Export and label a benchmark review packet
 

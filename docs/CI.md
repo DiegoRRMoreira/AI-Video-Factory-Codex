@@ -69,6 +69,13 @@ The tests insert uniquely named cost records and S3 objects. Use a disposable da
 
 ## Evidence and release boundary
 
+The offline media job also freezes and freely renders `fixture-e-text-v2`: eight
+synthetic TR/EN landscape/portrait stills and four clips, with no critic calls.
+Its run, manifest, stills, clips and technical reports are retained under the
+media artifact's `supplement/` directory. These silent text/framing fixtures do
+not certify speech, translation quality or human editorial acceptance. Audio and
+semantic skips and advisory findings remain in the retained reports.
+
 Artifact names include the workflow source SHA. For pull requests this is the tested merge commit. The verification and media jobs record `git rev-parse HEAD` and the lockfile SHA-256; the rendered-media manifest links the MP4 and audit files to the same run. Only the listed fixture paths are uploaded, including their hidden `.data` folders. Credentials and a developer's `.env` are not artifacts.
 
 The workflow has read-only repository permission, does not persist checkout credentials and does not publish releases or modify branch protection. To require it before merging, configure the three job names above as required status checks in repository settings. A local pass does not prove a hosted workflow pass; confirm the run's exact commit and all three jobs before using it as release evidence.

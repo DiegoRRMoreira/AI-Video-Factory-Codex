@@ -124,6 +124,17 @@ jobs:
           find .data -type f \( -name '*.mp4' -o -name '*.json' \) -print0 | sort -z | xargs -0 sha256sum > ../media-sha256.txt
       - name: Verify main and Short decision isolation
         run: pnpm quality:preview out/ci/quality 2>&1 | tee out/ci/quality.log
+      - name: Render the silent TR/EN landscape and portrait benchmark supplement
+        run: |
+          pnpm --silent bench supplement 2>&1 | tee out/ci/supplement-freeze.log
+          pnpm --silent bench run ci-text-supplement --free --clips=4 --fixture=fixture-e-text-v2 2>&1 | tee out/ci/supplement.log
+          shopt -s nullglob
+          runs=(.data/bench/runs/*-ci-text-supplement)
+          test "${#runs[@]}" -eq 1
+          cp -R "${runs[0]}" out/ci/supplement
+          mkdir -p out/ci/supplement/fixture
+          cp .data/bench/fixture-e-text-v2/manifest.json out/ci/supplement/fixture/manifest.json
+          cp -R .data/bench/fixture-e-text-v2/states out/ci/supplement/fixture/states
       - name: Record offline environment diagnostics
         run: pnpm --silent ys doctor --json > out/ci/doctor.json
       - name: Retain media evidence
@@ -141,6 +152,9 @@ jobs:
             out/ci/quality/verification.json
             out/ci/quality/.data/episodes/**/*.mp4
             out/ci/quality/.data/assets/episodes/**/*.json
+            out/ci/supplement/**/*.json
+            out/ci/supplement/**/*.jpg
+            out/ci/supplement/**/*.mp4
           retention-days: 7
 
   integration:

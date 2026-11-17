@@ -22,16 +22,18 @@ import { checklistIssues, checklistProblem, checklistScore, models as defaultMod
 import { renderEpisode, renderStills } from "@ys/video/render";
 import { auditRenderedVideo } from "@ys/video/audit";
 import { stillMoment } from "@ys/video/moment";
-import { benchmarkClip, benchmarkCode, comparableBenchmarks, fingerprint, freezeBenchmark, verifyBenchmark, inside, type FrozenBenchmark } from "../src/benchmark.ts";
+import { benchmarkArguments, benchmarkClip, benchmarkCode, comparableBenchmarks, fingerprint, freezeBenchmark, verifyBenchmark, inside, type FrozenBenchmark } from "../src/benchmark.ts";
 import type { EpisodeState } from "../src/state.ts";
 import { runBenchReview } from "./bench-review.ts";
+import { runBenchSupplement } from "./bench-supplement.ts";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const DATA = join(ROOT, ".data");
 const BENCH = join(DATA, "bench");
 const SET = join(BENCH, "set.json");
 const RUNS = join(BENCH, "runs");
-const FROZEN = join(BENCH, "fixture-v1");
+const selected = benchmarkArguments(process.argv.slice(2));
+const FROZEN = inside(BENCH, selected.fixture);
 let frozen: FrozenBenchmark | undefined;
 const statePath = (id: string) => join(DATA, "assets", "episodes", id, "state.json");
 
@@ -292,6 +294,7 @@ async function run(label: string, free: boolean, clipCount: number): Promise<voi
   const reviewerHash = fingerprint(JSON.stringify({ models: reviewerModels, batch: BATCH, grouping: "contiguous-style-and-caption-v1", reviewerPolicy }));
   const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
   const dir = join(RUNS, `${stamp}-${label}`);
+  await mkdir(RUNS, { recursive: true });
   await mkdir(dir);
   const files = await stills(set, dir);
   console.log(`kareler: ${dir}${join("/", "stills")}`);
@@ -327,8 +330,9 @@ async function run(label: string, free: boolean, clipCount: number): Promise<voi
   if (result.rendered !== result.expected || Object.values(clips).some((c) => c.status !== "complete") || result.reviewStatus === "incomplete") process.exitCode = 1;
 }
 
-const [cmd, ...args] = process.argv.slice(2);
-if (cmd === "review") console.log(JSON.stringify(await runBenchReview(ROOT, args), null, 2));
+const [cmd, ...args] = selected.args;
+if (cmd === "supplement" && !args.length) console.log(JSON.stringify(await runBenchSupplement(ROOT), null, 2));
+else if (cmd === "review") console.log(JSON.stringify(await runBenchReview(ROOT, args, selected.fixture), null, 2));
 else if (cmd === "pick") await pick(Number(args[0] ?? 30));
 else if (cmd === "freeze") {
   const set = await readJson<BenchSet>(SET);
@@ -346,6 +350,6 @@ else if (cmd === "diff" && args[0] && args[1]) {
   if (a.inputHash !== fixture.inputHash || b.inputHash !== fixture.inputHash) throw new Error("Comparison requires the matching frozen fixture");
   diff({ at: fixture.at, shots: fixture.shots }, a, b);
 } else {
-  console.error("Usage: bench pick [n] | bench freeze | bench run <label> [--free] [--clips=6] | bench diff <a> <b> | bench review export|import|report ...");
+  console.error("Usage: bench pick [n] | bench freeze | bench supplement | bench run <label> [--free] [--clips=6] [--fixture=fixture-name] | bench diff <a> <b> | bench review export|import|report ...");
   process.exit(1);
 }

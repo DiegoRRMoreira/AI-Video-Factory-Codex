@@ -2,9 +2,18 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename, readdir } from "node:fs/promises";
 import { join, dirname, resolve, relative, isAbsolute } from "node:path";
 import type { EpisodeState } from "./state.ts";
-import type { Timeline } from "@ys/core";
+import { BenchmarkSampleProvenance, type Timeline } from "@ys/core";
 
-export interface BenchShot { episode: string; shot: string; category: "close" | "wide" | "group" | "scene" }
+export interface BenchShot { episode: string; shot: string; category: "close" | "wide" | "group" | "scene"; provenance?: BenchmarkSampleProvenance }
+export function benchmarkArguments(args: string[]): { fixture: string; args: string[] } {
+  const flags = args.filter((arg) => arg.startsWith("--fixture"));
+  if (!flags.length) return { fixture: "fixture-v1", args };
+  if (flags.length !== 1 || !flags[0]!.startsWith("--fixture=")) throw new Error("Use one --fixture=fixture-<name> option");
+  const fixture = flags[0]!.slice("--fixture=".length), rest = args.filter((arg) => arg !== flags[0]);
+  if (!/^fixture-[a-z0-9][a-z0-9-]{0,50}$/.test(fixture)) throw new Error("Invalid benchmark fixture name");
+  if (rest[0] !== "run" && rest[0] !== "diff" && !(rest[0] === "review" && rest[1] === "export")) throw new Error("Fixture selection is supported for run, diff and review export");
+  return { fixture, args: rest };
+}
 export interface FrozenBenchmark {
   version: 1; at: string; inputHash: string; shots: BenchShot[];
   files: { path: string; sha256: string }[];
@@ -26,6 +35,7 @@ export async function freezeBenchmark(opts: {
   asset: (episode: string, key: string) => Promise<Uint8Array>;
 }): Promise<FrozenBenchmark> {
   if (!opts.shots.length) throw new Error("Benchmark set is empty");
+  const shots = opts.shots.map((shot) => shot.provenance ? { ...shot, provenance: BenchmarkSampleProvenance.parse(shot.provenance) } : shot);
   await mkdir(dirname(opts.directory), { recursive: true });
   const staging = `${opts.directory}.pending-${randomUUID()}`;
   await mkdir(staging);
@@ -34,11 +44,11 @@ export async function freezeBenchmark(opts: {
     const target = inside(staging, path); await mkdir(dirname(target), { recursive: true });
     await writeFile(target, bytes, { flag: "wx" }); files.push({ path, sha256: fingerprint(bytes) });
   };
-  for (const episode of new Set(opts.shots.map((s) => s.episode))) {
+  for (const episode of new Set(shots.map((s) => s.episode))) {
     inside(staging, episode);
     const state = structuredClone(await opts.load(episode));
     if (!state.timeline) throw new Error(`Timeline missing: ${episode}`);
-    for (const selected of opts.shots.filter((s) => s.episode === episode)) if (!state.timeline.visuals.some((v) => v.shotId === selected.shot) || !state.shots?.some((s) => s.id === selected.shot)) throw new Error(`Shot missing: ${episode}/${selected.shot}`);
+    for (const selected of shots.filter((s) => s.episode === episode)) if (!state.timeline.visuals.some((v) => v.shotId === selected.shot) || !state.shots?.some((s) => s.id === selected.shot)) throw new Error(`Shot missing: ${episode}/${selected.shot}`);
     const timeline = { ...state.timeline, captions: state.input.captions === false ? [] : state.timeline.captions };
     const keys = new Set([...timeline.visuals.flatMap((v) => [v.assetUrl, v.overlay, v.motion?.depthAssetUrl].filter((s): s is string => Boolean(s))), ...timeline.audio.map((a) => a.assetUrl)]);
     for (const key of [...keys].sort()) {
@@ -49,8 +59,8 @@ export async function freezeBenchmark(opts: {
     await put(`states/${episode}.json`, Buffer.from(JSON.stringify({ id: state.id, input: state.input, timeline, shots: state.shots, style: state.style })));
   }
   files.sort((a, b) => a.path.localeCompare(b.path, "en"));
-  const inputHash = fingerprint(JSON.stringify({ shots: opts.shots, files }));
-  const manifest: FrozenBenchmark = { version: 1, at: new Date().toISOString(), inputHash, shots: opts.shots, files };
+  const inputHash = fingerprint(JSON.stringify({ shots, files }));
+  const manifest: FrozenBenchmark = { version: 1, at: new Date().toISOString(), inputHash, shots, files };
   await writeFile(join(staging, "manifest.json"), JSON.stringify(manifest, null, 2), { flag: "wx" });
   // A published directory contains a manifest, so rename cannot replace it.
   await rename(staging, opts.directory);
@@ -60,6 +70,7 @@ export async function freezeBenchmark(opts: {
 export async function verifyBenchmark(directory: string): Promise<FrozenBenchmark> {
   const manifest = JSON.parse(await readFile(join(directory, "manifest.json"), "utf8")) as FrozenBenchmark;
   if (manifest.version !== 1 || !manifest.shots.length || fingerprint(JSON.stringify({ shots: manifest.shots, files: manifest.files })) !== manifest.inputHash) throw new Error("Invalid benchmark manifest");
+  for (const shot of manifest.shots) if (shot.provenance) BenchmarkSampleProvenance.parse(shot.provenance);
   for (const file of manifest.files) if (fingerprint(await readFile(inside(directory, file.path))) !== file.sha256) throw new Error(`Benchmark input changed: ${file.path}`);
   return manifest;
 }

@@ -3,6 +3,12 @@ import { z } from "zod";
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const key = z.string().min(1).max(260);
 export const BENCHMARK_TAGS = ["narrated-action", "readable-text", "transition", "crowded", "close-framing", "archive-insert", "portrait", "intentional-hold", "style-choice"] as const;
+export const BenchmarkSampleProvenance = z.object({
+  kind: z.enum(["synthetic", "production"]), purpose: z.string().trim().min(1).max(1000),
+  coverageTargets: z.array(z.enum(BENCHMARK_TAGS)).max(BENCHMARK_TAGS.length),
+  languageScope: z.enum(["on-screen-text", "voice-and-text", "not-assessed"]),
+}).strict();
+export type BenchmarkSampleProvenance = z.infer<typeof BenchmarkSampleProvenance>;
 const media = z.object({ path: z.string().regex(/^media\/[0-9]+\.(jpg|mp4)$/), sha256: hash }).strict();
 const frames = z.tuple([z.int().nonnegative(), z.int().nonnegative()]);
 export const BenchmarkReviewPacket = z.object({
@@ -12,7 +18,7 @@ export const BenchmarkReviewPacket = z.object({
   items: z.array(z.object({
     key, category: z.enum(["close", "wide", "group", "scene"]), language: z.string().min(1),
     styleSelection: z.string(), resolvedStyle: z.string().nullable(), width: z.int().positive(), height: z.int().positive(),
-    description: z.string(), still: media,
+    description: z.string(), provenance: BenchmarkSampleProvenance.optional(), still: media,
     clip: media.extend({ frames }).strict().optional(),
   }).strict()).min(1).max(200),
 }).strict();

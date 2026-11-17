@@ -62,6 +62,34 @@ human labels, new corpus coverage, fresh renders, scores or adjudication by itse
 The earlier `.temp_files` inventory packet remains a dated scaffold; the new CLI
 defines its own versioned packet/label contracts.
 
+Supplement follow-up: [`bench supplement`](QUALITY_WORKFLOW.md#separate-synthetic-text-and-portrait-supplement)
+defines a separate immutable `fixture-e-text-v2`, with eight silent synthetic
+shots across TR/EN and landscape/portrait cells. Explicit fixture selection is
+available for free runs, comparisons and review export. Supplied provenance is
+included in input/packet identities and distinguishes designed text/crop targets
+from reviewed coverage. This adds a test mechanism; actual completed media counts
+belong to each run's result, and no spoken-language or human calibration coverage
+follows from the recipe alone. The original 30-item corpus remains unchanged.
+
+The completed local `supplement-text-v2-20261117` run rendered **8/8 stills and
+4/4 clips** at the four language/aspect cells. Stills were verified at 960×540
+or 540×960; each H.264 clip was 4.5 seconds at its native landscape/portrait
+dimensions, with no audio stream. Black/freeze and local-motion checks completed;
+audio and semantic checks were skipped. Every clip retained two advisory
+freeze/low-motion findings rather than treating the planned hold as automatically
+accepted. Source/decoded boundary frames were inspected, and a repeated absolute
+seek produced identical JPEG bytes. This is coding-agent verification, not a
+human editorial label.
+
+The supplement input identity is
+`55e9c087d3dc6f7a9544ae2110ab52509ebd093d0bdcdf7b8c238868ecb138f8`.
+The default corpus's input identity remained unchanged, and its existing 30-item
+review packet was still readable. The new eight-item/four-clip review packet has
+no human or assistant labels. Local media hashes, frame probes, retained failed
+prototype evidence and repeat-seek proof are under
+`.temp_files/quality-supplement-2026-11-17/`. The media CI now repeats the free
+supplement workflow and retains its independent run evidence.
+
 1. Add explicit selection metadata for narrated actions, readable text,
    transitions, archive inserts and portrait crops. Existing framing categories
    alone do not establish those coverages. Resolve the three `auto` selections
