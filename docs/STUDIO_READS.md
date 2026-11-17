@@ -112,6 +112,36 @@ recalculates elapsed-time ETA from the saved stage start and counts on each requ
 the source revision stays stable while time advances. Legacy summaries without a
 stage-start field retain their stored estimate until rebuilt or next saved.
 
+## Review workspace identity and lifetime
+
+Detail responses now carry `sourceRevision` and canonical `outputVersions` for main
+and Short, including the existing legacy path/time identity. The Shots projection
+also includes Short and voice-audit summaries. These additions do not change state
+serialization or create another rendering engine. Quality-board refresh identity
+uses the source revision and completed-timeline marker as well as report/output
+versions, so plan changes cannot silently retain an old issue list.
+
+EpisodeView retains the last fully loaded Shots panel while another panel is
+active. It hides/pauses that workspace, disables its pending evidence reads and
+keeps local filters, shot selection and positions. Reopening first waits for the
+requested current Shots panel; late detail responses still pass the existing
+request-generation guard. The cache is scoped to the episode ID and cleared by
+unmounting the episode; it is not a disk/session cache.
+
+The timeline player bounds reads to 30 seconds, aborts obsolete loads and cleans
+frame listeners on close/unmount. A pending hidden seek applies once when active;
+returning to the same request does not rewind. Encoded players retain positions
+per output identity. `export=<canonical identity>` on the video stream rejects an
+identity mismatch with 409; measured source size/time mismatch also returns 409.
+Legacy video callers without this query retain their existing behavior. These
+metadata checks do not provide a cryptographic guarantee against arbitrary
+concurrent external filesystem mutation.
+
+Quality decisions abort and ignore stale request completion when episode/export
+identity changes or the board unmounts. Backend producer-lock and export/finding
+checks remain authoritative. Selecting an issue never grants a decision or starts
+generation, and a missing association is shown explicitly.
+
 ## Library query and cost scopes
 
 Studio's library uses the same filter normalization and predicates for Home and

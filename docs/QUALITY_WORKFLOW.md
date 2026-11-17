@@ -4,6 +4,15 @@
 
 Open **Quality issues** in the episode overview. The panel loads evidence on demand and offers source, output and decision filters, with 50 results per page. Full video-audit findings are read from their report artifact; the twelve-item polling summary is not treated as a complete list.
 
+**Inspect issue** opens the [Shots review workspace](STUDIO.md#review-playback-and-findings-together),
+where the correct main/Short player, selected shot and narration sit together.
+The same board is available there, retaining source/target/status filters across
+tab changes. Previous/Next unresolved controls cover the loaded filtered page;
+use page controls for the rest. Voice and research links focus their script scene.
+Opening a finding or preparing a correction remains read-only with respect to
+generation. Code preview is a separate viewing source and never substitutes for
+encoded-output evidence.
+
 Sources remain distinct:
 
 - Video measurements and reference-palette comparisons describe an actual export.

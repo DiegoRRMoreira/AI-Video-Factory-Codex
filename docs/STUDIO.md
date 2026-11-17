@@ -114,6 +114,50 @@ may drop frames while playing (the audio stays in sync), and the audio does not 
 loudness pass. Playback is smooth only in the production build (`pnpm studio:build && pnpm studio:start`);
 `pnpm studio` (development mode) runs React's checks on every frame.
 
+## Review playback and findings together
+
+The **Shots** tab contains a review workspace with a player, the selected shot's
+inspector and the quality issue board. **Inspect issue** in Overview opens the same
+workspace after loading its shot data. Inspecting a finding or preparing a
+correction does not start generation.
+
+Choose the viewing source explicitly: **Code preview**, **Main video** or **Short**.
+Code preview uses the existing Remotion scene/player and the current timeline; its
+audio has no final loudness pass. Encoded main/Short findings seek their own saved
+output in seconds relative to that output. Short times are not converted into
+positions on the full episode. Preview/plan findings carry no encoded-export
+approval control.
+
+Selecting a finding opens its associated shot and narration when the association
+exists. Main-video findings without a shot ID can be matched by their main-timeline
+time; a Short finding with no matching shot stays explicitly unassociated. Voice
+and research links open the actual script scene rather than only the script tab.
+Return through **Shots** to retain the review selection and filters.
+
+**Previous/Next unresolved issue on this page** cycles through Open and Needs a fix
+entries on the loaded filtered page. Existing page controls navigate the 50-row
+server pages; the unresolved controls do not claim to search unloaded pages.
+Reviewed/Accepted choices remain bound to the finding and exact export as before.
+An old response cannot reset a newer inspection. If the selected finding's export
+no longer matches the current player, the old seek is blocked visibly. Bound video
+requests also reject a different export on the server, and reject changed measured
+file metadata when that metadata is available.
+
+The workspace remains mounted when changing episode tabs, pauses hidden players
+and retains per-output positions and preview frames. Closing the code player frees
+its frame listener; reopening restores the frame until the completed timeline
+revision changes. These in-page choices are not persisted across a full reload.
+
+**Select shot for correction** prepares the existing selection and, for vector
+work, fills the correction note from the finding. Review/edit the note and use the
+existing priced regeneration action separately. No correction is queued from
+selection alone. The inline inspector keeps playback in view. Existing modal shot
+inspection retains Escape/arrow navigation with focus trapping and focus return.
+
+Episode tabs support arrow keys, Home and End with a single tab stop and a labeled
+panel. Browser visual/mobile and manual assistive-technology acceptance must still
+be completed on a working browser host; component tests are not a substitute.
+
 ## Download the publishing package
 
 Watch and download the video and its `.srt` subtitle file, and read its review. Subtitles are always written

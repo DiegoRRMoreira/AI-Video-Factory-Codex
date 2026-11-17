@@ -5,13 +5,14 @@ import { NarrationEditor, NarrationUndo } from "./narration-editor";
 import { VoiceAuditCard } from "./voice-audit-card";
 import { PronunciationPanel } from "./pronunciation-panel";
 import { ArchivePicker } from "./archive-picker";
+import { ReviewWorkspace, type IssueRequest } from "./review-workspace";
 
 import type { EpisodeState, PlannedShotState } from "@ys/pipeline/light";
 import { DRAFT_REVIEW, QUALITY_GATE, shotPasses, type ShotReviewRecord } from "@ys/core/rules";
 import { stylePackOf } from "@ys/core/styles";
 import { Check, CheckSquare, ChevronLeft, ChevronRight, Clapperboard, Mic, Play, RefreshCw, Square, Undo2, Wand2, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessageKey } from "../../../lib/i18n";
 import type { EpisodeResponse, QuotaView } from "../../../lib/types";
 import { VOICES } from "../../../lib/voices";
@@ -25,10 +26,16 @@ const TimelinePlayer = dynamic(() => import("./timeline-player"), { ssr: false }
 
 // ---------------- senaryo ----------------
 
-export function ScriptTab({ data, busy, act }: { data: EpisodeResponse; busy: boolean; act: Act }) {
+export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeResponse; busy: boolean; act: Act; focusScene?: { id: string; seq: number } }) {
   const { t, fmt } = useI18n();
   const { duration, number } = fmt;
   const { state } = data;
+  const focused = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!focusScene || focused.current === focusScene.seq) return;
+    const element = document.getElementById(`scene-${state.id}-${focusScene.id}`);
+    if (element) { element.focus(); element.scrollIntoView({ block: "center" }); focused.current = focusScene.seq; }
+  }, [focusScene, state.script]);
   const [dirtyScenes, setDirtyScenes] = useState<Record<string, boolean>>({});
   const markDirty = useCallback((sceneId: string, dirty: boolean) => {
     const key = `${state.id}:${sceneId}`;
@@ -93,7 +100,7 @@ export function ScriptTab({ data, busy, act }: { data: EpisodeResponse; busy: bo
         {state.script.scenes.map((scene, i) => {
           const voice = state.voice?.[scene.id];
           return (
-            <li key={scene.id} className="grid gap-3 rounded-xl border border-line bg-panel-2/30 p-3 md:grid-cols-[150px_1fr]">
+            <li key={scene.id} id={`scene-${state.id}-${scene.id}`} tabIndex={-1} className="grid gap-3 rounded-xl border border-line bg-panel-2/30 p-3 md:grid-cols-[150px_1fr]">
               <div className="text-xs text-muted">
                 <div className="flex items-center gap-2">
                   <span className="grid h-6 w-6 place-items-center rounded-md bg-panel-2 text-[11px] font-semibold text-white">
@@ -554,7 +561,7 @@ const scoreOf = (state: EpisodeState, id: string) => {
     : undefined;
 };
 
-export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boolean; act: Act }) {
+export function ShotsTab({ data, busy, act, workspace = false, active = true, issueRequest, onScene }: { data: EpisodeResponse; busy: boolean; act: Act; workspace?: boolean; active?: boolean; issueRequest?: IssueRequest; onScene?: (id: string) => void }) {
   const { t, fmt } = useI18n();
   const { usd } = fmt;
   const { state } = data;
@@ -568,7 +575,7 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
   const [playing, setPlaying] = useState<{ shot?: string; seek: number }>();
   const playFrom = state.done.timeline
     ? (id: string) => {
-        setOpen(undefined);
+        setOpen(workspace ? id : undefined);
         setPlaying((p) => ({ shot: id, seek: (p?.seek ?? 0) + 1 }));
       }
     : undefined;
@@ -576,7 +583,7 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
   const failedQa = shots.filter((s) => !state.archives?.[s.id] && state.qa?.[s.id] && !state.qa[s.id]!.passed).map((s) => s.id);
   const kfRow = data.estimates[modeOf(state.input)].rows.find((r) => r.stage === "keyframes");
   const perFrame = kfRow && kfRow.quantity ? kfRow.costUsd / kfRow.quantity : 0;
-  if (!shots.length) return <Empty>{t("shots.empty")}</Empty>;
+  if (!shots.length && !workspace) return <Empty>{t("shots.empty")}</Empty>;
 
   // Shift ile tıklama: son seçilen çekimden buna kadar aralık seçilir (sahne aralığını yeniden oluşturmak için).
   const toggle = (id: string, range = false) => {
@@ -607,6 +614,7 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
   const findings = [...picked].some((id) => reviewOf(id)?.issues.length);
   const shotsRow = data.estimates[modeOf(state.input)].rows.find((r) => r.stage === "shots");
   const perScene = shotsRow && shotsRow.quantity ? shotsRow.costUsd / shotsRow.quantity : 0;
+  const inspector = current && <ShotDetail state={state} shot={current} index={shots.indexOf(current)} total={shots.length} inline={workspace} onPlay={playFrom && (() => playFrom(current.id))} onClose={() => setOpen(undefined)} onMove={d => setOpen(shots[(shots.indexOf(current) + d + shots.length) % shots.length]!.id)} />;
 
   return (
     <div className="grid gap-4">
@@ -635,10 +643,11 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
           )}
         </div>
       )}
-      {playing && state.done.timeline && <TimelinePlayer id={state.id} shot={playing.shot} seek={playing.seek} version={state.done.timeline} />}
+      {workspace && <ReviewWorkspace data={data} active={active} busy={busy} PlayerComponent={TimelinePlayer} external={issueRequest} playRequest={playing} onShot={setOpen} onScene={onScene} onCorrect={(id, detail) => { setPicked(new Set([id])); setNote(detail.slice(0, 1500)); }}>{inspector}</ReviewWorkspace>}
+      {!workspace && playing && state.done.timeline && <TimelinePlayer id={state.id} shot={playing.shot} seek={playing.seek} version={state.done.timeline} />}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">{t("shots.count", { n: shots.length })}</span>
-        {state.done.timeline && (
+        {state.done.timeline && !workspace && (
           // Zaman çizelgesi hazırsa bölüm render edilmeden oynatılabilir (iş sürerken de: yalnız okur).
           <button className={`chip ${playing ? "chip-on" : ""}`} onClick={() => setPlaying(playing ? undefined : { seek: 0 })}>
             <Play size={12} /> {t(playing ? "shots.play.close" : "shots.play")}
@@ -748,17 +757,7 @@ export function ShotsTab({ data, busy, act }: { data: EpisodeResponse; busy: boo
         ))}
       </div>
 
-      {current && (
-        <ShotDetail
-          state={state}
-          shot={current}
-          index={shots.indexOf(current)}
-          total={shots.length}
-          onPlay={playFrom && (() => playFrom(current.id))}
-          onClose={() => setOpen(undefined)}
-          onMove={(d) => setOpen(shots[(shots.indexOf(current) + d + shots.length) % shots.length]!.id)}
-        />
-      )}
+      {!workspace && inspector}
     </div>
   );
 }
@@ -851,6 +850,7 @@ function ShotDetail({
   onPlay,
   onClose,
   onMove,
+  inline = false,
 }: {
   state: EpisodeState;
   shot: PlannedShotState;
@@ -859,18 +859,33 @@ function ShotDetail({
   onPlay?: () => void;
   onClose: () => void;
   onMove: (delta: number) => void;
+  inline?: boolean;
 }) {
   const { t, fmt } = useI18n();
+  const container = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (inline) return;
+    const origin = document.activeElement as HTMLElement;
+    container.current!.querySelector<HTMLButtonElement>("button")!.focus();
+    return () => { if (origin.isConnected) origin.focus(); };
+  }, [inline]);
   // Klavye: Esc kapatır, oklar önceki/sonraki çekime geçer.
   useEffect(() => {
+    if (inline) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      else if (e.key === "Tab") {
+        const buttons = [...container.current!.querySelectorAll<HTMLButtonElement>("button:not([disabled])")];
+        const first = buttons[0]!, last = buttons.at(-1)!;
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
       else if (e.key === "ArrowRight") onMove(1);
       else if (e.key === "ArrowLeft") onMove(-1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onMove]);
+  }, [onClose, onMove, inline]);
   const thumb = thumbOf(state, shot.id);
   const qa = state.archives?.[shot.id] ? undefined : state.qa?.[shot.id];
   const rv = state.archives?.[shot.id] && !state.done.review ? undefined : (state.review?.shots[shot.id] ?? state.draftReview?.shots[shot.id]);
@@ -879,13 +894,15 @@ function ShotDetail({
   const scene = state.script?.scenes.find((s) => s.id === shot.sceneId);
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+      className={inline ? "min-w-0 rounded-xl border border-line" : "fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"}
+      onClick={inline ? undefined : onClose}
+      role={inline ? "region" : "dialog"}
+      aria-label={t("workspace.inspector")}
+      aria-modal={inline ? undefined : true}
     >
       <div
-        className="grid max-h-[92vh] w-full max-w-6xl gap-4 overflow-auto rounded-2xl border border-line bg-panel p-4 shadow-2xl lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        ref={container}
+        className={inline ? "grid min-w-0 gap-3 p-3 text-sm" : "grid max-h-[92vh] w-full max-w-6xl gap-4 overflow-auto rounded-2xl border border-line bg-panel p-4 shadow-2xl lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"}
         onClick={(e) => e.stopPropagation()}
       >
         {thumb ? (
@@ -951,6 +968,7 @@ function ShotDetail({
             <p className="leading-relaxed text-muted">{shot.description}</p>
           </div>
           <ShotIntentDetails intent={shot.intent} subjectLabel={state.cast?.characters.find((c) => c.id === shot.intent?.subject)?.name ?? state.vectorProps?.[shot.intent?.subject ?? ""]?.description} targetLabel={state.cast?.characters.find((c) => c.id === shot.intent?.target)?.name ?? state.vectorProps?.[shot.intent?.target ?? ""]?.description} narration={scene?.narration} />
+          {scene && <section className="grid gap-1"><h3 className="label">{t("edit.narration", { scene: scene.id })}</h3><p className="break-words leading-relaxed">{scene.narration}</p></section>}
           {issues.length > 0 && (
             <div>
               <div className="label">{t("shots.issues")}</div>

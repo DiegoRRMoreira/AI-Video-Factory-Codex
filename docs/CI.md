@@ -6,7 +6,7 @@
 
 | Job | Checks | Evidence |
 | --- | --- | --- |
-| Types, coverage and Studio build | Typecheck, real-Git release ownership target, `pnpm test:coverage`, `pnpm studio:build` | Source commit, lockfile hash, tool versions, command logs and coverage summary; 14 days |
+| Types, coverage and Studio build | Production dependency audit, typecheck, real-Git release ownership target, `pnpm test:coverage`, `pnpm studio:build` | Source commit, lockfile hash, tool versions, command logs and coverage summary; 14 days |
 | No-generation render and export audits | Existing `render-demo`, explicit audit of its MP4, `quality:preview` | MP4s, state/audit JSON, media hashes and logs; 7 days |
 | PostgreSQL and RustFS integration | Migrations, then `pnpm test:integration` against disposable services | Source commit and test log; 14 days |
 
@@ -36,6 +36,7 @@ heap is enabled by default.
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm audit --prod
 pnpm typecheck
 pnpm test:coverage
 pnpm studio:build

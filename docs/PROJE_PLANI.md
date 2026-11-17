@@ -154,6 +154,14 @@ JSONL ledger caches stable parsed snapshots while database ledger queries retain
 their existing behavior. See [Studio read contracts](STUDIO_READS.md) for recovery,
 compatibility, tests and isolated scale measurements.
 
+Implementation note (17 November 2026): Studio retains a per-episode in-page Shots
+workspace while navigating other tabs, pausing hidden playback and preserving the
+selected evidence, shot and position. Main/Short streams may be bound to canonical
+export identity; code preview remains the existing Remotion player and is not
+encoded-output evidence. Source revision invalidates quality reads without adding
+fields to authoritative episode state. Runtime agent/tool isolation is unchanged.
+See [Studio review workspace](STUDIO.md#review-playback-and-findings-together).
+
 ```
 AI-Video-Factory/
 ├─ apps/

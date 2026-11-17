@@ -26,6 +26,8 @@ export interface QuotaView {
 }
 
 export interface EpisodeResponse {
+  sourceRevision?: string;
+  outputVersions?: { main?: string; short?: string };
   revision?: string;
   panel?: EpisodePanel;
   counts?: EpisodeSummary["counts"];

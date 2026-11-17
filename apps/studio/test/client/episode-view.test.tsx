@@ -109,6 +109,21 @@ describe("EpisodeView: yükleme ve üst bilgi", () => {
 });
 
 describe("EpisodeView: sekmeler", () => {
+  it("supports roving keyboard focus with arrows, Home and End while ignoring other keys", async () => {
+    await show(makeData(makeState()));
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    await act(async () => void fireEvent.keyDown(tab(tr("tab.overview")), { key: "ArrowRight" }));
+    expect(document.activeElement).toBe(tab(tr("tab.script")));
+    await act(async () => void fireEvent.keyDown(tab(tr("tab.script")), { key: "ArrowLeft" }));
+    expect(document.activeElement).toBe(tab(tr("tab.overview")));
+    await act(async () => void fireEvent.keyDown(tab(tr("tab.overview")), { key: "End" }));
+    expect(document.activeElement).toBe(tab(tr("tab.activity")));
+    await act(async () => void fireEvent.keyDown(tab(tr("tab.activity")), { key: "Home" }));
+    expect(document.activeElement).toBe(tab(tr("tab.overview")));
+    fireEvent.keyDown(tab(tr("tab.overview")), { key: "Enter" });
+    expect(tab(tr("tab.overview")).getAttribute("tabindex")).toBe("0");
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(tab(tr("tab.overview")).id);
+  });
   it("sekme tıklanınca içerik değişir ve adres çubuğuna yazılır; sayaçlar görünür", async () => {
     const shots = [{ id: "sh1", sceneId: "s1", kind: "still_motion" as const, startMs: 0, endMs: 1000, description: "", imagePrompt: "", motionPrompt: "", camera: "static" as const }];
     await show(makeData(makeState({ shots, activity })));

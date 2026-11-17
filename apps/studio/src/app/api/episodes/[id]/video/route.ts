@@ -4,6 +4,7 @@ import { msg } from "@ys/core/messages";
 import { errorText } from "@ys/core/messages";
 import { isMissingEpisode, textResponse } from "../../../../../lib/api";
 import { repo } from "../../../../../lib/server";
+import { exportIdentity } from "@ys/pipeline/light";
 
 /**
  * Dosyayı çekme (pull) tabanlı web akışına çevirir. `Readable.toWeb` istemci bağlantıyı kesince (oynatıcıda ileri sarma)
@@ -36,6 +37,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     return textResponse(req, errorText(e), isMissingEpisode(e) ? 404 : 500);
   }
   if (!state.render) return textResponse(req, msg("api.noVideo"), 404);
+  const requestedExport = new URL(req.url).searchParams.get("export");
   // "?srt": videonun yanına yazılan altyazı dosyası (indirme).
   if (new URL(req.url).searchParams.has("srt")) {
     const srt = await readFile(state.render.path.replace(/\.mp4$/, ".srt"), "utf8").catch(() => undefined);
@@ -58,14 +60,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   // "?short": dikey Short (videonun yanındaki .short.mp4).
   const short = new URL(req.url).searchParams.has("short");
   if (short && !state.short) return textResponse(req, msg("api.noShort"), 404);
+  const output = short ? state.short! : state.render, identity = exportIdentity(output);
+  if (requestedExport && requestedExport !== identity) return textResponse(req, msg("api.videoChanged"), 409);
   const path = short ? state.short!.path : state.render.path;
   const info = await stat(path).catch(() => undefined);
   if (!info) return textResponse(req, msg("api.noVideoFile"), 404);
+  if (requestedExport && output.audit?.source && (info.size !== output.audit.source.bytes || info.mtime.toISOString() !== output.audit.source.modifiedAt)) return textResponse(req, msg("api.videoChanged"), 409);
   const { size } = info;
   const download = new URL(req.url).searchParams.has("download");
   const headers: Record<string, string> = {
     "content-type": "video/mp4",
     "accept-ranges": "bytes",
+    ...(requestedExport ? { "cache-control": "no-store", "x-ys-export-id": identity } : {}),
     ...(download ? { "content-disposition": `attachment; filename="${id}${short ? ".short" : ""}.mp4"` } : {}),
   };
 

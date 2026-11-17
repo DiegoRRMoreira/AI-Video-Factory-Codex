@@ -3,6 +3,7 @@
  * Accept-Language) döner. Türkçeleri önceki yanıtlarla aynıdır (istemcinin eski hata eşlemesi bunlara bakar).
  */
 export const STUDIO_MESSAGES = {
+  "api.videoChanged": { tr: "Çıktı sürümü değişti; güncel kanıtı yeniden yükleyin.", en: "The export version changed; reload the current evidence." },
   "api.style.reference": { tr: "Geçerli bir PNG, JPEG veya WebP görseli seç (en çok 4 MB).", en: "Choose a valid PNG, JPEG or WebP image (up to 4 MB)." },
   "api.style.recipe": { tr: "Stil alanlarını ve en az üç #RRGGBB rengini kontrol et.", en: "Check the style fields and at least three #RRGGBB colours." },
   "api.style.missing": { tr: "Kaydedilmiş stil bulunamadı.", en: "Saved style not found." },

@@ -36,6 +36,8 @@ jobs:
           node-version: "26.13.0"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Check production dependency advisories
+        run: pnpm audit --prod
       - name: Install media audit tools
         run: |
           sudo apt-get update

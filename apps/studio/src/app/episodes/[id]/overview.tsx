@@ -5,6 +5,8 @@ import { useRef, useState, type ReactNode } from "react";
 import { RenderAuditCard } from "./render-audit-card";
 import { StyleComparisonCard } from "./style-comparison-card";
 import { QualityIssueBoard } from "./quality-issue-board";
+import { qualityVersion } from "../../../lib/review";
+import type { QualityIssue } from "@ys/pipeline/light";
 import { stylePackOf } from "@ys/core/styles";
 import { shotPasses } from "@ys/core/rules";
 import { TYPOGRAPHY_PAIRS } from "@ys/core/typography";
@@ -14,7 +16,7 @@ import { VOICES } from "../../../lib/voices";
 import { useI18n } from "../../locale-provider";
 import { asset, Bar, Stat, modeOf, type Act } from "./parts";
 
-export function OverviewTab({ data, busy = false, act }: { data: EpisodeResponse; busy?: boolean; act?: Act }) {
+export function OverviewTab({ data, busy = false, act, onInspectIssue, onScene }: { data: EpisodeResponse; busy?: boolean; act?: Act; onInspectIssue?: (issue: QualityIssue) => void; onScene?: (id: string) => void }) {
   const { t, fmt } = useI18n();
   const { usd, duration } = fmt;
   const { state } = data;
@@ -137,7 +139,7 @@ export function OverviewTab({ data, busy = false, act }: { data: EpisodeResponse
         <RenderAuditCard state={state} busy={busy} act={act} onSeek={(seconds) => seekOutput("main", seconds)} />
         <RenderAuditCard state={state} busy={busy} act={act} target="short" onSeek={(seconds) => seekOutput("short", seconds)} />
         <StyleComparisonCard state={state} busy={busy} act={act} onSeek={(seconds) => seekOutput("main", seconds)} />
-        <QualityIssueBoard id={state.id} busy={busy} version={[state.render?.exportId ?? state.render?.at, state.short?.exportId ?? state.short?.at, state.render?.audit?.at, state.short?.audit?.at, state.render?.styleComparison?.at, state.review?.at, state.draftReview?.at, state.voiceAudit?.at].join('|')} onSeek={seekOutput} />
+        <QualityIssueBoard id={state.id} busy={busy} version={qualityVersion(data)} onSeek={seekOutput} onInspect={onInspectIssue} onScene={onScene} />
         {state.render?.research && <section className="card space-y-2 p-4"><h3 className="font-semibold">{t("research.frozen")}</h3><p className="text-sm text-muted">{t("research.count", { sources: state.render.research.sources, claims: state.render.research.claims, unresolved: state.render.research.unresolved })}</p><p className="text-xs text-muted">{t("research.frozenHint")}</p><a className="btn-ghost" href={`/api/episodes/${state.id}/research?render`} download>{t("research.download")}</a></section>}
         {Boolean(state.render?.archiveSources?.length) && <section className="card min-w-0 space-y-2 p-4" aria-label={t("archive.used")}>
           <h3 className="font-semibold">{t("archive.used")}</h3>

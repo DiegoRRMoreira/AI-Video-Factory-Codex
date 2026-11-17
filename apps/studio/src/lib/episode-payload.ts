@@ -22,7 +22,7 @@ export function panelPayload(data: EpisodeResponse, panel: EpisodePanel): Episod
     overview: ["render", "short", "package", "review", "draftReview", "voice", "style", "shots", "keyframes", "stills", "voiceAudit", "styleReference", "scriptNotes", "voiceProviderId"],
     script: ["script", "scriptNotes", "voice", "pronunciations", "pronunciationOverrides", "pronunciationPlan", "narrationEdit", "voiceAudit"],
     concept: ["cast", "concept", "style", "assetChecks", "figurePreviews", "sideViews", "backgroundViews"],
-    shots: ["shots", "keyframes", "stills", "clips", "draftReview", "review", "style", "qa", "archives", "replans", "render", "script", "cast", "vectorProps"],
+    shots: ["shots", "keyframes", "stills", "clips", "draftReview", "review", "style", "qa", "archives", "replans", "render", "short", "voiceAudit", "script", "cast", "vectorProps"],
     costs: [], activity: ["activity"],
   };
   for (const key of fields[panel]) if (key in s) Object.assign(base, { [key]: s[key] });

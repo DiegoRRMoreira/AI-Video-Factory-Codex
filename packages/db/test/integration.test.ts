@@ -38,6 +38,15 @@ run("entegrasyon: Postgres + RustFS", () => {
     const uri = await store.put(key, new Uint8Array([1, 2, 3]), "application/octet-stream");
     expect(uri).toContain(key);
     expect(await store.get(key)).toEqual(new Uint8Array([1, 2, 3]));
+    const previous = await store.version(key);
+    const written = await store.putVersioned(key, new Uint8Array([4, 5, 6]), "application/octet-stream");
+    expect(await store.version(key)).toBe(written);
+    expect(written).not.toBe(previous);
+    expect(await store.compareAndSwap(key, new Uint8Array([1, 2, 3]), new Uint8Array([9]), "application/octet-stream")).toBe(false);
+    expect(await store.compareAndSwap(key, new Uint8Array([4, 5, 6]), new Uint8Array([7]), "application/octet-stream")).toBe(true);
+    expect(await store.get(key)).toEqual(new Uint8Array([7]));
     expect(await store.get(`test/${randomUUID()}`)).toBeNull();
+    await store.delete(key);
+    expect(await store.version(key)).toBeNull();
   });
 });

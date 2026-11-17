@@ -2,7 +2,8 @@
 
 import { statusLabel } from "../../../lib/status";
 import { formatText } from "@ys/core/messages";
-import type { Stage } from "@ys/pipeline/light";
+import type { QualityIssue, Stage } from "@ys/pipeline/light";
+import type { IssueRequest } from "./review-workspace";
 import { ArrowLeft, Mic, Pencil, Play, RefreshCw, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +20,9 @@ import { ConceptTab, ScriptTab, ShotsTab } from "./steps";
 export function EpisodeView({ id }: { id: string }) {
   const { t } = useI18n();
   const [data, setData] = useState<EpisodeResponse>();
+  const [shotsData, setShotsData] = useState<EpisodeResponse>();
+  const [issueRequest, setIssueRequest] = useState<IssueRequest>();
+  const [focusScene, setFocusScene] = useState<{ id: string; seq: number; episodeId: string }>();
   const [error, setError] = useState<string>();
   const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -61,6 +65,7 @@ export function EpisodeView({ id }: { id: string }) {
       }
       if (request === requestId.current) {
         setData(next);
+        if (!next.panel || next.panel === "shots") setShotsData(next);
         loadedResponse.current = next;
         setLoadFailed(false);
       }
@@ -158,6 +163,8 @@ export function EpisodeView({ id }: { id: string }) {
         ? "activity"
         : "overview");
   const panelReady = !data.panel || data.panel === active;
+  const inspectIssue = (issue: QualityIssue) => { setIssueRequest(previous => ({ issue, episodeId: id, seq: (previous?.seq ?? 0) + 1 })); setTab("shots"); };
+  const openScene = (sceneId: string) => { setFocusScene(previous => ({ id: sceneId, seq: (previous?.seq ?? 0) + 1, episodeId: id })); setTab("script"); };
   const openStage = (s: Stage) => {
     setLogStage(s);
     setTab("activity");
@@ -177,8 +184,16 @@ export function EpisodeView({ id }: { id: string }) {
             <button
               key={k}
               role="tab"
+              id={`episode-tab-${id}-${k}`}
+              aria-controls={`episode-panel-${id}`}
+              tabIndex={active === k ? 0 : -1}
               aria-selected={active === k}
               onClick={() => setTab(k)}
+              onKeyDown={e => {
+                const next = e.key === "ArrowRight" ? (TABS.indexOf(k) + 1) % TABS.length : e.key === "ArrowLeft" ? (TABS.indexOf(k) + TABS.length - 1) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : undefined;
+                if (next === undefined) return;
+                e.preventDefault(); setTab(TABS[next]!); e.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]!.focus();
+              }}
               className={`relative shrink-0 cursor-pointer px-3 py-3 text-sm transition ${active === k ? "text-white" : "text-muted hover:text-white"}`}
             >
               {t(`tab.${k}` as MessageKey)}
@@ -190,15 +205,15 @@ export function EpisodeView({ id }: { id: string }) {
             </button>
           ))}
         </nav>
-        <div className="p-5">
+        <div id={`episode-panel-${id}`} role="tabpanel" aria-labelledby={`episode-tab-${id}-${active}`} className="min-w-0 p-5">
           {!panelReady ? <p className="text-muted">{t("common.loading")}</p> : <>
-          {active === "overview" && <OverviewTab data={data} busy={busy} act={act} />}
-          {active === "script" && <ScriptTab data={data} busy={busy} act={act} />}
+          {active === "overview" && <OverviewTab data={data} busy={busy} act={act} onInspectIssue={inspectIssue} onScene={openScene} />}
+          {active === "script" && <ScriptTab data={data} busy={busy} act={act} focusScene={focusScene?.episodeId === id ? focusScene : undefined} />}
           {active === "concept" && <ConceptTab data={data} busy={busy} act={act} />}
-          {active === "shots" && <ShotsTab data={data} busy={busy} act={act} />}
           {active === "costs" && <CostsTab data={data} />}
           {active === "activity" && <ActivityTab activity={state.activity ?? []} job={data.job} stage={logStage} onStage={setLogStage} />}
           </>}
+          {shotsData?.state.id === id && <div hidden={active !== "shots" || !panelReady}><ShotsTab key={id} workspace active={active === "shots" && panelReady} data={{ ...shotsData, status: data.status, job: data.job }} busy={busy || active !== "shots" || !panelReady} act={act} issueRequest={issueRequest} onScene={openScene} /></div>}
         </div>
       </section>
     </div>

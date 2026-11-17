@@ -494,3 +494,123 @@ advance their heartbeat later. The receipt records any such later differences.
 
 Evidence: `.temp_files/roadmap-c-2026-11-16/`, with final source fingerprints and
 explicit gate results in `receipt.json`. No commit, push or release is implied.
+
+## Package D follow-up
+
+17 November 2026, working tree based on published commit `96c83d7`:
+
+- Shots now contains the existing Remotion preview, explicit main/Short playback,
+  inline shot/narration inspection and the quality issue board in one workspace.
+  Overview's Inspect issue action opens it. A finding selects its associated shot;
+  missing associations are disclosed. Voice/research findings open the actual
+  script scene. Encoded evidence is kept separate from current-code preview.
+- Source/target/status filters, shot selection and per-output position survive
+  episode-tab changes. Hidden players pause; preview close removes its frame
+  listener and reopening restores the frame. Source/timeline revisions invalidate
+  quality reads. Unresolved navigation covers the current filtered 50-row page;
+  existing pagination covers the rest. Full reload persistence is not implemented.
+- Correction selection prepares the existing shot selection and vector note.
+  It neither regenerates media nor changes production approval. Main and Short
+  decisions retain the backend producer-lock, finding and export checks. Obsolete
+  POST completions cannot reset newer inspection state. Legacy exports receive
+  the same canonical path/time identity used by quality decisions.
+- Tab arrows/Home/End use roving focus and labeled panels. Existing modal
+  inspection traps focus and restores its invoker; inline inspection retains
+  playback and context. Component tests cover 20 preview open/close cycles with
+  listener cleanup; this is not a live GPU/canvas allocation profile.
+
+Executable red/green evidence found three concrete integration failures:
+
+1. A hidden seek initially disappeared when activating its tab. It now applies
+   once on activation and does not rewind a later return to the same request.
+2. A request carrying an old export identity initially streamed the current
+   video. Bound requests now return 409 on export mismatch and on changed measured
+   size/time metadata. Legacy unbound requests retain their prior behavior.
+3. Resetting preview position when timeline and output changed together initially
+   cleared an encoded seek's stale-version guard. Preview reset now clears only a
+   preview request; the old encoded request remains visibly blocked.
+
+The original workflow proof also establishes that issue selection/navigation was
+absent before this package. Permanent tests exercise issue-to-shot/narration,
+main/Short local times, decision identity, prepared correction, actual tab return,
+scene focus, timeout/abort behavior and legacy scene-less links. Early test harness
+issues (duplicate fixture text and a dropped locale provider during rerender) were
+corrected without weakening behavior assertions. No timeout, worker count or
+coverage threshold was relaxed.
+
+A final integration run also exposed a fixture wait that accepted retained hidden
+issue text before the newly opened board finished loading. It now waits for visible
+Inspect issue controls, preserving the same navigation/identity assertions.
+
+| Final D check | Observed result |
+| --- | --- |
+| Standard `pnpm.cmd test:coverage` | 205 files / 2,258 tests pass; one integration file / two cases skipped |
+| Coverage | Statements 17,668; branches 13,616; functions 3,939; lines 13,594 — all 100% |
+| Root/Studio types | Pass on the final test/source snapshot |
+| Production build | Pass with default 31 workers after the security notification's built-in retry; dependency warning remains open |
+| Real-Git release ownership | 12 tests pass |
+| Owned-fixture HTTP/SSR | 14 requests pass, including expected 409 playback and 400 stale-decision responses |
+| Main/Short quality fixture | Complete, expected fixture findings and historical-decision isolation; zero ledger entries |
+| Fresh Remotion demo | 9.8 seconds, 1920×1080 at 30 fps, H.264/AAC; completed audit, zero findings and zero generation ledger bytes |
+
+Production verification uses copied, task-owned synthetic states and actual MP4s
+under `.temp_files/roadmap-d-2026-11-17/http-root`, not production episodes. Fourteen
+HTTP requests exercise page/shot payloads, canonical identities, Range bytes from
+the actual main/Short files, accepted current metadata decisions, controlled
+export replacement and rejection of old decisions/changed measured files. The
+temporary port-3101 server is stopped afterward; the user's port-3100 session and
+ongoing jobs are left alone. A fresh 9.8-second Remotion demo and the main/Short
+quality fixture complete with zero generation ledger entries.
+
+### D acceptance still pending
+
+The browser access host remains unavailable. Desktop/390-pixel visual acceptance,
+manual keyboard/screen-reader review, live browser/GPU resource profiling and
+production-build interactive playback cannot be certified from component/HTTP
+checks. Human five-task baseline sample size is **0**; no editor-time improvement
+percentage is claimed. Once browser/editor access is available, compare locate,
+seek, narration inspection, accepted decision and precise-correction tasks on
+fixed episodes at `96c83d7` and the new source, recording times, errors and outputs.
+
+The first production build compiled but exited 1 with Next.js's security upgrade
+notification for installed `16.4.3`. Its built-in same-command retry passed without
+an override or dependency change. This is build evidence, not a security repair.
+The official [16.4.5 release](https://github.com/vercel/next.js/releases/tag/v16.4.5)
+contains security fixes; that dependency update was offered separately and remains
+pending a scope preference. No automatic upgrade agent or extra worktree was run.
+
+Hosted CI, live PostgreSQL/RustFS and paid generation were not run. Local receipts,
+source fingerprints, media hashes and exact gate outcomes are retained under
+`.temp_files/roadmap-d-2026-11-17/`. Existing settings deletion and tsconfig byte
+identity are preserved. No commit, push, release or engine migration was performed
+for D. The next planned package is E's calibrated quality corpus, after addressing
+the dependency warning and collecting the pending editor/browser evidence.
+
+## 0.6.1 security and release preparation
+
+17 November 2026: the user approved the pending dependency work and requested
+preparation before a later 0.6.1 release. The earlier D receipt remains a historical
+16.4.3 result; the follow-up uses fresh source/dependency identities.
+
+- Studio now pins Next.js 16.4.5. The lockfile changes only Next.js and its matching
+  env/SWC packages. Frozen-lockfile installation succeeds; the production and full
+  registry scans both report zero currently known advisories, down from one
+  Moderate Next.js advisory. Two unchanged peer-range mismatches and deprecated
+  transitive packages are disclosed in the [dependency report](../security-report/dependency-audit.md).
+- CI now runs the production dependency audit before the normal types/coverage/
+  build gates. The workflow lint passes without weakening its checks.
+- Migrations and eight DB/storage tests pass against disposable PostgreSQL 18.6
+  and RustFS 1.0.4 on dynamic loopback ports. The S3 case now checks the written
+  object's own version, rejected stale compare-and-swap, successful conditional
+  replacement and deletion metadata. Task labels and IDs are checked before
+  cleanup; only owned containers are removed, with no production volumes used.
+- [0.6.1 notes](releases/v0.6.1.md) are drafted. The root version is still 0.6.0;
+  no release tag or GitHub release is created by the preparation. Release-helper
+  clean-tree checks stay intact, and unrelated settings/tsconfig changes remain
+  outside the intended commit scope.
+
+Current receipts and exact local/hosted verification outcomes are retained under
+`.temp_files/release-0.6.1-prep-2026-11-17/`. Runtime activation requires a Studio
+restart; patching the lockfile does not itself replace an already running server.
+Browser visual/mobile acceptance, manual accessibility, live GPU profiling and
+human editor timing remain separate, unverified acceptance work.

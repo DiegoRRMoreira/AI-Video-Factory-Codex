@@ -19,6 +19,14 @@ const script = {
 // ---------------- senaryo ----------------
 
 describe("ScriptTab", () => {
+  it("focuses the requested scene after lazy data arrives, without refocusing it on polling", () => {
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {}), state = makeState({ script });
+    const focus = { id: "s2", seq: 1 }, view = renderIn(<ScriptTab data={makeData(makeState())} busy={false} act={okAct()} focusScene={focus} />);
+    view.rerender(<ScriptTab data={makeData(state)} busy={false} act={okAct()} focusScene={focus} />);
+    expect(document.activeElement?.id).toBe(`scene-${state.id}-s2`); expect(scroll).toHaveBeenCalledTimes(1);
+    view.rerender(<ScriptTab data={makeData({ ...state, script: { scenes: [...script.scenes] } })} busy={false} act={okAct()} focusScene={focus} />);
+    expect(scroll).toHaveBeenCalledTimes(1); scroll.mockRestore();
+  });
   it("keeps approval blocked for repeated dirty edits and exposes grounded rewrite and revision undo", async () => {
     const act = okAct(), state = makeState({ script, story, narrationEdit: { id: "revision", at: "t" } });
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ revision: 0, sources: [{ id: "source", title: "Lab", url: "https://example.org/", excerpt: "Evidence" }], claims: [], unresolved: 0 })));
@@ -419,6 +427,18 @@ function shotsState(over: Partial<EpisodeState> = {}, input: Parameters<typeof m
 }
 
 describe("ShotsTab", () => {
+  it("traps dialog focus and returns it to the invoking control after Escape", () => {
+    const view = renderIn(<ShotsTab data={makeData(shotsState())} busy={false} act={okAct()} />);
+    const trigger = screen.getByRole("img", { name: "sh1" }).closest("button")!; trigger.focus(); fireEvent.click(trigger);
+    const buttons = [...screen.getByRole("dialog").querySelectorAll<HTMLButtonElement>("button")], first = buttons[0]!, last = buttons.at(-1)!;
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true }); expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(window, { key: "Tab" }); expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(window, { key: "Tab" }); fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(window, { key: "Escape" }); expect(document.activeElement).toBe(trigger);
+    const removed = document.createElement("button"); document.body.append(removed); removed.focus(); fireEvent.click(trigger); removed.remove(); view.unmount();
+  });
   it("shows the chosen archive image and suppresses generated-media reviews until a new export review exists", () => {
     const source = { id: `nasa-${"a".repeat(24)}`, provider: "nasa" as const, sourceId: "fixture", title: "Archive", creator: "NASA", date: "", sourceUrl: "https://images.nasa.gov/details/fixture", imageUrl: "https://images-assets.nasa.gov/image/fixture.jpg" };
     const photo = { key: "photo.jpg", mimeType: "image/jpeg" as const, source, width: 1, height: 1, downloadedAt: "t", originalSha256: "hash" };

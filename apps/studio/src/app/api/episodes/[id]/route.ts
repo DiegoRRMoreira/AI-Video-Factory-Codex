@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import { msg } from "@ys/core/messages";
 import { groupCosts, mediaSpentMicros } from "@ys/media-gateway";
-import { deleteEpisode, episodeRevision, estimateEpisode, lineStyleOf, listLibraryCharacters, motionModeOf, progressOf, runStatusOf, summarizeEpisode, summaryProgress, summaryStatus, type MotionMode } from "@ys/pipeline/light";
+import { deleteEpisode, episodeRevision, estimateEpisode, exportIdentity, lineStyleOf, listLibraryCharacters, motionModeOf, progressOf, runStatusOf, summarizeEpisode, summaryProgress, summaryStatus, type MotionMode } from "@ys/pipeline/light";
 import { panelPayload, responseRevision, selectedPanel } from "../../../../lib/episode-payload";
 import { apiError, errorResponse, isMissingEpisode, textResponse } from "../../../../lib/api";
 import { episodeBusy, estimateContext, forgetJob, getJob, ledgerRevision, ledgerSnapshot, quotaOf, repo, store, workDirOf } from "../../../../lib/server";
@@ -60,6 +60,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     // Timeline gömülü SVG'lerle megabaytlar tutabilir; Studio bunu kullanmaz. Render depodaki tam durumu okur.
     const { timeline: _timeline, ...studioState } = state;
     const body: EpisodeResponse = {
+      sourceRevision: episodeRevision(state),
+      outputVersions: { main: state.render ? exportIdentity(state.render) : undefined, short: state.short ? exportIdentity(state.short) : undefined },
       state: studioState,
       library,
       job,
@@ -76,7 +78,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     };
     if (req.headers.has("x-ys-panel")) {
       const panel = selectedPanel(req.headers.get("x-ys-panel"), status);
-      body.revision = responseRevision(episodeRevision(state), costSnapshot.revision, job, panel, !state.done.voice);
+      body.revision = responseRevision(body.sourceRevision!, costSnapshot.revision, job, panel, !state.done.voice);
       body.counts = summarizeEpisode(state).counts;
       return Response.json(panelPayload(body, panel), { headers: { "cache-control": "no-store" } });
     }

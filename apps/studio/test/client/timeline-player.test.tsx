@@ -6,7 +6,7 @@ import { json, makeData, makeState, okAct, renderIn, tr } from "./fixtures.tsx";
 // Gerçek oynatıcı (Remotion) ve sahne kodu (three, pixi, paper) testte yüklenmez: oynatıcıya verilenler kaydedilir.
 const played = vi.hoisted(() => [] as Record<string, unknown>[]);
 // Oynatıcının denetimleri (ref): atlama ve oynatma çağrıları kaydedilir.
-const controls = vi.hoisted(() => ({ calls: [] as string[] }));
+const controls = vi.hoisted(() => ({ calls: [] as string[], listeners: new Set<(e: { detail: { frame: number } }) => void>() }));
 vi.mock("@remotion/player", async () => {
   const { forwardRef, useImperativeHandle } = await import("react");
   return {
@@ -14,6 +14,9 @@ vi.mock("@remotion/player", async () => {
       useImperativeHandle(ref, () => ({
         seekTo: (f: number) => controls.calls.push(`seek:${f}`),
         play: () => controls.calls.push("play"),
+        pause: () => controls.calls.push("pause"),
+        addEventListener: (_name: string, listener: (e: { detail: { frame: number } }) => void) => controls.listeners.add(listener),
+        removeEventListener: (_name: string, listener: (e: { detail: { frame: number } }) => void) => controls.listeners.delete(listener),
       }));
       played.push(props);
       return <div data-testid="player" />;
@@ -48,10 +51,41 @@ afterEach(() => {
   vi.unstubAllGlobals();
   played.length = 0;
   controls.calls.length = 0;
+  controls.listeners.clear(); vi.useRealTimers();
   delete (window as { remotion_staticBase?: string }).remotion_staticBase;
 });
 
 describe("TimelinePlayer: bölümü render etmeden oynatır", () => {
+  it("applies a deferred hidden seek once on activation and does not rewind on a later tab return", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(TIMELINE)));
+    const view = renderIn(<TimelinePlayer id="e1" shot="sh2" seek={1} active={false} play={false} />);
+    await reactAct(async () => {}); await screen.findByTestId("player");
+    expect(controls.calls.filter(c => c.startsWith("seek:"))).toEqual([]);
+    view.rerender(<LocaleProvider locale="tr"><TimelinePlayer id="e1" shot="sh2" seek={1} active play={false} /></LocaleProvider>);
+    expect(controls.calls.filter(c => c.startsWith("seek:"))).toEqual(["seek:150"]);
+    view.rerender(<LocaleProvider locale="tr"><TimelinePlayer id="e1" shot="sh2" seek={1} active={false} play={false} /></LocaleProvider>);
+    view.rerender(<LocaleProvider locale="tr"><TimelinePlayer id="e1" shot="sh2" seek={1} active play={false} /></LocaleProvider>);
+    expect(controls.calls.filter(c => c.startsWith("seek:"))).toEqual(["seek:150"]);
+  });
+  it("clamps exact seconds/initial frames and cleans frame listeners across repeated open/close cycles", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json(TIMELINE)));
+    for (let cycle = 0; cycle < 20; cycle++) {
+      const frame = vi.fn(), view = renderIn(<TimelinePlayer id="e1" seconds={1000} seek={cycle} initialFrame={999} onFrame={frame} play={false} />);
+      await reactAct(async () => {}); await screen.findByTestId("player");
+      expect(controls.listeners.size).toBe(1); expect(played.at(-1)!.initialFrame).toBe(299);
+      [...controls.listeners][0]!({ detail: { frame: 177 } }); expect(frame).toHaveBeenCalledWith(177);
+      expect(controls.calls.at(-2)).toBe("seek:299");
+      view.unmount(); expect(controls.listeners.size).toBe(0);
+    }
+  });
+  it("aborts a timed-out timeline read and discloses the error instead of loading forever", async () => {
+    vi.useFakeTimers(); let signal!: AbortSignal;
+    vi.stubGlobal("fetch", vi.fn((_url, options) => { signal = options.signal; return new Promise(() => {}); }));
+    const view = renderIn(<TimelinePlayer id="e1" />);
+    await reactAct(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(signal.aborted).toBe(true); expect(screen.getByRole("alert")).toHaveProperty("textContent", tr("shots.play.error"));
+    view.unmount(); expect(vi.getTimerCount()).toBe(0);
+  });
   it("reloads an already open player when the completed timeline revision changes", async () => {
     let current = TIMELINE;
     const request = vi.fn(async () => json(current)); vi.stubGlobal("fetch", request);

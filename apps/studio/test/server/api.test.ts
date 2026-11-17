@@ -84,6 +84,13 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("revisioned episode summaries and panel reads", () => {
+  it("includes canonical main/Short identities and the source revision in the shared shot payload", async () => {
+    const state = await saveEpisode("d-outputs", { render: { path: "legacy.mp4", at: "legacy-at" }, short: { path: "short.mp4", at: "short-at", exportId: "short-id", title: "Short", scenes: ["s1"], sec: 5 } });
+    const { exportIdentity, episodeRevision } = await import("@ys/pipeline/light");
+    const result = await (await episode.GET(new Request("http://localhost/api", { headers: { "x-ys-panel": "shots" } }), params({ id: state.id }))).json();
+    expect(result.outputVersions).toEqual({ main: exportIdentity(state.render!), short: "short-id" });
+    expect(result.sourceRevision).toBe(episodeRevision(state)); expect(result.state.short.exportId).toBe("short-id");
+  });
   it("combines style and approval queue filters without starting generation or modifying state", async () => {
     const state = await saveEpisode("c-queue", { done: { style: "t", story: "t", script: "t" } }, { topic: "Queue test", stylePack: "flat-explainer" });
     const get = vi.spyOn(server.store(), "get");
@@ -910,6 +917,25 @@ describe("DELETE /api/episodes/[id]", () => {
 });
 
 describe("GET /api/episodes/[id]/video", () => {
+  it("binds Short reads independently and rejects changed measured files", async () => {
+    const path = join(root, "d-bound.mp4"); writeFileSync(path, new Uint8Array([1, 2, 3]));
+    const file = await (await import("node:fs/promises")).stat(path);
+    const state = await saveEpisode("d-bound", { render: { path, at: "t", exportId: "main" }, short: { path, at: "t", exportId: "short", title: "Short", sec: 1, scenes: [], audit: { status: "complete", at: "t", findings: [], findingsCount: 0, checks: [], source: { bytes: file.size, modifiedAt: file.mtime.toISOString() } } } });
+    const request = () => video.GET(new Request("http://local/video?short&export=short"), params({ id: state.id }));
+    const current = await request(); expect(current.status).toBe(200); expect(current.headers.get("x-ys-export-id")).toBe("short"); await current.arrayBuffer();
+    state.short!.audit!.source!.modifiedAt = "other"; await server.repo().save(state); expect((await request()).status).toBe(409);
+    state.short!.audit!.source!.bytes = 999; await server.repo().save(state); expect((await request()).status).toBe(409);
+    expect((await video.GET(new Request("http://local/video?short&export=main"), params({ id: state.id }))).status).toBe(409);
+  });
+  it("rejects a superseded export request instead of streaming another version", async () => {
+    const path = join(root, "bound-video.mp4"); writeFileSync(path, new Uint8Array([1, 2, 3]));
+    await saveEpisode("bound-video", { render: { path, at: "new", exportId: "new-export" } });
+    const old = await video.GET(new Request("http://localhost/video?export=old-export"), params({ id: "bound-video" }));
+    expect(old.status).toBe(409);
+    const current = await video.GET(new Request("http://localhost/video?export=new-export"), params({ id: "bound-video" }));
+    expect(current.status).toBe(200); expect(current.headers.get("x-ys-export-id")).toBe("new-export");
+    expect(new Uint8Array(await current.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
   const SIZE = 1000;
   const bytes = Uint8Array.from({ length: SIZE }, (_, i) => i % 256);
   const get = (id: string, headers: Record<string, string> = TR, query = "") =>
