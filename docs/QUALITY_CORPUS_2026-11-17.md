@@ -53,6 +53,15 @@ labels. No automatic export or publishing approval follows from this packet.
 
 ## Next execution sequence
 
+Implementation follow-up: the project now provides
+[`bench review export/import/report`](QUALITY_WORKFLOW.md#export-and-label-a-benchmark-review-packet).
+It snapshots a complete existing run into a portable gallery and byte-bound
+packet, validates explicit labels, and retains immutable revision history with
+separate human/assistant counts and visible branches/conflicts. It does not add
+human labels, new corpus coverage, fresh renders, scores or adjudication by itself.
+The earlier `.temp_files` inventory packet remains a dated scaffold; the new CLI
+defines its own versioned packet/label contracts.
+
 1. Add explicit selection metadata for narrated actions, readable text,
    transitions, archive inserts and portrait crops. Existing framing categories
    alone do not establish those coverages. Resolve the three `auto` selections

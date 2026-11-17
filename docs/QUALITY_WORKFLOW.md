@@ -68,6 +68,79 @@ Scored runs invoke the configured scene critic and incur agent usage. The review
 
 Missing stills, failed/incomplete clip audits or incomplete scored reviews produce a nonzero exit with the partial result retained. Individual clip errors are recorded rather than counted as successful samples. Historical benchmark files are preserved.
 
+## Export and label a benchmark review packet
+
+The developer CLI can package an existing complete frozen-input run without
+rendering or calling a critic:
+
+```powershell
+pnpm.cmd bench review export 20261111114126411-quality-baseline-20261111
+pnpm.cmd bench review report PACKET_ID
+pnpm.cmd bench review import PACKET_ID .\labels.json
+```
+
+Use the run's directory name, not its display label. Export writes a new
+`.data/bench/reviews/<packet-id>/` directory containing a responsive, read-only
+`index.html` gallery, copied stills/clips, `packet.json`, an empty
+`worksheet.json` and an append-only `annotations/` directory. Open `index.html`
+locally; it has no scripts, remote resources, label-saving service or production
+actions. Copy the entire packet directory, retaining its hash name, to move it.
+No Studio restart is needed for this CLI/gallery workflow.
+
+The gallery does not automatically collect labels. Copy `worksheet.json` to a
+working file and fill the reviewer name, self-declared `human` or `assistant`
+role, ISO review date and reviewed items. The empty initial worksheet cannot be
+imported. Omitted items remain unreviewed. A submission example follows; its
+judgment is illustrative, not a label supplied for the retained corpus:
+
+```json
+{
+  "version": 1,
+  "packetId": "REPLACE_WITH_THE_64_CHARACTER_PACKET_ID",
+  "parent": null,
+  "reviewer": { "name": "Your name", "role": "human" },
+  "reviewedAt": "2026-11-17T12:00:00Z",
+  "labels": [{
+    "key": "EPISODE_ID/SHOT_ID",
+    "verdict": "unresolved",
+    "tags": ["narrated-action"],
+    "note": "A still alone does not establish whether this action completes.",
+    "media": "still"
+  }]
+}
+```
+
+Verdicts are `accepted`, `defect` or `unresolved`; a nonblank evidence/rationale
+note is required. Tags are `narrated-action`, `readable-text`, `transition`,
+`crowded`, `close-framing`, `archive-insert`, `portrait`, `intentional-hold` and
+`style-choice`. Tags are supplied observations, not inferred coverage. A clip
+label needs `"media": "clip"` and `"frames": [start, end]` within the displayed
+absolute source-frame range. Still labels do not take frame intervals.
+
+Import validates the packet identity, copied media hashes, sample keys, tags and
+frame ranges. It writes a content-addressed revision with exclusive creation;
+reimporting an identical submission fails with `EEXIST` and preserves the first
+record. A corrupt/missing parent or changed media is an error, not an empty or
+successful review. Failed exports retain an unpublished `.pending-*` directory
+for diagnosis; they are not valid review packets and are never selected by the
+report command.
+
+To revise labels, copy the previous revision's `data` into a new working JSON
+file, set `parent` to that revision's `id`, retain the same reviewer name/role,
+and submit the **full current label set**. Omission retracts a prior label;
+an empty set is allowed only as a child revision. Existing files are never
+overwritten. Concurrent different submissions can create visible branches.
+Reports show every current leaf, ambiguous same-reviewer branches and conflicting
+human verdicts; they do not silently choose the newest file. Branch merging and
+human adjudication remain a later slice.
+
+Human and assistant counts are separate, and unresolved judgments remain visible.
+The reviewer role is self-declared metadata, not authenticated identity. A label
+does not approve an episode/export, invoke generation, produce an editorial
+score, or establish a reviewer false-positive rate or quality gain. The packet
+retains the original run's source/reviewer/input identities, so exporting an old
+run does not make it a current-renderer baseline.
+
 ## Isolated workflow verification
 
 ```powershell

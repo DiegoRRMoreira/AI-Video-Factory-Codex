@@ -1,4 +1,5 @@
 export * from "./money.ts";
+export * from "./benchmark-review.ts";
 export * from "./intent.ts";
 export * from "./research.ts";
 export * from "./pronunciations.ts";

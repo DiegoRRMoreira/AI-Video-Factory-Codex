@@ -24,6 +24,7 @@ import { auditRenderedVideo } from "@ys/video/audit";
 import { stillMoment } from "@ys/video/moment";
 import { benchmarkClip, benchmarkCode, comparableBenchmarks, fingerprint, freezeBenchmark, verifyBenchmark, inside, type FrozenBenchmark } from "../src/benchmark.ts";
 import type { EpisodeState } from "../src/state.ts";
+import { runBenchReview } from "./bench-review.ts";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const DATA = join(ROOT, ".data");
@@ -327,7 +328,8 @@ async function run(label: string, free: boolean, clipCount: number): Promise<voi
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-if (cmd === "pick") await pick(Number(args[0] ?? 30));
+if (cmd === "review") console.log(JSON.stringify(await runBenchReview(ROOT, args), null, 2));
+else if (cmd === "pick") await pick(Number(args[0] ?? 30));
 else if (cmd === "freeze") {
   const set = await readJson<BenchSet>(SET);
   const manifest = await freezeBenchmark({ directory: FROZEN, shots: set.shots, load: loadState, asset: async (episode, key) => {
@@ -344,6 +346,6 @@ else if (cmd === "diff" && args[0] && args[1]) {
   if (a.inputHash !== fixture.inputHash || b.inputHash !== fixture.inputHash) throw new Error("Comparison requires the matching frozen fixture");
   diff({ at: fixture.at, shots: fixture.shots }, a, b);
 } else {
-  console.error("Usage: bench pick [n] | bench freeze | bench run <label> [--free] [--clips=6] | bench diff <a> <b>");
+  console.error("Usage: bench pick [n] | bench freeze | bench run <label> [--free] [--clips=6] | bench diff <a> <b> | bench review export|import|report ...");
   process.exit(1);
 }
