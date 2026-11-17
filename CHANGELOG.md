@@ -2,6 +2,16 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.1 (2026-11-17)
+
+- Finalize 0.6.1 release notes
+- Unify Studio review and prepare the 0.6.1 security baseline
+- Improve Studio discovery and revision-aware reads
+- Add a style-aware anatomy check to the frame checklist
+- Override hono to 4.13.18 for five new advisories
+- docs: streamline READMEs and organize production guides
+- Override @hono/node-server to 2.1.6 for two moderate advisories
+
 ## v0.6.0 (2026-11-13)
 
 - The draft review checks every frame against a checklist: for each of 13 checks (shows what is narrated, the frame has content, nobody cut off or floating, no backdrop box, texts clear of each other and of the subtitles, readable text, scale, clutter, repetition, the narrated action, anything else broken) the critic first writes what it saw in that frame, then gives a verdict. Answers without real evidence are rejected and the frame is asked again. The code scores the frame: 10, minus 3 per major and 1 per minor failure.
