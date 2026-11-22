@@ -184,6 +184,17 @@ describe("EpisodeView: sekmeler", () => {
   });
 });
 
+describe("EpisodeView: YouTube analizi", () => {
+  it("analiz bölümü rapor sekmesiyle açılır; konsept ve çekim sekmeleri yok", async () => {
+    const state = makeState({ youtube: {} } as Partial<EpisodeState>, { youtube: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", videoId: "dQw4w9WgXcQ", count: 6, minSec: 20, maxSec: 60 } });
+    await show(makeData(state));
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs).toEqual([tr("tab.youtube"), tr("tab.costs"), tr("tab.activity")]);
+    expect(screen.getByRole("tab", { name: tr("tab.youtube") }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("youtube-steps")).toBeTruthy();
+  });
+});
+
 describe("EpisodeView: durum panelleri", () => {
   it("offers script creation, discloses local-only work and opens a completed output without generation", async () => {
     const first = await show(makeData(makeState(), { status: { status: "idle", stage: "style" } }));

@@ -69,6 +69,7 @@ vi.mock("../../src/lib/server", () => ({
 }));
 vi.mock("../../src/lib/update", () => ({ updateInfo: async () => fake.update }));
 vi.mock("../../src/app/footage-form", () => ({ FootageForm: () => <div data-footage-form="" /> }));
+vi.mock("../../src/app/youtube-form", () => ({ YoutubeForm: () => <div data-youtube-form="" /> }));
 vi.mock("../../src/app/new-episode-form", () => ({
   NewEpisodeForm: ({ series, initialSeries, bank, samples }: { series: { name: string }[]; initialSeries?: string; bank: { name: string }[]; samples: object }) => (
     <div
@@ -506,6 +507,11 @@ describe("Yeni bölüm sayfası", () => {
     expect(footage).toContain("data-footage-form");
     expect(footage).not.toContain("data-form=");
     expect(text(footage)).toContain("Kendi görüntünden Short");
+    expect(topic).toContain('href="/episodes/new?kind=youtube"');
+    const youtube = await html(NewEpisodePage({ searchParams: Promise.resolve({ kind: "youtube" }) }));
+    expect(youtube).toContain("data-youtube-form");
+    expect(youtube).not.toContain("data-footage-form");
+    expect(text(youtube)).toContain("YouTube videosundan Short");
   });
 });
 

@@ -20,3 +20,4 @@ export * from "./acp-settings.ts";
 export * from "./youtube.ts";
 export * from "./youtube-media.ts";
 export * from "./youtube-stages.ts";
+export * from "./youtube-shorts.ts";

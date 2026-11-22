@@ -82,6 +82,47 @@ approving it cuts (each new part's vertical crop is checked against its source b
 fixed if it cut the subject; `--no-qa` turns the check off) and builds the preview, and the Shots tab plays it
 before you approve the render. The cover image is the rendered Short's frame where the hook is fully on screen.
 
+## Shorts from a YouTube video
+
+`episode new --youtube <address>` opens an analysis episode for a YouTube video you own or have the right to use.
+It needs [yt-dlp](https://github.com/yt-dlp/yt-dlp) (`winget install yt-dlp.yt-dlp`, or set `YS_YTDLP` to its path)
+and FFmpeg:
+
+```sh
+pnpm ys episode new --youtube https://youtu.be/<id> --count 6 --min 20 --max 60 --lang en
+pnpm ys episode run <id>
+pnpm ys episode show <id>
+pnpm ys episode shorts <id> --candidates c1,c3
+```
+
+- `--count 1–12`: how many Short candidates to rank (default 6). `--min` / `--max`: a Short's length in seconds
+  (default 20–60, within 15–180).
+- `--lang`: the language of the report, titles and hooks.
+- `--no-transcribe`: without captions on the video, do not transcribe its speech (whisper.cpp or ElevenLabs Scribe, as
+  for footage). Captions (hand-written first, then YouTube's automatic ones in the spoken language) are used when there.
+- Videos over 90 minutes are refused (`YS_YOUTUBE_MAX_MIN` changes it); live streams too.
+
+The run downloads the video once (up to 1080p, kept in the library under `library/youtube/<id>/`, so a second analysis
+or the Shorts reuse it), reads its captions, chapters and replay graph, measures scene cuts, small frames and long
+silences, then the `youtube-analyst` agent goes through the video in windows of about six minutes, each shown as contact
+sheets with the transcript, and the `youtube-curator` agent ranks the candidates. A run that stops halfway resumes from
+the finished windows. `episode show` prints the report: scenes, cut suggestions and each candidate's time ranges.
+
+`episode shorts <id> --candidates c1,c3` turns candidates into footage Short episodes (1080×1920, original speech as
+captions, the hook as an on-screen text) and produces them right away; `--review` opens them at the script gate so the
+cut can be changed in the Studio first, `--no-music` leaves the music out. In the Studio: **New episode → From YouTube**,
+then the episode's **Analysis** tab shows the report and makes Shorts from the candidates you tick.
+
+## Agents through ACP
+
+Every agent normally runs on Claude through the Agent SDK. On the Studio's **Models** page you can also add an
+[Agent Client Protocol](https://agentclientprotocol.com) agent: **Add Antigravity (agy)** sets up `agy acp`, or give
+any ACP agent's command and arguments. **Find models** reads its models, thinking levels and image support from the
+agent itself (no prompt is sent). Its models then appear in every agent's list under the agent's name, stored as
+`acp:<agent>:<model>`. Calls run in an empty temporary folder with no file or terminal access, any tool permission is
+refused, and the JSON answer is checked against the agent's schema in code (asked again up to twice if it does not
+fit). Their cost is not known and is recorded as zero; they use the ACP agent's own account and quota.
+
 ## Character bank
 
 In vector mode, every approved character is kept in a library and shown on the Studio's **Characters** page.

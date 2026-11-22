@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import type { EpisodePanel, EpisodeResponse, JobView } from "./types.ts";
 
-export function selectedPanel(value: string | null, status: EpisodeResponse["status"]): EpisodePanel {
-  if (["overview", "script", "concept", "shots", "costs", "activity"].includes(value ?? "")) return value as EpisodePanel;
-  return status.status === "waiting" ? status.stage === "render" ? "shots" : status.stage === "voice" ? "concept" : "script" : status.status === "running" ? "activity" : "overview";
+/** İstenen panel; "auto" ise bölümün durumuna göre (istemcinin açtığı sekmeyle aynı kural). YouTube analizinin ana paneli rapordur. */
+export function selectedPanel(value: string | null, status: EpisodeResponse["status"], youtube = false): EpisodePanel {
+  if (["overview", "script", "concept", "shots", "costs", "activity", "youtube"].includes(value ?? "")) return value as EpisodePanel;
+  return status.status === "waiting" ? status.stage === "render" ? "shots" : status.stage === "voice" ? "concept" : "script" : status.status === "running" ? "activity" : youtube ? "youtube" : "overview";
 }
 export function responseRevision(source: string, ledger: string, job: JobView | null, panel: EpisodePanel, voicePending: boolean) {
   return createHash("sha256").update(JSON.stringify([source, ledger, job, panel, voicePending ? Math.floor(Date.now() / 60_000) : null])).digest("hex");
@@ -23,7 +24,7 @@ export function panelPayload(data: EpisodeResponse, panel: EpisodePanel): Episod
     script: ["script", "scriptNotes", "voice", "pronunciations", "pronunciationOverrides", "pronunciationPlan", "narrationEdit", "voiceAudit"],
     concept: ["cast", "concept", "style", "assetChecks", "figurePreviews", "sideViews", "backgroundViews"],
     shots: ["shots", "keyframes", "stills", "clips", "draftReview", "review", "style", "qa", "archives", "replans", "render", "short", "voiceAudit", "script", "cast", "vectorProps"],
-    costs: [], activity: ["activity"],
+    costs: [], activity: ["activity"], youtube: ["youtube"],
   };
   for (const key of fields[panel]) if (key in s) Object.assign(base, { [key]: s[key] });
   // Koddan oynatma ayrı timeline ucunu kullanır; çekim tarifi kartlarda çizilmez.

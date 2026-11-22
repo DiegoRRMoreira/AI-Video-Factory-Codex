@@ -26,7 +26,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     if (req.headers.get("x-ys-status") === "1") {
       const [summary, costs] = await Promise.all([repo().summary(id), ledgerRevision()]);
       const { status, job } = await liveStatus(id, summary, { ...summaryStatus(summary) });
-      const panel = selectedPanel(req.headers.get("x-ys-panel"), status);
+      const panel = selectedPanel(req.headers.get("x-ys-panel"), status, Boolean(summary.input.youtube));
       const revision = responseRevision(summary.revision, costs, job, panel, !summary.done.voice);
       return Response.json({ revision, summary, status, progress: summaryProgress(summary) ?? null }, { headers: { "cache-control": "no-store" } });
     }
@@ -77,7 +77,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       quota,
     };
     if (req.headers.has("x-ys-panel")) {
-      const panel = selectedPanel(req.headers.get("x-ys-panel"), status);
+      const panel = selectedPanel(req.headers.get("x-ys-panel"), status, Boolean(state.input.youtube));
       body.revision = responseRevision(body.sourceRevision!, costSnapshot.revision, job, panel, !state.done.voice);
       body.counts = summarizeEpisode(state).counts;
       return Response.json(panelPayload(body, panel), { headers: { "cache-control": "no-store" } });

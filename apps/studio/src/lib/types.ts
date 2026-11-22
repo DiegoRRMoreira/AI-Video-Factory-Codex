@@ -1,6 +1,6 @@
 import type { CostGroup, Quota } from "@ys/media-gateway";
 import type { EpisodeEstimate, EpisodeState, EpisodeSummary, LibraryCharacter, MotionMode, Progress, RunStatus, Stage } from "@ys/pipeline/light";
-export type EpisodePanel = "overview" | "script" | "concept" | "shots" | "costs" | "activity";
+export type EpisodePanel = "overview" | "script" | "concept" | "shots" | "costs" | "activity" | "youtube";
 export interface EpisodeStatusResponse {
   revision: string;
   summary: EpisodeSummary;

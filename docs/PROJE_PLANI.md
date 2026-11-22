@@ -577,6 +577,29 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
   (`footage-inspector`) gösterilir; kırpma özneyi keserse odak ve kadraj düzeltilip parça bir kez yeniden kesilir, sonuç
   kurguya ve parça kartına yazılır.
 
+### 16.2 YouTube videosundan Short ve ACP ajanları (22 Kas 2026)
+
+Kullanıcı: "YouTube URL verdiğimde videoyu indirip ACP modunda agy (Antigravity) ya da Claude ile, istediğim modelle
+analiz ettirip hangi sahnede ne var, nereleri kesmek gerek, nereden Short üretilir bulsun." Kararlar: genel ACP
+katmanı, ilk ajan agy; rapor + aday seçimi.
+
+- **ACP:** `agents/src/acp.ts` ajan CLI'ını alt süreç olarak açar, stdio JSON-RPC konuşur (initialize, session/new,
+  session/set_config_option ile model ve düşünme seviyesi, session/prompt; agy 1.5.14'e karşı yoklandı). Boş geçici
+  klasörde çalışır, dosya/uçbirim yeteneği bildirilmez, araç izni geri çevrilir. Şema zorlanamadığı için yanıt kodda
+  doğrulanır, uymazsa aynı oturumda iki kez düzeltme istenir. Seçim `acp:<ajan>:<model>`; ajanlar
+  `settings/acp.json`'da, modeller ajandan keşfedilir (istem yok). Maliyet bilinmez, 0 yazılır.
+- **Analiz bölümü** (`input.youtube`): story = yt-dlp bilgi (süre sınırı 90 dk, canlı yayın yok), video (1080p,
+  `library/youtube/<kimlik>/`, bir kez), altyazı (elle → otomatik özgün dil; yoksa STT), sahne kesimleri (yalnız anahtar
+  kareler), sahne başına küçük kareler, uzun sessizlikler; script = ~6 dk'lık pencereler, her biri kontakt sayfası
+  (4×3) + döküm + tekrar izlenme grafiği + bölümler + sessizliklerle `youtube-analyst`'e; biten pencere kaydedilir,
+  yarıda kalan iş oradan sürer; `youtube-curator` adayları birleştirip sıralar, kod kelime sınırına oturtur, süreyi
+  sınırlar, örtüşeni atar. Diğer aşamalar boştur, kapılar geçer.
+- **Adaydan Short** (`createYoutubeShorts`, yalnız depo): footage bölümü, kaynak kütüphanedeki video (kopyalanmaz,
+  yerel kopya `workDir/_library` altında paylaşılır), döküm adayın kelimeleri, kurgu anlatımsız ve özgün sesli, kanca
+  ekran yazısı. İnceleme istenmezse senaryo onaylı açılır ve hemen üretilir.
+- Stüdyo: Yeni bölüm → "YouTube'dan" (hak onayı zorunlu); bölümün Analiz sekmesi rapor, adaylar ve Short üretimi;
+  Modeller sayfasında ACP ajanları. CLI: `episode new --youtube`, `episode shorts <id> --candidates`.
+
 ## 17. Pazar Haritası (Ekim 2026)
 
 Pazar her ay değişiyor. Son 6 ayda Sora kapandı, Kling 4.0, Seedance 2.5, Wan 3.0 ve Gemini Omni çıktı. Bu yüzden mimari **"model değil, yetenek"** üzerine kurulu. Aşağıdaki liste bugünkü durum. Model Scout ajanı (§16) bu listeyi canlı tutar.

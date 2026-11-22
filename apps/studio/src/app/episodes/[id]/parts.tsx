@@ -19,7 +19,7 @@ export const draftBelow = (state: EpisodeState) => (state.input.qa === false || 
  * önizleme kapısı yalnız açık onayla geçilir.
  */
 export const approved = (state: EpisodeState, gate: Gate) =>
-  gate === "preview" && draftBelow(state).length ? Boolean(state.approvals?.preview) : Boolean(state.input.autoApprove || state.approvals?.[gate]);
+  Boolean(state.input.youtube) || (gate === "preview" && draftBelow(state).length ? Boolean(state.approvals?.preview) : Boolean(state.input.autoApprove || state.approvals?.[gate]));
 
 /** Bekleyen onay kapısının sekmesi: senaryo, konsept, önizleme (render öncesi, Çekimler). */
 export const gateTab = (stage: Stage | undefined): Tab => (stage === "render" ? "shots" : stage === "voice" ? "concept" : "script");
@@ -31,10 +31,11 @@ export type Act = (action: Record<string, unknown>) => Promise<boolean>;
 export const modeOf = (input: { motionMode?: "animated" | "mixed" | "still" | "vector"; aiClipRatio: number }) =>
   input.motionMode ?? (input.aiClipRatio > 0 ? "mixed" : "still");
 
-export type Tab = "overview" | "script" | "concept" | "shots" | "costs" | "activity";
+export type Tab = "overview" | "script" | "concept" | "shots" | "costs" | "activity" | "youtube";
 export const TABS: Tab[] = ["overview", "script", "concept", "shots", "costs", "activity"];
-/** Bölümün sekmeleri: footage bölümünde konsept (kadro, karakter seçimi) yok. */
-export const tabsOf = (state: Pick<EpisodeState, "input">): Tab[] => (state.input.footage ? TABS.filter((t) => t !== "concept") : TABS);
+/** Bölümün sekmeleri: footage bölümünde konsept (kadro, karakter seçimi) yok; YouTube analizinde rapor, maliyet ve günlük. */
+export const tabsOf = (state: Pick<EpisodeState, "input">): Tab[] =>
+  state.input.youtube ? ["youtube", "costs", "activity"] : state.input.footage ? TABS.filter((t) => t !== "concept") : TABS;
 
 /** Aşama şeridindeki gruplar: senaryo ve konsept onay kapılarıyla ayrılır. */
 export const STAGE_GROUPS: { key: "pre" | "prod" | "post"; stages: Stage[] }[] = [

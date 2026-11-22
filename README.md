@@ -17,6 +17,8 @@ Turn a topic into a narrated, animated YouTube video. Claude agents write the st
 - **Narrated videos in multiple languages:** synchronized captions, lip sync, music and sound effects. The Studio supports English and Turkish.
 - **A publishing package:** video, `.srt` subtitles, title, description, chapters, tags, thumbnail and a vertical Short from horizontal episodes.
 - **Shorts from your own footage:** upload your videos and images, pick a length (15–180 s), and AI picks the best moments, frames them for 9:16, adds a voice-over or keeps the original speech, and burns in captions, on-screen texts, music and sound effects.
+- **Shorts from a YouTube video:** paste the address of a video you own; it is downloaded and gone through scene by scene, and you get a scene log, what to cut, and ranked Short candidates. The ones you pick become vertical Shorts with the original speech as captions.
+- **Any model through ACP:** besides Claude, each agent can run on an Agent Client Protocol agent such as Antigravity (`agy`), with its Gemini, Claude or GPT-OSS models, picked per agent on the Models page.
 - **Review throughout production:** script/concept approvals, shot previews, drawing checks, selected-shot revisions and export audits.
 - **Resumable, cost-aware production:** saved stage progress, generation caching, provider fallback and estimates before paid calls.
 
@@ -71,6 +73,14 @@ To cut a vertical Short from your own videos and images instead:
 
 ```sh
 pnpm ys episode new --footage trip.mp4 --footage sunrise.jpg --sec 30 --overlay "Best morning ever" --manual
+```
+
+Or have a long YouTube video of yours analysed for Shorts (needs [yt-dlp](https://github.com/yt-dlp/yt-dlp)):
+
+```sh
+pnpm ys episode new --youtube https://www.youtube.com/watch?v=<id> --count 6 --min 20 --max 60
+pnpm ys episode run <id>
+pnpm ys episode shorts <id> --candidates c1,c3
 ```
 
 ## Documentation

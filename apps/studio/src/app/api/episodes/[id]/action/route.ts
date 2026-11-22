@@ -22,6 +22,7 @@ import {
   selectCandidate,
   setMotion,
   type MotionMode,
+  createYoutubeShorts,
 } from "@ys/pipeline/light";
 import { importArchiveImage } from "@ys/pipeline/archive";
 import { LocalizedError, msg } from "@ys/core/messages";
@@ -63,6 +64,7 @@ export type StudioAction =
   | { type: "reuse-character"; castId: string; key: string }
   | { type: "set-series"; series?: string }
   | { type: "edit-footage"; plan: unknown }
+  | { type: "make-shorts"; candidates: unknown; review?: unknown; music?: unknown }
   | { type: "cancel" };
 
 /** Stüdyodaki her insan kararı ve iş başlatma buradan geçer. */
@@ -205,6 +207,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         if (!state.render?.styleReference || !state.render.styleSampling) throw new LocalizedError(msg("err.missing", { what: "render/style reference" }));
         startJob(id, "job.compareStyle", ["episode", "compare-style", id]);
         break;
+      }
+      case "make-shorts": {
+        // Seçilen adaylardan Short bölümleri; incelenmeyecekler hemen üretilir (önizleme kapısına kadar).
+        const picks = Array.isArray(action.candidates) ? action.candidates.filter((c): c is string => typeof c === "string" && /^c\d{1,2}$/.test(c)).slice(0, 12) : [];
+        if (!picks.length) throw new LocalizedError(msg("api.youtube.candidates"));
+        const review = action.review === true;
+        const created = await createYoutubeShorts(store(), id, picks, { review, music: action.music !== false });
+        if (!review) for (const s of created) startJob(s.id, "job.produce", ["episode", "run", s.id]);
+        return Response.json({ ok: true, ids: created.map((s) => s.id) });
       }
       case "cancel":
         cancelJob(id);

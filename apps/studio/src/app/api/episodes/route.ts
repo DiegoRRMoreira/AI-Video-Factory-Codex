@@ -1,5 +1,5 @@
 import { BudgetTier, LineStyle, STYLE_AUTO, STYLE_CUSTOM, stylePackOf } from "@ys/core";
-import { cleanSeries, loadCustomStyle, newEpisodeState, UPLOAD_KEY, withBankChoice, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
+import { cleanSeries, loadCustomStyle, newEpisodeState, UPLOAD_KEY, withBankChoice, youtubeInput, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
 import { msg } from "@ys/core/messages";
 import { apiError, errorResponse, readJson } from "../../../lib/api";
 import { repo, startJob, store } from "../../../lib/server";
@@ -59,6 +59,47 @@ interface CreateBody {
   series?: string;
   /** Kendi görüntünden Short (footage modu): yüklenmiş dosyalar (api/footage), süre ve seçenekler. */
   footage?: { uploads?: unknown; sec?: unknown; narration?: unknown; transcribe?: unknown; texts?: unknown };
+  /** YouTube'dan Short: adres, aday sayısı, Short süresi, konuşma tanıma ve hak onayı. */
+  youtube?: { url?: unknown; count?: unknown; minSec?: unknown; maxSec?: unknown; transcribe?: unknown; rights?: unknown };
+}
+
+const num = (v: unknown) => (v === undefined || v === null || v === "" ? undefined : Number(v));
+
+/**
+ * YouTube analiz bölümü: adres doğrulanır (yalnız kanonik adres yt-dlp'ye gider), kullanıcı hakkını onaylamalı. İş hemen
+ * başlar ve onay beklemeden rapora kadar gider; Short'lar rapordan seçilir.
+ */
+async function createYoutube(req: Request, body: CreateBody): Promise<Response> {
+  const y = body.youtube!;
+  if (y.rights !== true) return apiError(req, msg("api.youtube.rights"));
+  const budget = Number(body.budgetUsd ?? 5);
+  if (!Number.isFinite(budget) || budget <= 0) return apiError(req, msg("api.budget"));
+  try {
+    const counts = [num(y.count), num(y.minSec), num(y.maxSec)].map((n) => (n !== undefined && Number.isFinite(n) ? n : undefined));
+    const youtube = youtubeInput({ url: typeof y.url === "string" ? y.url : "", count: counts[0], minSec: counts[1], maxSec: counts[2], transcribe: y.transcribe !== false });
+    const lang = typeof body.lang === "string" && /^[a-z]{2,3}(-[A-Z]{2})?$/.test(body.lang) ? body.lang : "tr";
+    const state = newEpisodeState({
+      topic: typeof body.topic === "string" && body.topic.trim() ? body.topic.trim().slice(0, 300) : "YouTube",
+      lang,
+      targetSec: 60,
+      tier: BudgetTier.catch("standard").parse(body.tier),
+      aiClipRatio: 0,
+      budgetUsd: budget,
+      autoApprove: false,
+      captions: body.captions !== false,
+      sfx: body.sfx !== false,
+      music: body.music !== false,
+      youtube,
+      width: 1080,
+      height: 1920,
+      fps: 30,
+    });
+    await repo().save(state);
+    startJob(state.id, "job.youtube", ["episode", "run", state.id]);
+    return Response.json({ id: state.id });
+  } catch (e) {
+    return errorResponse(req, e);
+  }
 }
 
 /**
@@ -112,6 +153,7 @@ export async function POST(req: Request) {
     return errorResponse(req, e);
   }
   if (body.footage !== undefined) return createFootage(req, body);
+  if (body.youtube !== undefined) return createYoutube(req, body);
   if (typeof body.topic !== "string" || !body.topic.trim()) return apiError(req, msg("api.topic"));
   const minutes = Number(body.minutes ?? 3);
   const budget = Number(body.budgetUsd ?? 20);

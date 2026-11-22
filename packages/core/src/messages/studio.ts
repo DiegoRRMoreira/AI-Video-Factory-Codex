@@ -8,6 +8,8 @@ export const STUDIO_MESSAGES = {
   "api.style.recipe": { tr: "Stil alanlarını ve en az üç #RRGGBB rengini kontrol et.", en: "Check the style fields and at least three #RRGGBB colours." },
   "api.style.missing": { tr: "Kaydedilmiş stil bulunamadı.", en: "Saved style not found." },
   "api.style.bank": { tr: "Özel stil ile hazır stilin karakter bankası birlikte seçilemez.", en: "A custom style cannot be combined with characters from a ready-made style." },
+  "api.youtube.rights": { tr: "Videonun sahibi olduğunu ya da kullanma hakkın olduğunu onayla", en: "Confirm that you own the video or have the right to use it" },
+  "api.youtube.candidates": { tr: "En az bir Short adayı seç", en: "Pick at least one Short candidate" },
   "api.badJson": { tr: "Geçersiz istek gövdesi (JSON nesnesi gerekli)", en: "Invalid request body (a JSON object is required)" },
   "api.badEpisode": { tr: "Geçersiz bölüm", en: "Invalid episode" },
   "api.busy": { tr: "Önce çalışan iş bitmeli", en: "Wait for the running job to finish first" },

@@ -16,6 +16,7 @@ import { CostsTab } from "./costs-panel";
 import { OverviewTab } from "./overview";
 import { Badge, Bar, gateTab, modeOf, nextWork, STAGE_GROUPS, STATUS_TONE, StatusIcon, stageKey, TABS, tabsOf, type Act, type Tab } from "./parts";
 import { ConceptTab, ScriptTab, ShotsTab } from "./steps";
+import { YoutubeTab } from "./youtube-report";
 
 export function EpisodeView({ id }: { id: string }) {
   const { t } = useI18n();
@@ -162,7 +163,7 @@ export function EpisodeView({ id }: { id: string }) {
       ? gateTab(status.stage)
       : status.status === "running"
         ? "activity"
-        : "overview");
+        : tabs[0]!);
   const panelReady = !data.panel || data.panel === active;
   const inspectIssue = (issue: QualityIssue) => { setIssueRequest(previous => ({ issue, episodeId: id, seq: (previous?.seq ?? 0) + 1 })); setTab("shots"); };
   const openScene = (sceneId: string) => { setFocusScene(previous => ({ id: sceneId, seq: (previous?.seq ?? 0) + 1, episodeId: id })); setTab("script"); };
@@ -212,6 +213,7 @@ export function EpisodeView({ id }: { id: string }) {
           {active === "script" && <ScriptTab data={data} busy={busy} act={act} focusScene={focusScene?.episodeId === id ? focusScene : undefined} />}
           {active === "concept" && <ConceptTab data={data} busy={busy} act={act} />}
           {active === "costs" && <CostsTab data={data} />}
+          {active === "youtube" && <YoutubeTab data={data} busy={busy} act={act} />}
           {active === "activity" && <ActivityTab activity={state.activity ?? []} job={data.job} stage={logStage} onStage={setLogStage} />}
           </>}
           {shotsData?.state.id === id && <div hidden={active !== "shots" || !panelReady}><ShotsTab key={id} workspace active={active === "shots" && panelReady} data={{ ...shotsData, status: data.status, job: data.job }} busy={busy || active !== "shots" || !panelReady} act={act} issueRequest={issueRequest} onScene={openScene} /></div>}

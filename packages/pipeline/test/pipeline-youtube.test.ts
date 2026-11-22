@@ -378,6 +378,18 @@ describe("adaydan Short", () => {
     await expect(done.h.pipeline.createYoutubeShorts(done.id, ["c9"])).rejects.toThrow("böyle bir aday yok: c9");
   });
 
+  it("döküm dosyası silinmiş, başlıksız aday, karesiz analiz: Short yine açılır", async () => {
+    const { h, id } = await analysed();
+    const state = await h.load(id);
+    h.store.map.delete(state.youtube!.transcript!.key!);
+    state.youtube!.report!.candidates[0]!.title = "";
+    delete state.youtube!.frames;
+    await h.pipeline.save(state);
+    const [s] = await h.pipeline.createYoutubeShorts(id, ["c1"]);
+    expect(s!.input.topic).toBe("Uzun Sohbet");
+    expect(s!.footageScan!.f1).toEqual({ frames: [], words: [] });
+  });
+
   it("dökümü olmayan analizden Short kelimesiz açılır", async () => {
     const h = harness();
     yt.captions = undefined;
