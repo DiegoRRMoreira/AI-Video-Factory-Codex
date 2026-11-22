@@ -68,7 +68,7 @@ export function musicSections(timeline: Timeline): MusicSection[] {
   const total = timeline.durationInFrames;
   const marks: { from: number; mood: VectorMood }[] = [];
   for (const v of [...timeline.visuals].sort((a, b) => a.fromFrame - b.fromFrame)) {
-    const mood = v.vector?.mood ?? "neutral";
+    const mood = v.vector?.mood ?? v.mood ?? "neutral";
     if (marks.at(-1)?.mood !== mood) marks.push({ from: v.fromFrame, mood });
   }
   if (!marks.length) marks.push({ from: 0, mood: "neutral" });

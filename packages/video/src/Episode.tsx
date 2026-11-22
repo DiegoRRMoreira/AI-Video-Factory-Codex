@@ -16,6 +16,7 @@ import {
 import { Ambience } from "./Ambience.tsx";
 import { captionPages, cutLook, cutsOf, type Cut } from "./cut.ts";
 import { stageFit, VectorScene } from "./Vector.tsx";
+import { Overlays } from "./Overlays.tsx";
 
 export type EpisodeProps = { timeline: Timeline };
 
@@ -220,6 +221,8 @@ export function Episode({ timeline }: EpisodeProps) {
       })}
 
       <EpisodeAudio timeline={timeline} />
+
+      {timeline.overlays?.length ? <Overlays overlays={timeline.overlays} typography={timeline.typography} /> : null}
 
       {timeline.captions.length > 0 && <Captions captions={timeline.captions} typography={timeline.typography} />}
     </AbsoluteFill>

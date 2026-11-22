@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Footage yüklemesinin kabul ettiği gövde türleri (api/footage; uzantı ve dosya imzası orada da denetlenir). Tarayıcı
+ * türü bilmezse (bazı .mkv) octet-stream gönderir.
+ */
+const UPLOAD_MIME = new Set(["video/mp4", "video/quicktime", "video/webm", "video/x-matroska", "video/x-m4v", "image/jpeg", "image/png", "image/webp", "application/octet-stream"]);
+
 /** Stüdyo'nun kendi makinesindeki adları; başka ad (ağdaki IP, alan adı) YS_STUDIO_HOSTS ile açıkça eklenir. */
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
@@ -42,7 +48,11 @@ export function proxy(req: NextRequest) {
     }
   }
   if (!sameOrigin) return NextResponse.json({ error: "Yalnız Stüdyo sayfasından" }, { status: 403 });
-  if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) {
+  const type = req.headers.get("content-type") ?? "";
+  // Footage yüklemesi gövdeyi dosyanın kendisi olarak gönderir: yalnız bu uç noktada, yalnız izinli video/resim
+  // türleri (bunlar "basit" istek türü değildir, çapraz kökenden önce izin sorulur; köken denetimi yukarıda).
+  if (req.nextUrl.pathname === "/api/footage" && UPLOAD_MIME.has(type.split(";")[0]!.trim())) return NextResponse.next();
+  if (!type.startsWith("application/json")) {
     return NextResponse.json({ error: "JSON gerekli" }, { status: 415 });
   }
   return NextResponse.next();

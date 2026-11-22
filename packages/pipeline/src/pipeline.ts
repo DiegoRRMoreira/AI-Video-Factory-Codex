@@ -106,7 +106,7 @@ import type {
   RefInput,
   RunOptions,
 } from "@ys/media-gateway";
-import { getJson, putJson, type AssetStore } from "@ys/storage";
+import { deletePrefix, getJson, putJson, type AssetStore } from "@ys/storage";
 import { renderEpisode, renderFigurePreviews, renderStills, renderThumbnail, thumbnailShot, thumbnailTitle } from "@ys/video/render";
 import { readFile } from "node:fs/promises";
 import { curateLessons } from "./curate.ts";
@@ -150,6 +150,7 @@ import {
 } from "./state.ts";
 import { existingSamples, loadStyleSamples, SAMPLE_BRIEF, STYLE_SAMPLES_ID, STYLE_SAMPLES_KEY, type StyleSample, type StyleSamples } from "./samples.ts";
 import { shortRange, shortTimeline } from "./short.ts";
+import { addFootageSources, checkFootageInput, footageStages } from "./footage-stages.ts";
 import { buildTimeline, clipSeconds, resolveShotTimes, sceneOffsets, toSrt } from "./timing.ts";
 import { assignReverseViews, reverseCandidates, varyShotSizes } from "./variety.ts";
 import { withKey } from "./key-prop.ts";
@@ -403,6 +404,23 @@ export class EpisodePipeline {
     return state;
   }
 
+  /**
+   * Footage bölümü: kullanıcının dosyaları (yerel yollar) bölümün klasörüne eklenir, sonra durum yazılır. Ekleme yarıda
+   * düşerse yüklenen dosyalar silinir (bölüm listede görünmez, artık dosya kalmaz).
+   */
+  async createFootage(input: EpisodeInput, files: { name: string; path: string }[]): Promise<EpisodeState> {
+    checkFootageInput({ targetSec: input.targetSec, footage: { sources: files } });
+    const state = newEpisodeState({ ...input, footage: { ...input.footage!, sources: [] } });
+    try {
+      await addFootageSources(this.deps.store, state, files, async (path) => new Uint8Array(await readFile(path)));
+    } catch (e) {
+      await deletePrefix(this.deps.store, `assets/footage/${state.id}/`);
+      throw e;
+    }
+    await this.save(state);
+    return state;
+  }
+
   async load(id: string): Promise<EpisodeState> {
     const state = await getJson<EpisodeState>(this.deps.store, this.stateKey(id));
     if (!state) throw new LocalizedError(msg("err.episode.notFound", { id }));
@@ -622,7 +640,7 @@ export class EpisodePipeline {
       state.stats![stage] = { ...state.stats![stage]!, endedAt: new Date().toISOString(), durationMs: Date.now() - started };
     };
     try {
-      await this.stages[stage](state, opts);
+      await ((state.input.footage ? this.footage[stage] : undefined) ?? this.stages[stage])(state, opts);
       // Newly planned shot ids can describe different content; prior explicit image choices need a new review.
       if (stage === "shots") delete state.archives;
     } catch (e) {
@@ -2663,6 +2681,23 @@ export class EpisodePipeline {
 
   // ---------------- aşamalar ----------------
 
+  private footageMap?: ReturnType<typeof footageStages>;
+  /** Footage modunun aşamaları (footage-stages.ts); verilmeyen aşama normal aşamadır. */
+  private get footage(): ReturnType<typeof footageStages> {
+    return (this.footageMap ??= footageStages({
+      store: this.deps.store,
+      gateway: this.deps.gateway,
+      workDir: this.deps.workDir,
+      log: (text) => this.log(text),
+      save: (state) => this.save(state),
+      agent: (state, stage, call) => this.agent(state, stage, call),
+      agentDeps: () => this.agentDeps,
+      runOptions: (state, stage, signal, refId) => this.runOptions(state, stage, signal, refId),
+      music: (state, timeline) => this.music(state, timeline),
+      soundEffects: (state, timeline) => this.soundEffects(state, timeline),
+    }));
+  }
+
   private readonly stages: Record<Stage, (state: EpisodeState, opts: RunEpisodeOptions) => Promise<void>> = {
     style: async (state) => {
       if (state.input.customStyleId) {
@@ -2894,6 +2929,8 @@ export class EpisodePipeline {
       if (state.pronunciationPlan && (state.pronunciationPlan.revision !== book.revision || state.pronunciationPlan.rulesFingerprint !== pronunciationRulesFingerprint(state, book))) throw new LocalizedError(msg("err.pronunciation.changed"));
       // Yazım sabit kalsa da incelenmiş okunuş değişmiş olabilir; bilinmeyen eski kayıt kendiliğinden silinmez.
       const todo = state.script.scenes.filter((s) => {
+        // Anlatımsız sahne (footage modunda kaynağın kendi konuşmasını taşıyan vuruş) seslendirilmez.
+        if (!s.narration.trim()) return false;
         const previous = voice[s.id], spoken = previous?.spoken ?? previous?.text;
         return !previous || previous.text !== undefined && previous.text !== s.narration || spoken !== undefined && spoken !== sayPlan(s.narration, initialTerms, language).spoken;
       });
@@ -3123,7 +3160,8 @@ export class EpisodePipeline {
 
       // Depodaki (yerel veya S3) varlıkları render klasörüne indir; klipleri render formatına çevir.
       const files = timeline.visuals.filter((v) => v.assetUrl);
-      const clipKeys = new Set(files.filter((v) => v.kind !== "still_motion").map((v) => v.assetUrl));
+      // Footage parçaları kesilirken render biçimine getirildi (footage-media.ts cutVideo); yeniden kodlanmaz.
+      const clipKeys = new Set(files.filter((v) => v.kind !== "still_motion" && v.kind !== "footage").map((v) => v.assetUrl));
       const keys = new Set([...files.map((v) => v.assetUrl), ...timeline.visuals.flatMap((v) => (v.overlay ? [v.overlay] : [])), ...timeline.audio.map((a) => a.assetUrl)]);
       for (const key of keys) {
         const target = join(publicDir, ...key.split("/"));

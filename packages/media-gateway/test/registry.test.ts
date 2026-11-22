@@ -160,7 +160,10 @@ describe("createProvidersFromEnv", () => {
     const req = { capability: "tts" as const, quality: "draft" as const, text: "a", voiceId: "v" };
 
     const def = createProvidersFromEnv({ ELEVENLABS_API_KEY: "e" }, dir).providers;
-    expect(def.map((p) => p.id)).toEqual(["elevenlabs:tts", "elevenlabs:sfx", "elevenlabs:music"]);
+    expect(def.map((p) => p.id)).toEqual(["elevenlabs:tts", "elevenlabs:sfx", "elevenlabs:music", "elevenlabs:stt"]);
+    // Konuşmadan metin modeli env ile seçilir.
+    expect(def[3]).toMatchObject({ model: "scribe_v1" });
+    expect(createProvidersFromEnv({ ELEVENLABS_API_KEY: "e", ELEVENLABS_STT_MODEL: "scribe_v2" }, dir).providers[3]).toMatchObject({ model: "scribe_v2" });
     await def[0]!.generate(req, { fetch });
     const custom = createProvidersFromEnv({ ELEVENLABS_API_KEY: "e", ELEVENLABS_TTS_MODEL: "eleven_flash" }, dir).providers;
     await custom[0]!.generate(req, { fetch });

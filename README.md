@@ -16,6 +16,7 @@ Turn a topic into a narrated, animated YouTube video. Claude agents write the st
 - **64 style packs:** consistent palettes, drawing rules and textures, with reusable characters, presenters and series settings.
 - **Narrated videos in multiple languages:** synchronized captions, lip sync, music and sound effects. The Studio supports English and Turkish.
 - **A publishing package:** video, `.srt` subtitles, title, description, chapters, tags, thumbnail and a vertical Short from horizontal episodes.
+- **Shorts from your own footage:** upload your videos and images, pick a length (15–180 s), and AI picks the best moments, frames them for 9:16, adds a voice-over or keeps the original speech, and burns in captions, on-screen texts, music and sound effects.
 - **Review throughout production:** script/concept approvals, shot previews, drawing checks, selected-shot revisions and export audits.
 - **Resumable, cost-aware production:** saved stage progress, generation caching, provider fallback and estimates before paid calls.
 
@@ -65,6 +66,12 @@ pnpm ys episode show <id>
 ```
 
 `--manual` stops at approval gates. Generation uses your configured Claude account and media providers. The [CLI guide](docs/CLI.md) covers approvals, options, retries and character reuse.
+
+To cut a vertical Short from your own videos and images instead:
+
+```sh
+pnpm ys episode new --footage trip.mp4 --footage sunrise.jpg --sec 30 --overlay "Best morning ever" --manual
+```
 
 ## Documentation
 

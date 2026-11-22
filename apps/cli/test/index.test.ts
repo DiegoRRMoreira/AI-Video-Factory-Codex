@@ -279,11 +279,17 @@ describe("episode ve render-demo", () => {
     expect(pipeline).toBeInstanceOf(fake.FakePipeline);
     expect(sub).toBe("select");
     expect(id).toBe("e1");
-    expect(args).toMatchObject({ noQa: true, noRealism: true, stylePack: "noir", gate: "c1=2", pick: "c1=2", minutes: "2", lang: "en", series: "S", tier: "economy" });
+    expect(args).toMatchObject({ noQa: true, noRealism: true, stylePack: "noir", gate: "c1=2", pick: "c1=2", minutes: "2", lang: "en", series: "S", tier: "economy", noNarration: false, noTranscribe: false });
     expect(fake.state.pipelines[0]).toMatchObject({ workDir: ".data/episodes" });
     expect(r.err).toContain("  · ağ geçidi günlüğü");
     expect(r.err).toContain("pipeline günlüğü");
     expect(r.err).toContain("ajan günlüğü");
+  });
+
+  it("footage bayrakları: birden çok dosya ve yazı, anlatım ve döküm kapatılabilir", async () => {
+    await cli("episode", "new", "--footage", "a.mp4", "--footage", "b.jpg", "--sec", "45", "--overlay", "Bir", "--overlay", "İki", "--no-narration", "--no-transcribe");
+    const args = (episodeMod.episodeCommand.mock.calls[0] as unknown as unknown[])[3] as Record<string, unknown>;
+    expect(args).toMatchObject({ footage: ["a.mp4", "b.jpg"], sec: "45", overlay: ["Bir", "İki"], noNarration: true, noTranscribe: true });
   });
 
   it("render-demo API'siz demo hattını çalıştırır", async () => {

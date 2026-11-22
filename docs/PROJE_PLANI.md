@@ -535,6 +535,35 @@ Aynı metin Almancada ~%20–30 uzar, Japoncada kısalır. Çözüm üç katmanl
 
 ---
 
+### 16.1 Kendi görüntüden Short (footage modu, 22 Kas 2026)
+
+Kullanıcı: "kaynak video ve resim vererek istenen süreli dikey short, üstünde altyazı ya da başka yazılar ve seslerle".
+Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footage modunda kendi işlevleri çalışır
+(`pipeline/src/footage-stages.ts`):
+
+- **story = tarama:** her kaynak ffprobe ile ölçülür (telefon videosunun dönüşü dahil), kurgu ajanı için 2–12 kare
+  örneklenir (toplam en çok 40), konuşma açıksa ElevenLabs Scribe ile kelime zamanlı dökülür (media-gateway `stt`
+  yeteneği; ~$0.40/saat, doğrulanmamış). Döküm düşerse kurgu karelerle sürer.
+- **script = kurgu:** `footage-editor` ajanı (görsel, hızlı katman) vuruşları, parçaları, kadraj odağını (focusX),
+  cover/contain kararını, her parçanın sesini (asıl, ortam, sessiz), anlatımı ve ekran yazılarını seçer. Kod kuralları:
+  kaynağa sığdırma, çok kısa parçayı atma, sessiz kaynağı susturma, anlatımlı vuruşta konuşmayı ortam sesine indirme
+  (iki ses üst üste anlaşılmaz), kullanıcının yazılarını eksiksiz koyma. Senaryo kapısı burada durur.
+- **voice:** yalnız anlatımlı vuruşlar seslendirilir. **shots = zamanlama:** vuruş payı hedefe ölçeklenir; anlatım ya
+  da korunan konuşma uzunsa o kazanır; video önce kaynakta uzar, yetmezse 0,6 hıza kadar yavaşlar.
+- **clips = kesim:** ffmpeg ile 1080×1920, sabit fps, sessiz H.264 (render yeniden kodlamaz, çekim türü `footage`);
+  cover odaktan kırpar, contain bulanık dolgunun üstüne ortalar; ses ayrı WAV izi (`source` rolü). Parmak izi aynı
+  parça yeniden kesilmez.
+- **timeline:** altyazı anlatımın ve korunan konuşmanın kelimeleri; ekran yazıları `Timeline.overlays` (kanca
+  kinetik, etiket daktilo, çağrı pop; VERTICAL_SAFE içinde, altta altyazının üstünde; parça önbelleğinin anahtarında);
+  müzik vuruşların havasından, efektler geçişlerden ve yazılardan.
+- Stil, kadro, konsept, kare ve inceleme aşamaları boştur; konsept kapısı kendiliğinden geçer, önizleme kapısı
+  render'dan önce durur. Dosyalar `assets/footage/<bölüm>/` altında, bölüm silinince gider.
+- Stüdyo: Yeni bölüm → "Kendi görüntünden Short"; dosyalar seçilince `/api/footage`'a ham gövdeyle yüklenir (uzantı
+  ve dosya imzası denetlenir, en çok 1 GB), `uploads/footage/` bekleme alanına yazılır; Stüdyo ffprobe çalıştırmaz,
+  ölçüm ve bölüme alma işin ilk aşamasında yapılır. CLI: `episode new --footage a.mp4 --footage b.jpg --sec 30`.
+- Açık işler: yerel STT (whisper.cpp) seçeneği, kurgunun Stüdyo'da elle düzeltilmesi (parça sırası, kırpma),
+  footage kareleri için görsel denetim, yalnız video içeren timeline'da küçük resim.
+
 ## 17. Pazar Haritası (Ekim 2026)
 
 Pazar her ay değişiyor. Son 6 ayda Sora kapandı, Kling 4.0, Seedance 2.5, Wan 3.0 ve Gemini Omni çıktı. Bu yüzden mimari **"model değil, yetenek"** üzerine kurulu. Aşağıdaki liste bugünkü durum. Model Scout ajanı (§16) bu listeyi canlı tutar.

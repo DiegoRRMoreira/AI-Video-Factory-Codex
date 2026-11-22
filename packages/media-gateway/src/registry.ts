@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ComfyUiAdapter, type ComfyWorkflowSpec } from "./providers/comfyui.ts";
-import { ElevenLabsMusicAdapter, ElevenLabsSfxAdapter, ElevenLabsTtsAdapter } from "./providers/elevenlabs.ts";
+import { ElevenLabsMusicAdapter, ElevenLabsSfxAdapter, ElevenLabsSttAdapter, ElevenLabsTtsAdapter } from "./providers/elevenlabs.ts";
 import { FalAdapter } from "./providers/fal.ts";
 import { FAL_MODELS } from "./providers/fal-models.ts";
 import { GeminiImageAdapter, GeminiTtsAdapter, OmniVideoAdapter, VeoAdapter } from "./providers/gemini.ts";
@@ -176,6 +176,7 @@ export function createProvidersFromEnv(
       new ElevenLabsTtsAdapter(env.ELEVENLABS_API_KEY, env.ELEVENLABS_TTS_MODEL ?? "eleven_v3"),
       new ElevenLabsSfxAdapter(env.ELEVENLABS_API_KEY),
       new ElevenLabsMusicAdapter(env.ELEVENLABS_API_KEY, env.ELEVENLABS_MUSIC_MODEL ?? "music_v1"),
+      new ElevenLabsSttAdapter(env.ELEVENLABS_API_KEY, env.ELEVENLABS_STT_MODEL ?? "scribe_v1"),
     );
   } else {
     skipped.push(msg("gw.skip.noKey", { scope: "elevenlabs:*", key: "ELEVENLABS_API_KEY" }));

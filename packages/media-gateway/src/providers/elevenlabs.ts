@@ -113,6 +113,57 @@ export class ElevenLabsTtsAdapter implements ProviderAdapter {
   }
 }
 
+interface ScribeWord {
+  text: string;
+  start?: number;
+  end?: number;
+  type?: string;
+}
+
+/**
+ * Konuşmadan metin (ElevenLabs Scribe): kaynak videonun sesinden kelime zamanlı döküm (footage modu altyazısı).
+ * verified: false — uç ve alan adları belgelerden (https://elevenlabs.io/docs/api-reference/speech-to-text/convert),
+ * gerçek çağrıyla doğrulanmadı. Fiyat ~$0.40/saat (fiyat sayfası, 22 Kas 2026, doğrulanmadı). Sonuç dosyası dökümün
+ * JSON'udur (önbellek ve defter için); kelimeler `words` alanında, boşluk ve ses olayları atılır.
+ */
+export class ElevenLabsSttAdapter implements ProviderAdapter {
+  readonly local = false;
+  readonly capabilities: readonly Capability[] = ["stt"];
+  readonly limits: ProviderLimits = {};
+  readonly id = "elevenlabs:stt";
+  readonly qualityPrior = 0.9;
+  readonly price: PriceRule = { unit: "per_minute", usd: 0.4 / 60, defaultSec: 60 };
+  readonly priceSource: PriceSource = { url: PRICING_URL, checked: "2026-11-22", note: msg("price.note.stt") };
+
+  constructor(
+    private readonly apiKey: string,
+    private readonly model = "scribe_v1",
+  ) {}
+
+  async generate(req: GenerationRequest, ctx: GenerateContext): Promise<GenerationResult> {
+    const audio = req.refs?.find((r) => r.role === "source_audio");
+    if (!audio) throw new LocalizedError(msg("gw.stt.missing"));
+    const form = new FormData();
+    form.append("model_id", this.model);
+    form.append("timestamps_granularity", "word");
+    form.append("tag_audio_events", "false");
+    if (req.language) form.append("language_code", req.language);
+    form.append("file", new Blob([new Uint8Array(audio.bytes)], { type: audio.mimeType }), "audio");
+    const res = await requestJson<{ text?: string; words?: ScribeWord[] }>(ctx.fetch, `${BASE}/speech-to-text`, {
+      method: "POST",
+      headers: { "xi-api-key": this.apiKey },
+      body: form,
+      signal: ctx.signal,
+      timeoutMs: GENERATION_TIMEOUT_MS,
+    });
+    const words = (res.words ?? [])
+      .filter((w) => (w.type ?? "word") === "word" && w.text.trim() && w.start !== undefined && w.end !== undefined)
+      .map((w) => ({ text: w.text.trim(), startMs: Math.max(0, Math.round(w.start! * 1000)), endMs: Math.max(0, Math.round(w.end! * 1000)) }));
+    const json = JSON.stringify({ text: res.text ?? "", words });
+    return { files: [{ bytes: new TextEncoder().encode(json), mimeType: "application/json" }], words };
+  }
+}
+
 /** Ses efekti üretimi. Kanal SFX kütüphanesini bir kez doldurmak için (§18). */
 export class ElevenLabsSfxAdapter implements ProviderAdapter {
   readonly local = false;

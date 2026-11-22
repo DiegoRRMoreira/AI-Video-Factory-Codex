@@ -50,6 +50,12 @@ export interface EpisodeArgs {
   pick?: string;
   vertical?: boolean;
   short?: boolean;
+  /** Footage modu: kaynak video ve resim yolları, Short süresi (sn), yazılar. */
+  footage?: string[];
+  sec?: string;
+  overlay?: string[];
+  noNarration?: boolean;
+  noTranscribe?: boolean;
 }
 
 const parseStage = (s: string | undefined): Stage | undefined => {
@@ -93,6 +99,29 @@ export async function episodeCommand(
       return;
     }
     case "new": {
+      if (args.footage?.length) {
+        const sec = positive("--sec", args.sec ?? 30);
+        const state = await pipeline.createFootage(
+          {
+            topic: args.topic?.trim() || "Short",
+            lang: args.lang ?? "tr",
+            targetSec: Math.round(sec),
+            tier: BudgetTier.parse(args.tier ?? "economy"),
+            budgetUsd: positive("--budget", args.budget ?? 5),
+            aiClipRatio: 0,
+            voiceId: args.voice,
+            autoApprove: !args.manual,
+            captions: !args.noCaptions,
+            footage: { sources: [], narration: !args.noNarration, transcribe: !args.noTranscribe, texts: (args.overlay ?? []).map((t) => t.trim()).filter(Boolean) },
+            width: 1080,
+            height: 1920,
+            fps: 30,
+          },
+          args.footage.map((path) => ({ name: path, path })),
+        );
+        console.log(state.id);
+        return;
+      }
       if (!args.topic) throw new Error("--topic gerekli");
       const minutes = positive("--minutes", args.minutes ?? 3);
       const budget = positive("--budget", args.budget ?? 10);

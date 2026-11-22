@@ -48,6 +48,7 @@ export const GATEWAY_MESSAGES = {
   "gw.veo.noVideo": { tr: "Veo video döndürmedi: {reasons}", en: "Veo returned no video: {reasons}" },
   "gw.comfy.error": { tr: "ComfyUI hata: {detail}", en: "ComfyUI error: {detail}" },
   "gw.eleven.missing": { tr: "ElevenLabs TTS için voiceId ve text gerekli", en: "ElevenLabs TTS requires voiceId and text" },
+  "gw.stt.missing": { tr: "Konuşmadan metin için ses dosyası (source_audio) gerekli", en: "Speech to text requires an audio file (source_audio)" },
 
   // Kurulmayan sağlayıcılar (Fiyatlar sayfası, CLI).
   "gw.skip.comfyFile": { tr: "comfy:{id} (workflow dosyası yok: {file})", en: "comfy:{id} (workflow file missing: {file})" },

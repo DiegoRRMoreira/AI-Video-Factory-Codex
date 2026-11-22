@@ -16,6 +16,7 @@ Bir konudan seslendirilmiş, animasyonlu YouTube videosu üretin. Claude ajanlar
 - **64 stil paketi:** tutarlı palet, çizim kuralları ve dokular; yeniden kullanılabilen karakterler, sunucular ve seri ayarları.
 - **Birden fazla dilde seslendirilmiş video:** eşzamanlı altyazı, dudak hareketi, müzik ve ses efektleri. Stüdyo Türkçe ve İngilizce kullanılabilir.
 - **Yayın paketi:** video, `.srt` altyazı, başlık, açıklama, bölümler, etiketler, kapak görseli ve yatay bölümlerden dikey Short.
+- **Kendi görüntünüzden Short:** videolarınızı ve resimlerinizi yükleyin, süreyi seçin (15–180 sn); AI en iyi anları seçer, 9:16'ya kadrajlar, anlatım ekler ya da asıl konuşmayı korur, altyazı, ekran yazıları, müzik ve efekt sesleriyle birlikte işler.
 - **Üretim boyunca inceleme:** senaryo/konsept onayları, çekim önizlemeleri, çizim denetimleri, seçili çekimleri yenileme ve çıktı denetimleri.
 - **Kaldığı yerden süren, maliyeti izlenen üretim:** aşama kaydı, üretim önbelleği, yedek sağlayıcı ve ücretli çağrılardan önce tahmin.
 
@@ -65,6 +66,12 @@ pnpm ys episode show <id>
 ```
 
 `--manual` onay kapılarında durur. Üretim, yapılandırdığınız Claude hesabını ve medya sağlayıcılarını kullanır. Onaylar, seçenekler, yeniden deneme ve karakter kullanımı [CLI rehberinde](docs/CLI.md) açıklanır.
+
+Bunun yerine kendi videolarınızdan ve resimlerinizden dikey Short kesmek için:
+
+```sh
+pnpm ys episode new --footage gezi.mp4 --footage gundogumu.jpg --sec 30 --overlay "Hayatımın sabahı" --manual
+```
 
 ## Dokümanlar
 

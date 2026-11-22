@@ -1,5 +1,5 @@
 import { BudgetTier, LineStyle, STYLE_AUTO, STYLE_CUSTOM, stylePackOf } from "@ys/core";
-import { cleanSeries, loadCustomStyle, newEpisodeState, withBankChoice, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
+import { cleanSeries, loadCustomStyle, newEpisodeState, UPLOAD_KEY, withBankChoice, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
 import { msg } from "@ys/core/messages";
 import { apiError, errorResponse, readJson } from "../../../lib/api";
 import { repo, startJob, store } from "../../../lib/server";
@@ -57,6 +57,50 @@ interface CreateBody {
   lineStyle?: string;
   stylePack?: string;
   series?: string;
+  /** Kendi görüntünden Short (footage modu): yüklenmiş dosyalar (api/footage), süre ve seçenekler. */
+  footage?: { uploads?: unknown; sec?: unknown; narration?: unknown; transcribe?: unknown; texts?: unknown };
+}
+
+/**
+ * Footage bölümü: yüklenmiş dosyalar bekleme alanından bölüme işin ilk aşamasında alınır (ölçüm orada). Dikey 1080×1920,
+ * kurgu onayında durur (senaryo kapısı), konu isteğe bağlı kısa bilgidir.
+ */
+async function createFootage(req: Request, body: CreateBody): Promise<Response> {
+  const f = body.footage;
+  const raw: unknown[] = Array.isArray(f?.uploads) ? f.uploads : [];
+  const uploads = raw.flatMap((u) => {
+    const { key, name } = (u ?? {}) as { key?: unknown; name?: unknown };
+    return typeof key === "string" && UPLOAD_KEY.test(key) && typeof name === "string" ? [{ key, name: name.slice(-120) }] : [];
+  });
+  if (!uploads.length || uploads.length !== raw.length || uploads.length > 20) return apiError(req, msg("api.footage.uploads"));
+  for (const u of uploads) if (!(await store().list(u.key)).includes(u.key)) return apiError(req, msg("api.footage.uploads"));
+  const sec = Number(f!.sec ?? 30);
+  if (!Number.isFinite(sec) || sec < 15 || sec > 180) return apiError(req, msg("api.footage.sec"));
+  const budget = Number(body.budgetUsd ?? 5);
+  if (!Number.isFinite(budget) || budget <= 0) return apiError(req, msg("api.budget"));
+  const texts = (Array.isArray(f!.texts) ? f!.texts : []).filter((t): t is string => typeof t === "string" && Boolean(t.trim())).map((t) => t.trim().slice(0, 60)).slice(0, 8);
+  const lang = typeof body.lang === "string" && /^[a-z]{2,3}(-[A-Z]{2})?$/.test(body.lang) ? body.lang : "tr";
+  const input: EpisodeInput = {
+    topic: typeof body.topic === "string" && body.topic.trim() ? body.topic.trim().slice(0, 300) : "Short",
+    lang,
+    targetSec: Math.round(sec),
+    tier: BudgetTier.catch("standard").parse(body.tier),
+    aiClipRatio: 0,
+    budgetUsd: budget,
+    voiceId: typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined,
+    autoApprove: false,
+    captions: body.captions !== false,
+    sfx: body.sfx !== false,
+    music: body.music !== false,
+    footage: { sources: [], pending: uploads, narration: f!.narration !== false, transcribe: f!.transcribe !== false, texts },
+    width: 1080,
+    height: 1920,
+    fps: 30,
+  };
+  const state = newEpisodeState(input);
+  await repo().save(state);
+  startJob(state.id, "job.script", ["episode", "run", state.id, "--until", "script"]);
+  return Response.json({ id: state.id });
 }
 
 /** Bölümü oluşturur ve senaryo üretimini hemen başlatır (stil → hikâye → senaryo, sonra onay bekler). */
@@ -67,6 +111,7 @@ export async function POST(req: Request) {
   } catch (e) {
     return errorResponse(req, e);
   }
+  if (body.footage !== undefined) return createFootage(req, body);
   if (typeof body.topic !== "string" || !body.topic.trim()) return apiError(req, msg("api.topic"));
   const minutes = Number(body.minutes ?? 3);
   const budget = Number(body.budgetUsd ?? 20);

@@ -43,6 +43,7 @@ export const AGENT_ROLES = {
   packager: "fast",
   pronouncer: "cheap",
   "set-dresser": "fast",
+  "footage-editor": "fast",
 } as const satisfies Record<string, ModelTier>;
 export type AgentRole = keyof typeof AGENT_ROLES;
 

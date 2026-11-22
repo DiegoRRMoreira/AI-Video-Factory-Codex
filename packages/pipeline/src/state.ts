@@ -8,6 +8,7 @@ import type { ArchiveImage, ArchiveCandidate } from "@ys/core";
 import type { CastOut, LessonTarget, MotionMode, ScriptOut, ShotPlanOut, StoryOut, StyleBibleOut } from "@ys/agents";
 import type { Ambience, AssetCheck, BudgetTier, FlagSpec, LineStyle, MapSpec, Msg, SceneBelow, ShotReviewRecord, Timeline, VectorShot, WordTiming } from "@ys/core";
 import { scenesBelow, stylePackOf } from "@ys/core";
+import type { FootageAssets, FootageCut, FootageInput, FootagePlan, FootageScan } from "./footage.ts";
 
 export type { MotionMode };
 
@@ -120,6 +121,11 @@ export interface EpisodeInput {
   presenter?: string;
   /** Karakter bankasından kadroya eklenen karakterler (kütüphane kimlikleri); yönetmen uygun sahnelerde kullanır. */
   bankCast?: string[];
+  /**
+   * Footage modu (22 Kas): kullanıcının kendi videolarından ve resimlerinden dikey Short. Verilince stil, kadro,
+   * konsept ve kare aşamaları atlanır; kurgu ajanı parçaları seçer (footage.ts).
+   */
+  footage?: FootageInput;
   width: number;
   height: number;
   fps: number;
@@ -145,7 +151,8 @@ export interface PlannedShotState {
   intent?: ShotIntent;
   id: string;
   sceneId: string;
-  kind: "still_motion" | "ai_clip";
+  /** footage: kullanıcının videosundan kesilmiş parça (footage modu). */
+  kind: "still_motion" | "ai_clip" | "footage";
   /** Bölüm başına göre. */
   startMs: number;
   endMs: number;
@@ -276,6 +283,14 @@ export interface EpisodeState {
    */
   shotPlanDraft?: Record<string, { sig: string; shots: ShotPlanOut["scenes"][number]["shots"] }>;
   shots?: PlannedShotState[];
+  /** Footage modu: kaynak başına örneklenen kareler ve konuşma dökümü (story aşaması). */
+  footageScan?: Record<string, FootageScan>;
+  /** Footage modu: kurgu (script aşaması, onaydan önce). */
+  footagePlan?: FootagePlan;
+  /** Footage modu: hedefe ve ses süresine oturtulmuş parçalar (shots aşaması). */
+  footageCuts?: FootageCut[];
+  /** Footage modu: kesilmiş parçaların depo anahtarları; parmak izi değişmeyen parça yeniden kesilmez (clips aşaması). */
+  footageAssets?: FootageAssets & { sig: Record<string, string> };
   keyframes?: Record<string, AssetRef>;
   /** Human-selected real archive inserts; original generated shots stay available for restoration. */
   archives?: Record<string, ArchiveImage>;
@@ -374,6 +389,8 @@ export function draftBelow(state: EpisodeState): SceneBelow[] {
 }
 
 export function isApproved(state: EpisodeState, gate: Gate): boolean {
+  // Footage modunda konsept (karakter/mekân seçimi) yok: kapı kendiliğinden geçer.
+  if (gate === "concept" && state.input.footage) return true;
   // Barajı geçemeyen sahne varken render otomatik onaylanmaz: yapımcı ya yeniden oluşturur ya da bilerek onaylar (12 Kas).
   if (gate === "preview" && draftBelow(state).length) return Boolean(state.approvals?.preview);
   return Boolean(state.input.autoApprove || state.approvals?.[gate]);

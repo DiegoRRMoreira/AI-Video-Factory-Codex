@@ -39,6 +39,7 @@ export const AGENT_NAMES = [
   "figureDesigner",
   "pronouncer",
   "setDresser",
+  "footageEditor",
 ] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 

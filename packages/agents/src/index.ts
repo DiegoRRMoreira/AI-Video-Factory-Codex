@@ -9,3 +9,4 @@ export * from "./pronounce.ts";
 export * from "./likeness.ts";
 export * from "./set-dresser.ts";
 export * from "./style-analyst.ts";
+export * from "./footage.ts";

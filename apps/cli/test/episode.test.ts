@@ -39,13 +39,17 @@ const base = (over: Partial<EpisodeState> = {}): EpisodeState =>
 /** Sahte pipeline: durumları bellekte tutar, çağrıları kaydeder. */
 function fakePipeline(initial: EpisodeState[] = []) {
   const states = new Map(initial.map((s) => [s.id, structuredClone(s)]));
-  const calls = { create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[] };
+  const calls = { footage: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[], create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[] };
   const pipeline = {
     create: async (input: EpisodeInput) => {
       calls.create.push(input);
       const s = base({ id: `yeni-${calls.create.length}`, input });
       states.set(s.id, s);
       return s;
+    },
+    createFootage: async (input: EpisodeInput, files: { name: string; path: string }[]) => {
+      calls.footage.push({ input, files });
+      return base({ id: "footage-1", input });
     },
     load: async (id: string) => {
       const s = states.get(id);
@@ -134,6 +138,42 @@ describe("positive", () => {
     expect(positive("--budget", "2,5")).toBe(2.5);
     expect(positive("--budget", 3)).toBe(3);
     for (const v of ["0", "-1", "$5", "abc", ""]) expect(() => positive("--budget", v)).toThrow("--budget pozitif bir sayı olmalı (ör. 2.5)");
+  });
+});
+
+describe("episode new --footage", () => {
+  it("dikey footage bölümü: varsayılan 30 sn, anlatım ve döküm açık, yazılar kırpılır", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4", "b.jpg"], overlay: [" Bir ", "  "] });
+    expect(calls.footage[0]).toEqual({
+      input: {
+        topic: "Short",
+        lang: "tr",
+        targetSec: 30,
+        tier: "economy",
+        budgetUsd: 5,
+        aiClipRatio: 0,
+        voiceId: undefined,
+        autoApprove: true,
+        captions: true,
+        footage: { sources: [], narration: true, transcribe: true, texts: ["Bir"] },
+        width: 1080,
+        height: 1920,
+        fps: 30,
+      },
+      files: [
+        { name: "a.mp4", path: "a.mp4" },
+        { name: "b.jpg", path: "b.jpg" },
+      ],
+    });
+    expect(out).toEqual(["footage-1"]);
+  });
+
+  it("bütün footage bayrakları", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4"], sec: "45.4", topic: " Tatil ", lang: "en", tier: "premium", budget: "2", voice: "v", manual: true, noCaptions: true, noNarration: true, noTranscribe: true });
+    expect(calls.footage[0]!.input).toMatchObject({ topic: "Tatil", lang: "en", targetSec: 45, tier: "premium", budgetUsd: 2, voiceId: "v", autoApprove: false, captions: false, footage: { narration: false, transcribe: false, texts: [] } });
+    await expect(episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4"], sec: "0" })).rejects.toThrow("--sec pozitif");
   });
 });
 

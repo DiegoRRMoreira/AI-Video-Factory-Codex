@@ -5,6 +5,8 @@ import { GESTURE_RHYTHM } from "./gesture-timing.ts";
 import { KINETIC, kineticLength, revealWindow } from "./kinetic-timing.ts";
 import { bubbleSize, sayWindow } from "./bubble.ts";
 import { emptyBubble } from "./staging.ts";
+import { cutsOf } from "./cut.ts";
+import { overlayRevealSec } from "./overlay-timing.ts";
 
 /**
  * Kareye kilitli efekt sesleri: olaylar timeline'daki animasyonlardan çıkarılır (render'ın kullandığı zamanlamalarla),
@@ -55,27 +57,7 @@ export function sfxEvents(timeline: Timeline): SfxEvent[] {
     for (const text of v.vector.texts) {
       // Yazı animasyonları render'daki gibi doğal hızında oynar (revealWindow): sesler de o pencerede.
       for (const a of text.anims.map((x) => revealWindow(x, text.text, v.durationInFrames / timeline.fps))) {
-        if (a.type === "kinetic") {
-          const words = text.text.split(/\s+/).filter(Boolean).length;
-          const total = kineticLength(words);
-          out.push({ frame: at(a.start), sound: "whoosh", pitch: 1.4 });
-          // Kelime yaylanarak oturduğu anda (tweenin ~%55'i) hafif tık; sırayla perdesi yükselir.
-          for (let i = 0; i < words; i++) {
-            const t = (KINETIC.words + KINETIC.stagger * i + KINETIC.word * 0.55) / total;
-            out.push({ frame: at(a.start + span(a) * t), sound: "tick", pitch: 1 + i * 0.04 });
-          }
-        }
-        if (a.type === "typewriter") {
-          // Her yeni harf bir tuş; çok sık yazımda en az 2 kare arayla.
-          const n = text.text.length;
-          let last = -Infinity;
-          for (let k = 1; k <= n; k++) {
-            const f = at(a.start + span(a) * ((k - 0.5) / n));
-            if (f - last < 2 || /\s/.test(text.text[k - 1]!)) continue;
-            out.push({ frame: f, sound: "type", pitch: 0.9 + ((k * 7) % 5) * 0.05 });
-            last = f;
-          }
-        }
+        if (a.type === "kinetic" || a.type === "typewriter") out.push(...revealSounds(a.type, text.text, (k) => at(a.start + span(a) * k)));
         if (a.type === "count_up") {
           // Sayaç yavaşladıkça tıklar seyrelir (ekrandaki sayı ease-out ile yürür); bitişte zil.
           let shown = 0;
@@ -95,7 +77,42 @@ export function sfxEvents(timeline: Timeline): SfxEvent[] {
     if (v.overlay) out.push({ frame: v.fromFrame + 1, sound: "whoosh", pitch: 0.8 });
     if (v.vector.crowd) out.push(...crowdSounds(v.vector.crowd, v.fromFrame, v.durationInFrames, timeline.fps));
   }
+  // Footage modu (havası çekimde, vektörsüz): vuruş değişirken geçişin başında hafif vınlama; ekran yazıları açılırken
+  // render'daki pencereyle. Vektör bölümdeki arşiv resmi (havasız) ses almaz.
+  const cuts = cutsOf(timeline.visuals, timeline.episodeId);
+  timeline.visuals.forEach((v, i) => {
+    if (v.mood && !v.vector && cuts[i] && cuts[i]!.kind !== "dissolve") out.push({ frame: v.fromFrame, sound: "whoosh", pitch: 0.9 });
+  });
+  for (const o of timeline.overlays ?? []) {
+    const frames = overlayRevealSec(o, timeline.fps) * timeline.fps;
+    if (o.anim === "pop") out.push({ frame: o.fromFrame, sound: "pop" });
+    else out.push(...revealSounds(o.anim, o.text, (k) => Math.round(o.fromFrame + k * frames)));
+  }
   return out.sort((a, b) => a.frame - b.frame);
+}
+
+/**
+ * Yazı açılışının sesi; at(k) açılma ilerlemesi k (0–1) anındaki kare. Kinetik: başta vınlama, kelime yaylanarak
+ * oturduğu anda (tweenin ~%55'i) hafif tık, perdesi sırayla yükselir. Daktilo: her yeni harf bir tuş, en az 2 kare arayla.
+ */
+function revealSounds(type: "kinetic" | "typewriter", text: string, at: (k: number) => number): SfxEvent[] {
+  const out: SfxEvent[] = [];
+  if (type === "kinetic") {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    const total = kineticLength(words);
+    out.push({ frame: at(0), sound: "whoosh", pitch: 1.4 });
+    for (let i = 0; i < words; i++) out.push({ frame: at((KINETIC.words + KINETIC.stagger * i + KINETIC.word * 0.55) / total), sound: "tick", pitch: 1 + i * 0.04 });
+    return out;
+  }
+  const n = text.length;
+  let last = -Infinity;
+  for (let k = 1; k <= n; k++) {
+    const f = at((k - 0.5) / n);
+    if (f - last < 2 || /\s/.test(text[k - 1]!)) continue;
+    out.push({ frame: f, sound: "type", pitch: 0.9 + ((k * 7) % 5) * 0.05 });
+    last = f;
+  }
+  return out;
 }
 
 /**

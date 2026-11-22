@@ -13,3 +13,6 @@ export * from "./settings.ts";
 export * from "./series.ts";
 export * from "./summaries.ts";
 export * from "./lock.ts";
+export * from "./footage.ts";
+export * from "./footage-media.ts";
+export * from "./footage-stages.ts";

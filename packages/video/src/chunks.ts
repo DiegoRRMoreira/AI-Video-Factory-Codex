@@ -89,6 +89,8 @@ export async function chunkKeys(timeline: Timeline, ranges: ChunkRange[], public
     const span = shots.length ? [Math.min(...shots.map((s) => ms(s.v.fromFrame))), Math.max(...shots.map((s) => ms(s.v.fromFrame + s.v.durationInFrames + s.tail)))] : [ms(from), ms(to)];
     const speech = (timeline.speech ?? []).filter((w) => w.endMs > span[0]! - CHUNK.speechPadMs && w.startMs < span[1]! + CHUNK.speechPadMs);
     const shown = pages.filter((p) => p.startMs < ms(to) && p.startMs + p.durationMs > ms(from));
+    // Ekran yazıları (footage modu): yalnız varsa anahtara girer, eski bölümlerin önbelleği geçerli kalır.
+    const overlays = (timeline.overlays ?? []).filter((o) => o.fromFrame < to && o.fromFrame + o.durationInFrames > from);
     keys.push(
       sha(
         JSON.stringify({
@@ -102,6 +104,7 @@ export async function chunkKeys(timeline: Timeline, ranges: ChunkRange[], public
           look: [timeline.palette, timeline.lineStyle ?? null, timeline.texture ?? null, timeline.typography ?? null],
           speech,
           pages: shown,
+          ...(overlays.length ? { overlays } : {}),
         }),
       ).slice(0, 32),
     );

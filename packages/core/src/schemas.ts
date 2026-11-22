@@ -1,5 +1,5 @@
 import { Texture } from "./texture.ts";
-import { LineStyle, VectorAsset, VectorShot } from "./vector.ts";
+import { LineStyle, VectorAsset, VectorMood, VectorShot } from "./vector.ts";
 import { z } from "zod";
 import { ShotIntent } from "./intent.ts";
 import { Typography } from "./typography.ts";
@@ -27,6 +27,7 @@ export const Capability = z.enum([
   "lipsync",
   "tts",
   "tts_timestamps", // kelime zamanlamalı TTS
+  "stt", // konuşmadan kelime zamanlı metin (kaynak videonun sesi)
   "music",
   "sfx",
   "upscale_image",
@@ -45,6 +46,8 @@ export const ShotKind = z.enum([
   "motion_graphic",
   "title_card",
   "transition",
+  /** Kullanıcının verdiği kaynak videodan kesilmiş parça (footage modu): 9:16'ya hazır, render yeniden kodlamaz. */
+  "footage",
 ]);
 export type ShotKind = z.infer<typeof ShotKind>;
 
@@ -169,15 +172,32 @@ export const TimelineVisual = z.object({
    */
   dressing: z.array(z.string()).optional(),
   playbackRate: z.number().min(0.5).max(2).default(1),
+  /** Vektör olmayan çekimin müzik havası (footage modu); vektör çekimde vector.mood geçerli. */
+  mood: VectorMood.optional(),
 });
 
 export const TimelineAudio = z.object({
-  role: z.enum(["voice", "music", "sfx"]),
+  /** source: kaynak videonun kendi sesi (footage modu; konuşma korunur ya da ortam sesi olarak kısık çalar). */
+  role: z.enum(["voice", "music", "sfx", "source"]),
   assetUrl: z.string(),
   fromFrame: z.number().int().nonnegative(),
   durationInFrames: z.number().int().positive(),
   volume: z.number().min(0).max(2).default(1),
 });
+
+/**
+ * Vektör sahnesi dışındaki ekran yazısı (footage modu): kanca, başlık, etiket ya da çağrı. Bölüm karesine göre konumlanır
+ * (dikeyde VERTICAL_SAFE içinde), kendi açılış animasyonuyla.
+ */
+export const TimelineOverlay = z.object({
+  text: z.string().min(1),
+  style: z.enum(["hook", "title", "label", "cta"]),
+  fromFrame: z.number().int().nonnegative(),
+  durationInFrames: z.number().int().positive(),
+  position: z.enum(["top", "center", "bottom"]).default("top"),
+  anim: z.enum(["kinetic", "typewriter", "pop"]).default("pop"),
+});
+export type TimelineOverlay = z.infer<typeof TimelineOverlay>;
 
 export const Timeline = z.object({
   /** Absent on older timelines: retain their original system-font rendering. */
@@ -200,5 +220,7 @@ export const Timeline = z.object({
   lineStyle: LineStyle.default("outline"),
   /** Stil paketinin dokusu (vektör sahnelerin üstüne); eski timeline'da yok. */
   texture: Texture.default("none"),
+  /** Vektör sahnesi dışındaki ekran yazıları (footage modu); eski timeline'da yok. */
+  overlays: z.array(TimelineOverlay).optional(),
 });
 export type Timeline = z.infer<typeof Timeline>;

@@ -52,6 +52,31 @@ Useful options for `episode new`:
 - `--vertical`: render in 9:16.
 - `--no-captions`: do not burn subtitles into the video (the `.srt` is still written).
 
+## Shorts from your own footage
+
+`episode new --footage <file>` (repeat the flag for each file) makes a vertical 1080×1920 Short from your own
+videos and images (mp4, mov, webm, mkv, m4v, jpg, jpeg, png, webp):
+
+```sh
+pnpm ys episode new --footage trip.mp4 --footage beach.mov --footage sunrise.jpg --sec 30 \
+  --topic "A weekend on the coast, ending on the sunrise" --overlay "Best morning ever" --lang en --manual
+```
+
+- `--sec 15–180`: target length (default 30). Narration may make it longer; the edit never cuts through speech it keeps.
+- `--topic`: optional brief for the editor (default "Short").
+- `--overlay "text"` (repeatable): your on-screen texts, used verbatim; the editor adds a hook and a call to action itself.
+- `--no-narration`: no AI voice-over; the footage, its own sound and the texts carry the Short.
+- `--no-transcribe`: do not transcribe the speech in your videos (ElevenLabs Scribe, about $0.40 per hour of audio, needs `ELEVENLABS_API_KEY`); without it the editor only sees frames and kept speech gets no captions.
+- `--no-captions`, `--voice`, `--lang`, `--budget` (default 5) and `--manual` work as for other episodes.
+
+The stages are: scan (frames and transcript), edit (the `footage-editor` agent picks the parts, the crop and whether
+each part's own sound plays, writes the narration and on-screen texts; the script gate stops here with `--manual`),
+voice, timing (each beat fits its narration and the target), cut (FFmpeg, 9:16, cropped around the subject or shown
+whole over a blurred copy), timeline (captions, texts, the original sound, music and sound effects), preview gate and
+render. Where narration plays over a part, its own speech drops to a quiet ambience so the two never talk over each
+other. In the Studio, choose **New episode → Short from your footage**; files upload as you pick them (up to 1 GB each,
+`YS_FOOTAGE_MAX_MB` changes it).
+
 ## Character bank
 
 In vector mode, every approved character is kept in a library and shown on the Studio's **Characters** page.

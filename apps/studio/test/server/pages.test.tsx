@@ -68,6 +68,7 @@ vi.mock("../../src/lib/server", () => ({
   getJob: () => fake.job,
 }));
 vi.mock("../../src/lib/update", () => ({ updateInfo: async () => fake.update }));
+vi.mock("../../src/app/footage-form", () => ({ FootageForm: () => <div data-footage-form="" /> }));
 vi.mock("../../src/app/new-episode-form", () => ({
   NewEpisodeForm: ({ series, initialSeries, bank, samples }: { series: { name: string }[]; initialSeries?: string; bank: { name: string }[]; samples: object }) => (
     <div
@@ -495,6 +496,16 @@ describe("Yeni bölüm sayfası", () => {
     expect(h).toContain('data-initial="Osmanlı"');
     // Boş seri parametresi seri seçmez.
     expect(await html(NewEpisodePage({ searchParams: Promise.resolve({ series: "" }) }))).toContain('data-initial=""');
+  });
+
+  it("iki sekme: konudan bölüm ve kendi görüntünden Short (?kind=footage)", async () => {
+    const topic = await html(NewEpisodePage({ searchParams: Promise.resolve({}) }));
+    expect(topic).toContain('href="/episodes/new?kind=footage"');
+    expect(topic).not.toContain("data-footage-form");
+    const footage = await html(NewEpisodePage({ searchParams: Promise.resolve({ kind: "footage" }) }));
+    expect(footage).toContain("data-footage-form");
+    expect(footage).not.toContain("data-form=");
+    expect(text(footage)).toContain("Kendi görüntünden Short");
   });
 });
 

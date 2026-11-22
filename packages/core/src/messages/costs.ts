@@ -42,6 +42,7 @@ export const COSTS_MESSAGES = {
     en: "Deducted from the subscription's character quota; the free plan does not allow commercial use",
   },
   "price.note.sfx": { tr: "Ses efekti; 0.5–30 sn", en: "Sound effects; 0.5–30 s" },
+  "price.note.stt": { tr: "Konuşmadan metin (Scribe), kelime zamanlı; doğrulanmadı", en: "Speech to text (Scribe), word timed; unverified" },
   "price.note.perMegapixel": { tr: "~1 MP; megapiksel başına", en: "~1 MP; per megapixel" },
   "price.note.kling": { tr: "sessiz ${silent}/sn, sesli ${audio}/sn", en: "silent ${silent}/s, with audio ${audio}/s" },
   "price.note.klingPro": {

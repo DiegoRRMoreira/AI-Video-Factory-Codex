@@ -51,6 +51,10 @@ Komutlar:
 
   episode new --topic "..." [--lang tr] [--minutes 3] [--tier economy] [--budget 10]
               [--clips 0.2] [--style "..."] [--voice id] [--vertical]
+  episode new --footage a.mp4 --footage b.jpg [--sec 30] [--topic "kısa bilgi"] [--overlay "yazı"]...
+              [--no-narration] [--no-transcribe] [--voice id] [--lang tr]
+                                    Kendi videonla resimlerinden dikey Short (15–180 sn): AI kurgu, anlatım,
+                                    konuşma dökümü (ElevenLabs Scribe), altyazı, ekran yazıları, müzik, efekt
   episode run <id> [--until <aşama>] [--from <aşama>] [--only <aşama>]
               aşamalar: style story script voice shots keyframes clips timeline render
   episode show <id>
@@ -153,6 +157,11 @@ async function main(): Promise<void> {
       backfill: { type: "boolean", default: false },
       vertical: { type: "boolean", default: false },
       short: { type: "boolean", default: false },
+      footage: { type: "string", multiple: true },
+      sec: { type: "string" },
+      overlay: { type: "string", multiple: true },
+      "no-narration": { type: "boolean", default: false },
+      "no-transcribe": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       // "--version" seçenek olarak tanımlı değilse parseArgs "Unknown option" ile düşüyordu.
       version: { type: "boolean", default: false },
@@ -292,6 +301,8 @@ async function main(): Promise<void> {
       noCaptions: values["no-captions"],
       noReverseViews: values["no-reverse-views"],
       noSetDressing: values["no-set-dressing"],
+      noNarration: values["no-narration"],
+      noTranscribe: values["no-transcribe"],
       stylePack: values["style-pack"],
       gate: positionals[3],
       pick: positionals[3],
