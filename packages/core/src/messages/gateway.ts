@@ -82,5 +82,10 @@ export const GATEWAY_MESSAGES = {
   "agent.failed": { tr: "{agent}: {subtype}{detail} (maliyet ${cost})", en: "{agent}: {subtype}{detail} (cost ${cost})" },
   "agent.apiError": { tr: "{agent}: API hatası{status}: {result}", en: "{agent}: API error{status}: {result}" },
   "agent.schema": { tr: "{agent}: şemaya uymayan çıktı: {detail}", en: "{agent}: output does not match the schema: {detail}" },
+  "agent.acpMissing": { tr: "{agent}: ACP ajanı \"{backend}\" tanımlı değil (Modeller sayfası)", en: "{agent}: ACP agent \"{backend}\" is not set up (Models page)" },
+  "agent.acpNoImages": { tr: "{agent}: {backend} görsel kabul etmiyor; bu ajan için görsel alan bir model seçin", en: "{agent}: {backend} does not accept images; pick a model that does for this agent" },
+  "agent.acpStop": { tr: "{agent}: ACP turu bitmeden durdu ({reason})", en: "{agent}: the ACP turn stopped early ({reason})" },
+  "agent.acpError": { tr: "{agent}: ACP hatası: {detail}", en: "{agent}: ACP error: {detail}" },
+  "agent.acpSpawn": { tr: "{agent}: ACP ajanı başlatılamadı, komut bulunamadı: {command}", en: "{agent}: could not start the ACP agent, command not found: {command}" },
   "err.ledger.changed": { tr: "Maliyet defteri okuma sırasında değişti; yeniden deneyin", en: "Cost ledger changed during reading; try again" },
 } as const;

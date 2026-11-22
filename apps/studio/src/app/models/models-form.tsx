@@ -1,9 +1,10 @@
 "use client";
 
-import { AGENT_ROLES, DEFAULT_TIER_MODEL, MODEL_CHOICES, type AgentRole, type ModelSettings } from "@ys/core/models";
+import { acpChoice, AGENT_ROLES, DEFAULT_TIER_MODEL, MODEL_CHOICES, type AcpBackend, type AgentRole, type ModelSetting, type ModelSettings } from "@ys/core/models";
 import { useState } from "react";
 import type { MessageKey } from "../../lib/i18n";
 import { useI18n } from "../locale-provider";
+import { AcpAgents } from "./acp-agents";
 
 /** Aşamaya göre gruplu ajanlar: kullanıcı hangi işin hangi modelle yapıldığını bir bakışta görür. */
 const GROUPS: { title: MessageKey; roles: AgentRole[] }[] = [
@@ -15,12 +16,14 @@ const GROUPS: { title: MessageKey; roles: AgentRole[] }[] = [
   { title: "models.group.check", roles: ["asset-guess", "asset-gate", "scene-critic", "frame-inspector", "lesson-curator"] },
   { title: "models.group.publish", roles: ["packager"] },
   { title: "models.group.footage", roles: ["footage-editor", "footage-inspector"] },
+  { title: "models.group.youtube", roles: ["youtube-analyst", "youtube-curator"] },
   { title: "models.group.image", roles: ["director"] },
 ];
 
-export function ModelsForm({ initial }: { initial: ModelSettings }) {
+export function ModelsForm({ initial, acp = [] }: { initial: ModelSettings; acp?: AcpBackend[] }) {
   const { t } = useI18n();
   const [settings, setSettings] = useState<ModelSettings>(initial);
+  const [backends, setBackends] = useState<AcpBackend[]>(acp);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const save = async (next: ModelSettings) => {
@@ -48,6 +51,13 @@ export function ModelsForm({ initial }: { initial: ModelSettings }) {
           </button>
         )}
       </div>
+      <AcpAgents
+        backends={backends}
+        onSaved={(saved) => {
+          setBackends(saved.acp.backends);
+          setSettings(saved.models);
+        }}
+      />
       {GROUPS.map((g) => (
         <section key={g.title} className="card">
           <h2 className="mb-3 font-semibold">{t(g.title)}</h2>
@@ -69,7 +79,7 @@ export function ModelsForm({ initial }: { initial: ModelSettings }) {
                     value={chosen ?? ""}
                     onChange={(e) => {
                       const next = { ...settings };
-                      if (e.target.value) next[role] = e.target.value as (typeof MODEL_CHOICES)[number];
+                      if (e.target.value) next[role] = e.target.value as ModelSetting;
                       else delete next[role];
                       void save(next);
                     }}
@@ -80,6 +90,17 @@ export function ModelsForm({ initial }: { initial: ModelSettings }) {
                         {m}
                       </option>
                     ))}
+                    {backends
+                      .filter((b) => b.models.length)
+                      .map((b) => (
+                        <optgroup key={b.id} label={b.label}>
+                          {b.models.map((m) => (
+                            <option key={m.id} value={acpChoice(b.id, m.id)}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
                   </select>
                 </div>
               );

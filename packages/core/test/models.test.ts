@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanModelSettings, modelFor } from "../src/models.ts";
+import { acpChoice, AGY_BACKEND, cleanAcpSettings, cleanModelSettings, modelFor, parseAcpChoice } from "../src/models.ts";
 
 describe("ajan model seçimi", () => {
   it("bilinmeyen ajan ve model atılır", () => {
@@ -15,5 +15,27 @@ describe("ajan model seçimi", () => {
     expect(modelFor("asset-planner:character", "claude-sonnet-5-5", s)).toBe("claude-haiku-5-5");
     expect(modelFor("vector-designer:background", "claude-sonnet-5-5", s)).toBe("claude-sonnet-5-5");
     expect(modelFor("asset-gate", "claude-haiku-5-5", undefined)).toBe("claude-haiku-5-5");
+  });
+
+  it("ACP seçimi: biçim, tanımlı ajan ve keşfedilmiş model", () => {
+    expect(acpChoice("agy", "gemini-4-neon")).toBe("acp:agy:gemini-4-neon");
+    expect(parseAcpChoice("acp:agy:gemini-3.8-flash")).toEqual({ backend: "agy", model: "gemini-3.8-flash" });
+    expect(parseAcpChoice("claude-opus-5-5")).toBeUndefined();
+    expect(parseAcpChoice("acp:Bad Id:m")).toBeUndefined();
+    expect(parseAcpChoice("acp:agy:bad model")).toBeUndefined();
+    const raw = { "youtube-analyst": "acp:agy:m1", "youtube-curator": "acp:agy:gone", packager: "acp:other:m1", screenwriter: "acp:x" };
+    // Ajanlar verilmezse biçimi doğru her seçim kalır.
+    expect(cleanModelSettings(raw)).toEqual({ "youtube-analyst": "acp:agy:m1", "youtube-curator": "acp:agy:gone", packager: "acp:other:m1" });
+    const agy = { ...AGY_BACKEND, models: [{ id: "m1", name: "M1" }] };
+    expect(cleanModelSettings(raw, [agy])).toEqual({ "youtube-analyst": "acp:agy:m1" });
+  });
+
+  it("ACP ayarları: geçersiz, yinelenen ve fazlası atılır; kabuk karakteri reddedilir", () => {
+    expect(cleanAcpSettings(undefined)).toEqual({ backends: [] });
+    expect(cleanAcpSettings({ backends: "x" })).toEqual({ backends: [] });
+    const ok = { id: "agy", label: "A", command: "C:\\tools\\agy.exe", args: ["acp", "--sandbox"] };
+    const out = cleanAcpSettings({ backends: [ok, { ...ok, label: "dup" }, { ...ok, id: "evil", args: ["acp & calc"] }, { ...ok, id: "x2", command: "a|b" }, null] });
+    expect(out.backends).toEqual([{ ...ok, models: [], efforts: [], images: false }]);
+    expect(cleanAcpSettings({ backends: Array.from({ length: 12 }, (_, i) => ({ ...ok, id: `b${i}` })) }).backends).toHaveLength(10);
   });
 });

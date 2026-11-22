@@ -4,7 +4,7 @@ import { collectVoiceAudit, type VoiceMeasure } from "./voice-audit.ts";
 import { loadPronunciationBook, pronunciationLanguage, pronunciationRulesFingerprint, pronunciationTerms, pronunciationTermsFingerprint } from "./pronunciation-settings.ts";
 import { PronunciationEntry, pronunciationTermKey, type PronunciationBook } from "@ys/core";
 import { measureVoiceAudio } from "@ys/video/voice-audit";
-import { shotIntentText } from "@ys/core";
+import { shotIntentText, type AcpBackend } from "@ys/core";
 import type { auditRenderedVideo } from "@ys/video/audit";
 import { collectRenderAudit, pendingRenderAudit } from "./render-audit.ts";
 import { compareRenderedStyle, styleSamples } from "./style-comparison.ts";
@@ -110,7 +110,7 @@ import { deletePrefix, getJson, putJson, type AssetStore } from "@ys/storage";
 import { renderEpisode, renderFigurePreviews, renderStills, renderThumbnail, thumbnailShot, thumbnailTitle } from "@ys/video/render";
 import { readFile } from "node:fs/promises";
 import { curateLessons } from "./curate.ts";
-import { loadModelSettings } from "./settings.ts";
+import { loadAgentSettings } from "./settings.ts";
 import { acquireLock } from "./lock.ts";
 import { CHARACTER_BANK_ID, listLibraryCharacters, noteCharacterUse, seriesMascots, withBankChoice, type LibraryCharacter } from "./library.ts";
 import { loadCustomStyle } from "./custom-styles.ts";
@@ -379,8 +379,11 @@ export class EpisodePipeline {
 
   /** Kullanıcının model seçimi; her çalıştırmanın başında depodan okunur (Stüdyo'da değişince sonraki çalıştırmada geçerli). */
   private models: ModelSettings = {};
+  /** Tanımlı ACP ajanları; model seçimiyle birlikte okunur. */
+  private acp: AcpBackend[] = [];
   private get agentDeps(): AgentDeps {
-    return { ...this.deps.agentDeps, models: { ...this.deps.agentDeps?.models, ...this.models } };
+    // Testlerin verdiği ajanlar (deps.agentDeps.acp) depodakileri ezer.
+    return { acp: this.acp, ...this.deps.agentDeps, models: { ...this.deps.agentDeps?.models, ...this.models } };
   }
 
   constructor(private readonly deps: PipelineDeps) {
@@ -597,7 +600,7 @@ export class EpisodePipeline {
 
   private async runLocked(id: string, opts: RunEpisodeOptions): Promise<EpisodeState> {
     const state = await this.load(id);
-    this.models = await loadModelSettings(this.deps.store);
+    ({ models: this.models, acp: this.acp } = await loadAgentSettings(this.deps.store));
     const chosen = Object.entries(this.models);
     if (chosen.length) this.log(msg("log.run.models", { list: chosen.map(([role, model]) => `${role} → ${model}`).join(", ") }));
     if (opts.only) {

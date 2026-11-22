@@ -16,3 +16,4 @@ export * from "./lock.ts";
 export * from "./footage.ts";
 export * from "./footage-media.ts";
 export * from "./footage-stages.ts";
+export * from "./acp-settings.ts";

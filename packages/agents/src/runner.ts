@@ -1,6 +1,7 @@
 import { query, type Options, type SDKResultMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { LocalizedError, modelFor, msg, type ModelSettings, type Msg, type Text } from "@ys/core";
+import { LocalizedError, modelFor, msg, parseAcpChoice, type AcpBackend, type ModelSettings, type Msg, type Text } from "@ys/core";
 import { z } from "zod";
+import { AcpRpcError, AcpSession, extractJson, type AcpBlock, type AcpSpawn } from "./acp.ts";
 
 export type QueryFn = typeof query;
 
@@ -44,6 +45,10 @@ export interface AgentDeps {
   log?: (message: string) => void;
   /** Kullanıcının ajan başına model seçimi (Stüdyo → Modeller); ajanın varsayılanını ezer. */
   models?: ModelSettings;
+  /** Tanımlı ACP ajanları (`acp:<ajan>:<model>` seçimleri bunlarla çalışır). */
+  acp?: readonly AcpBackend[];
+  /** ACP alt sürecini açan işlev (testler sahtesini verir). */
+  acpSpawn?: AcpSpawn;
 }
 
 /**
@@ -178,9 +183,11 @@ export async function runStructured<T>(call: AgentCall<T>, deps: AgentDeps = {})
 }
 
 async function runOnce<T>(call: AgentCall<T>, deps: AgentDeps): Promise<AgentResult<T>> {
-  const queryFn = deps.queryFn ?? query;
   const model = modelFor(call.name, call.model, deps.models);
   deps.log?.(`ajan: ${call.name} (${model})`);
+  const acp = parseAcpChoice(model);
+  if (acp) return runAcp(call, model, acp, deps);
+  const queryFn = deps.queryFn ?? query;
 
   const abort = new AbortController();
   const timeoutMs = AGENT_TIMEOUT_MS();
@@ -250,4 +257,64 @@ function finish<T>(call: AgentCall<T>, model: string, message: SDKResultMessage,
   }
   deps.log?.(`ajan: ${call.name} bitti, $${cost.toFixed(4)}`);
   return { data: parsed.data, name: call.name, costUsd: cost, model, durationMs: message.duration_ms };
+}
+
+/** ACP yanıtı şemaya uymazsa aynı oturumda kaç kez düzeltme istenir. */
+const ACP_FIXES = 2;
+/** Geçici ACP hataları: kota/oran sınırı, aşırı yük, 5xx, bağlantı. */
+const ACP_TRANSIENT = /429|RESOURCE_EXHAUSTED|rate.?limit|quota|overload|unavailable|5\d\d|deadline|timed? ?out|ECONN|network/i;
+
+const ACP_RULES =
+  "You are called as a plain model through an API. Do not use any tools: do not read, write, search or run anything. Answer only from the text and images in this message.";
+
+/**
+ * ACP ajanıyla tek bir yapılandırılmış çağrı: sistem talimatı ve görseller istemle gider, yanıttaki JSON şemaya göre
+ * kodda doğrulanır (ACP'de şema zorlanamıyor), uymazsa aynı oturumda düzeltme istenir. Maliyet bilinmiyor (0; ajanın
+ * kendi kotası).
+ */
+async function runAcp<T>(call: AgentCall<T>, model: string, choice: { backend: string; model: string }, deps: AgentDeps): Promise<AgentResult<T>> {
+  const backend = deps.acp?.find((b) => b.id === choice.backend);
+  if (!backend) throw new AgentError(msg("agent.acpMissing", { agent: call.name, backend: choice.backend }), 0, model, call.name);
+  const started = Date.now();
+  const abort = new AbortController();
+  const timeoutMs = AGENT_TIMEOUT_MS();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  let session: AcpSession | undefined;
+  try {
+    session = await AcpSession.open(backend, deps.acpSpawn, abort.signal);
+    if (call.images?.length && !session.info.images) throw new AgentError(msg("agent.acpNoImages", { agent: call.name, backend: backend.label }), 0, model, call.name);
+    await session.configure(choice.model, call.effort);
+    const schema = JSON.stringify(toOutputSchema(call.schema));
+    let blocks: AcpBlock[] = [
+      { type: "text", text: `${call.system}\n\n${ACP_RULES}` },
+      ...(call.images ?? []).map((img) => ({ type: "image" as const, data: Buffer.from(img.data).toString("base64"), mimeType: img.mimeType })),
+      { type: "text", text: `${call.prompt}\n\nReply with one JSON value that matches this JSON Schema and nothing else (no prose, no code fence):\n${schema}` },
+    ];
+    for (let fix = 0; ; fix++) {
+      const turn = await session.prompt(blocks);
+      if (turn.stopReason !== "end_turn") throw new AgentError(msg("agent.acpStop", { agent: call.name, reason: turn.stopReason }), 0, model, call.name);
+      let detail: string;
+      try {
+        const parsed = call.schema.safeParse(extractJson(turn.text));
+        if (parsed.success) {
+          deps.log?.(`ajan: ${call.name} bitti (${backend.label})`);
+          return { data: parsed.data, name: call.name, costUsd: 0, model, durationMs: Date.now() - started };
+        }
+        detail = z.prettifyError(parsed.error);
+      } catch (e) {
+        detail = (e as Error).message;
+      }
+      if (fix >= ACP_FIXES) throw new AgentError(msg("agent.schema", { agent: call.name, detail: detail.slice(0, 600) }), 0, model, call.name);
+      blocks = [{ type: "text", text: `Your answer could not be used: ${detail.slice(0, 1500)}\nReply again with only the corrected JSON value, nothing else.` }];
+    }
+  } catch (e) {
+    if (abort.signal.aborted) throw new AgentError(msg("agent.timeout", { agent: call.name, sec: timeoutMs / 1000 }), 0, model, call.name, true);
+    if (e instanceof AgentError) throw e;
+    if (e instanceof AcpRpcError) throw new AgentError(msg("agent.acpError", { agent: call.name, detail: e.message.slice(0, 300) }), 0, model, call.name, ACP_TRANSIENT.test(e.message));
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new AgentError(msg("agent.acpSpawn", { agent: call.name, command: backend.command }), 0, model, call.name);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    await session?.close();
+  }
 }

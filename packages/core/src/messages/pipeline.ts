@@ -377,6 +377,8 @@ export const PIPELINE_MESSAGES = {
   },
   "err.footage.noVideo": { tr: "Dosyada görüntü akışı yok (video ya da resim değil)", en: "The file has no picture stream (not a video or image)" },
   "err.footage.type": { tr: "Desteklenmeyen dosya türü: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)", en: "Unsupported file type: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)" },
+  "err.acp.unknown": { tr: "Tanımsız ACP ajanı: {id}", en: "Unknown ACP agent: {id}" },
+  "err.acp.discover": { tr: "{label} modelleri bulunamadı: {detail}", en: "Could not list the models of {label}: {detail}" },
   "err.footage.none": { tr: "Footage bölümü için en az bir video ya da resim gerekli", en: "A footage episode needs at least one video or image" },
   "err.footage.editInvalid": { tr: "Geçersiz kurgu düzenlemesi (vuruş, parça ya da yazı biçimi bozuk)", en: "Invalid edit (a beat, part or text is malformed)" },
   "err.footage.emptyPlan": { tr: "Kurgu boş kaldı: ajanın seçtiği parçaların hiçbiri kaynaklara uymadı", en: "The edit came out empty: none of the parts the editor picked fit the sources" },

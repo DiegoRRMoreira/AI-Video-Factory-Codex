@@ -45,19 +45,82 @@ export const AGENT_ROLES = {
   "set-dresser": "fast",
   "footage-editor": "fast",
   "footage-inspector": "cheap",
+  "youtube-analyst": "fast",
+  "youtube-curator": "fast",
 } as const satisfies Record<string, ModelTier>;
 export type AgentRole = keyof typeof AGENT_ROLES;
 
-export const ModelSettings = z.record(z.string(), z.string());
-export type ModelSettings = Partial<Record<AgentRole, ModelChoice>>;
+/**
+ * ACP (Agent Client Protocol) ajanı: stdio üzerinden JSON-RPC konuşan bir ajan CLI'ı (`agy acp`, claude-code-acp,
+ * codex-acp…). Seçim `acp:<ajan>:<model>` biçiminde saklanır; modeller ajanın oturumundan keşfedilir (istem göndermeden).
+ */
+export type AcpChoice = `acp:${string}:${string}`;
+export type ModelSetting = ModelChoice | AcpChoice;
 
-/** Geçerli seçimleri süzer: bilinmeyen ajan ya da model sessizce atılır (eski ayar dosyası çalışmayı bozmaz). */
-export function cleanModelSettings(raw: unknown): ModelSettings {
+const ACP_ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
+const ACP_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$/;
+/** Komut ve argümanlar kabuk karakteri taşımaz (.cmd/.bat Windows'ta kabukla açılır; enjeksiyon olmasın). */
+const SAFE_ARG = /^[\w .:\\/@=+,~-]{1,300}$/;
+
+export const AcpModel = z.object({ id: z.string().regex(ACP_MODEL_ID), name: z.string().max(120) });
+export type AcpModel = z.infer<typeof AcpModel>;
+
+export const AcpBackend = z.object({
+  id: z.string().regex(ACP_ID),
+  label: z.string().min(1).max(80),
+  command: z.string().regex(SAFE_ARG),
+  args: z.array(z.string().regex(SAFE_ARG)).max(20),
+  /** Keşfedilen modeller (boşsa seçilemez). */
+  models: z.array(AcpModel).max(300).default([]),
+  /** Ajanın düşünme seviyeleri (thought_level), sırayla. */
+  efforts: z.array(z.string().max(40)).max(12).default([]),
+  /** İstem görsel kabul ediyor mu (initialize → promptCapabilities.image). */
+  images: z.boolean().default(false),
+});
+export type AcpBackend = z.infer<typeof AcpBackend>;
+
+export interface AcpSettings {
+  backends: AcpBackend[];
+}
+
+/** Antigravity CLI'ının hazır tanımı (Modeller sayfasında tek tıkla eklenir; modeller keşifle gelir). */
+export const AGY_BACKEND: AcpBackend = { id: "agy", label: "Antigravity (agy)", command: "agy", args: ["acp"], models: [], efforts: [], images: false };
+
+/** Geçersiz ya da yinelenen ajanlar sessizce atılır (bozuk dosya çalışmayı bozmaz). */
+export function cleanAcpSettings(raw: unknown): AcpSettings {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { backends?: unknown }).backends) ? (raw as { backends: unknown[] }).backends : [];
+  const backends: AcpBackend[] = [];
+  for (const item of list.slice(0, 10)) {
+    const parsed = AcpBackend.safeParse(item);
+    if (parsed.success && !backends.some((b) => b.id === parsed.data.id)) backends.push(parsed.data);
+  }
+  return { backends };
+}
+
+export const acpChoice = (backend: string, model: string): AcpChoice => `acp:${backend}:${model}`;
+
+/** `acp:<ajan>:<model>` seçimini çözer; ACP seçimi değilse undefined. */
+export function parseAcpChoice(model: string): { backend: string; model: string } | undefined {
+  const m = /^acp:([^:]+):(.+)$/.exec(model);
+  return m && ACP_ID.test(m[1]!) && ACP_MODEL_ID.test(m[2]!) ? { backend: m[1]!, model: m[2]! } : undefined;
+}
+
+export const ModelSettings = z.record(z.string(), z.string());
+export type ModelSettings = Partial<Record<AgentRole, ModelSetting>>;
+
+/**
+ * Geçerli seçimleri süzer: bilinmeyen ajan ya da model sessizce atılır (eski ayar dosyası çalışmayı bozmaz). ACP seçimi,
+ * ajanlar verilmişse yalnız tanımlı bir ajanın keşfedilmiş bir modeliyse kalır (silinen ajan çağrıyı düşürmesin).
+ */
+export function cleanModelSettings(raw: unknown, backends?: readonly AcpBackend[]): ModelSettings {
   const parsed = ModelSettings.safeParse(raw);
   if (!parsed.success) return {};
   const out: ModelSettings = {};
   for (const [role, model] of Object.entries(parsed.data)) {
-    if (Object.hasOwn(AGENT_ROLES, role) && (MODEL_CHOICES as readonly string[]).includes(model)) out[role as AgentRole] = model as ModelChoice;
+    if (!Object.hasOwn(AGENT_ROLES, role)) continue;
+    if ((MODEL_CHOICES as readonly string[]).includes(model)) out[role as AgentRole] = model as ModelChoice;
+    const acp = parseAcpChoice(model);
+    if (acp && (!backends || backends.some((b) => b.id === acp.backend && b.models.some((m) => m.id === acp.model)))) out[role as AgentRole] = model as AcpChoice;
   }
   return out;
 }
