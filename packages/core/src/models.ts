@@ -86,13 +86,33 @@ export interface AcpSettings {
 /** Antigravity CLI'ının hazır tanımı (Modeller sayfasında tek tıkla eklenir; modeller keşifle gelir). */
 export const AGY_BACKEND: AcpBackend = { id: "agy", label: "Antigravity (agy)", command: "agy", args: ["acp"], models: [], efforts: [], images: false };
 
-/** Geçersiz ya da yinelenen ajanlar sessizce atılır (bozuk dosya çalışmayı bozmaz). */
-export function cleanAcpSettings(raw: unknown): AcpSettings {
+/** Hazır, doğrulanmış ajan tanımları: komut ve argümanlarıyla birebir bunlar API'den kabul edilir. */
+export const ACP_PRESETS: readonly AcpBackend[] = [AGY_BACKEND];
+
+/**
+ * Ajanın izin sormasını kapatan bayraklar (--dangerously-skip-permissions, --yolo, --auto-approve…): ajana giden metnin
+ * bir kısmı güvenilmez (video başlığı, döküm) ve izin soran ajan geri çevrilir; bu bayrakla araçlarını sormadan çalıştırırdı.
+ */
+const BYPASS = /danger|skip-?perm|yolo|bypass|allow-?all|auto-?approve|no-?sandbox|trust/i;
+
+/**
+ * Ajan çalıştırılabilir mi (22 Kas güvenlik incelemesi: Modeller API'si çalıştırılacak komutu kaydediyor): izin atlatan
+ * bayrak hiçbir zaman; komut ve argümanlar hazır bir tanımla birebir aynıysa, ya da komut sunucu ortamında
+ * (`YS_ACP_COMMANDS`) açıkça izinliyse.
+ */
+export function acpAllowed(b: Pick<AcpBackend, "command" | "args">, allowed: readonly string[] = []): boolean {
+  if (b.args.some((a) => BYPASS.test(a))) return false;
+  const preset = ACP_PRESETS.some((p) => p.command === b.command && p.args.length === b.args.length && p.args.every((a, i) => a === b.args[i]));
+  return preset || allowed.includes(b.command);
+}
+
+/** Geçersiz, yinelenen ya da izinsiz komutlu ajanlar sessizce atılır (bozuk dosya çalışmayı bozmaz). */
+export function cleanAcpSettings(raw: unknown, allowed: readonly string[] = []): AcpSettings {
   const list = raw && typeof raw === "object" && Array.isArray((raw as { backends?: unknown }).backends) ? (raw as { backends: unknown[] }).backends : [];
   const backends: AcpBackend[] = [];
   for (const item of list.slice(0, 10)) {
     const parsed = AcpBackend.safeParse(item);
-    if (parsed.success && !backends.some((b) => b.id === parsed.data.id)) backends.push(parsed.data);
+    if (parsed.success && acpAllowed(parsed.data, allowed) && !backends.some((b) => b.id === parsed.data.id)) backends.push(parsed.data);
   }
   return { backends };
 }

@@ -117,11 +117,15 @@ then the episode's **Analysis** tab shows the report and makes Shorts from the c
 
 Every agent normally runs on Claude through the Agent SDK. On the Studio's **Models** page you can also add an
 [Agent Client Protocol](https://agentclientprotocol.com) agent: **Add Antigravity (agy)** sets up `agy acp`, or give
-any ACP agent's command and arguments. **Find models** reads its models, thinking levels and image support from the
+another ACP agent's command and arguments. A command other than the ready-made ones runs only if it is listed in
+`YS_ACP_COMMANDS` (comma separated) in the environment of the shell that starts the Studio and the CLI, and arguments
+that turn off the agent's permission prompts (`--dangerously-skip-permissions`, `--yolo`, `--auto-approve`…) are
+always refused. **Find models** reads its models, thinking levels and image support from the
 agent itself (no prompt is sent). Its models then appear in every agent's list under the agent's name, stored as
 `acp:<agent>:<model>`. Calls run in an empty temporary folder with no file or terminal access, any tool permission is
-refused, and the JSON answer is checked against the agent's schema in code (asked again up to twice if it does not
-fit). Their cost is not known and is recorded as zero; they use the ACP agent's own account and quota.
+refused, a call in which the agent starts any tool is stopped and fails, the prompt says that titles, transcripts and
+captions are untrusted data, and the JSON answer is checked against the agent's schema in code (asked again up to twice
+if it does not fit). The agent still runs with your local privileges and its own settings. Their cost is not known and is recorded as zero; they use the ACP agent's own account and quota.
 
 ## Character bank
 

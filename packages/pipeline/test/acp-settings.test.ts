@@ -27,6 +27,21 @@ describe("ACP ayarları", () => {
     expect(await getJson(store, "settings/models.json")).toEqual({});
   });
 
+  it("hazır tanım dışındaki komut yalnız YS_ACP_COMMANDS ile; izin atlatan bayrak hiçbir zaman", async () => {
+    const store = tempStore();
+    const custom = { id: "claude", label: "Claude ACP", command: "claude-code-acp", args: [] };
+    expect((await saveAcpSettings(store, { backends: [custom] })).backends).toEqual([]);
+    process.env.YS_ACP_COMMANDS = " claude-code-acp ; other ,";
+    try {
+      expect((await saveAcpSettings(store, { backends: [custom, { ...custom, id: "bad", args: ["--dangerously-skip-permissions"] }] })).backends.map((b) => b.id)).toEqual(["claude"]);
+      expect((await loadAcpSettings(store)).backends.map((b) => b.id)).toEqual(["claude"]);
+    } finally {
+      delete process.env.YS_ACP_COMMANDS;
+    }
+    // İzin kaldırılınca kayıtlı ajan da okunmaz.
+    expect((await loadAcpSettings(store)).backends).toEqual([]);
+  });
+
   it("keşif modelleri ve görsel desteğini kayda yazar; tanımsız ajan ve keşif hatası çevrilebilir hata", async () => {
     const store = tempStore();
     await saveAcpSettings(store, { backends: [AGY_BACKEND, { ...AGY_BACKEND, id: "other", label: "Other" }] });

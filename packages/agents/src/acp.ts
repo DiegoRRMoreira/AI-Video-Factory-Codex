@@ -23,8 +23,9 @@ export interface AcpChild {
 export type AcpSpawn = (command: string, args: readonly string[], cwd: string) => AcpChild;
 
 /** Windows'ta .cmd/.bat yalnız kabukla açılır (Node 20+); argümanlar core'da kabuk karakterine karşı süzülür. */
-export const spawnAcp: AcpSpawn = (command, args, cwd) =>
-  spawn(command, [...args], { cwd, stdio: "pipe", windowsHide: true, shell: process.platform === "win32" && /\.(cmd|bat)$/i.test(command) });
+export const needsShell = (command: string, platform: string = process.platform) => /\.(cmd|bat)$/i.test(command) && platform === "win32";
+
+export const spawnAcp: AcpSpawn = (command, args, cwd) => spawn(command, [...args], { cwd, stdio: "pipe", windowsHide: true, shell: needsShell(command) });
 
 /** Ajanın JSON-RPC hatası (kod + mesaj). */
 export class AcpRpcError extends Error {
@@ -214,7 +215,13 @@ export class AcpSession {
 
   private notify(method: string, params: Record<string, unknown>) {
     if (method !== "session/update") return;
-    const update = params.update as { sessionUpdate?: string; content?: { type?: string; text?: string }; configOptions?: ConfigOption[] } | undefined;
+    const update = params.update as { sessionUpdate?: string; content?: { type?: string; text?: string }; configOptions?: ConfigOption[]; title?: string } | undefined;
+    // Ajan bir araç çağırmaya başladıysa (dosya okuma, komut, ağ) oturum hemen kesilir: istemin bir kısmı güvenilmez veridir
+    // ve ajanın kendi izin ayarları bazı araçları sormadan çalıştırabilir. Burada yalnız metin cevabı beklenir.
+    if (update?.sessionUpdate === "tool_call" || update?.sessionUpdate === "tool_call_update") {
+      void this.close(new AcpRpcError("session/prompt", -32001, `agent tried to use a tool: ${String(update.title ?? "?").slice(0, 120)}`));
+      return;
+    }
     if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") this.text += update.content.text ?? "";
     if (update?.sessionUpdate === "config_option_update" && update.configOptions) this.setConfig(update.configOptions);
   }

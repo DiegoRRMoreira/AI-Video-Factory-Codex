@@ -12,6 +12,8 @@ export interface FakeTurn {
   permission?: { optionId: string; kind: string }[];
   /** Süreç bu turda çöker. */
   exit?: number;
+  /** Önce bir araç çağrısı bildirir (başlığı; boşsa başlıksız tool_call_update). */
+  tool?: string;
   /** Çökerken stderr'e bir şey yazmaz. */
   quiet?: boolean;
   /** Hiç yanıt verme (zaman aşımı). */
@@ -129,6 +131,8 @@ export function fakeAcp(opts: FakeOptions = {}): FakeAgent {
           if (turn.hang) return;
           if (turn.exit !== undefined) return die(turn.exit, turn.quiet);
           if (turn.error) return send({ jsonrpc: "2.0", id: m.id, error: turn.error });
+          if (turn.tool !== undefined)
+            send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "s1", update: turn.tool ? { sessionUpdate: "tool_call", toolCallId: "t1", title: turn.tool } : { sessionUpdate: "tool_call_update", toolCallId: "t1" } } });
           if (turn.permission) send({ jsonrpc: "2.0", id: "perm1", method: "session/request_permission", params: { sessionId: "s1", options: turn.permission } });
           if (opts.bare) {
             send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "s1", update: { sessionUpdate: "agent_message_chunk", content: { type: "image" } } } });

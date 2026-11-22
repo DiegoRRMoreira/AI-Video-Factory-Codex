@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatText, type AcpBackend } from "@ys/core";
 import { z } from "zod";
-import { AcpRpcError, AcpSession, AgentError, discoverAcp, extractJson, nearestEffort, runStructured, spawnAcp } from "../src/index.ts";
+import { AcpRpcError, AcpSession, AgentError, discoverAcp, extractJson, nearestEffort, needsShell, runStructured, spawnAcp } from "../src/index.ts";
 import { fakeAcp, type FakeOptions } from "./acp-fake.ts";
 
 // Geçici klasör silinemezse (Windows'ta ölmekte olan sürecin çalışma klasörü: EBUSY) kapanış hatasız sürmeli.
@@ -241,6 +241,22 @@ describe("ACP keşfi ve yardımcılar", () => {
     expect(extractJson('Here: [1, 2] done')).toEqual([1, 2]);
     expect(() => extractJson("nothing")).toThrow("no JSON object");
     expect(() => extractJson("} {")).toThrow("no JSON object");
+  });
+
+  it("kabuk yalnız Windows'ta .cmd/.bat için", () => {
+    expect(needsShell("claude-code-acp.CMD", "win32")).toBe(true);
+    expect(needsShell("x.bat", "linux")).toBe(false);
+    expect(needsShell("agy", "win32")).toBe(false);
+    expect(typeof needsShell("agy")).toBe("boolean");
+  });
+
+  it("araç çağrısı başlarsa oturum kesilir, yeniden denenmez", async () => {
+    const { agent, result } = run({ turns: [{ tool: "Read file", text: '{"ok":true}' }] });
+    expect(await errorText(result)).toBe("youtube-analyst: ACP error: ACP session/prompt: agent tried to use a tool: Read file");
+    expect(agent.spawned).toHaveLength(1);
+    expect(agent.killed).toBe(1);
+    const untitled = run({ turns: [{ tool: "", text: '{"ok":true}' }] });
+    expect(await errorText(untitled.result)).toContain("agent tried to use a tool: ?");
   });
 
   it("varsayılan spawn gerçek süreç açar (olmayan komut: error olayı)", async () => {

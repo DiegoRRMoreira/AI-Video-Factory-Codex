@@ -4,14 +4,21 @@ import { getJson, putJson, type AssetStore } from "@ys/storage";
 const MODELS_KEY = "settings/models.json";
 const ACP_KEY = "settings/acp.json";
 
+/** Hazır tanımların dışında çalıştırılmasına izin verilen ACP komutları (sunucu ortamı, virgül ya da noktalı virgülle). */
+export const allowedAcpCommands = (): string[] =>
+  (process.env.YS_ACP_COMMANDS ?? "")
+    .split(/[;,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
 /** Tanımlı ACP ajanları (Stüdyo → Modeller). Dosya yoksa ya da bozuksa hiç ajan yok. */
 export async function loadAcpSettings(store: AssetStore): Promise<AcpSettings> {
-  return cleanAcpSettings(await getJson(store, ACP_KEY));
+  return cleanAcpSettings(await getJson(store, ACP_KEY), allowedAcpCommands());
 }
 
 /** Yalnız geçerli ajanlar yazılır; artık var olmayan bir ajanın modeline bağlı seçimler de düşer. */
 export async function saveAcpSettings(store: AssetStore, raw: unknown): Promise<AcpSettings> {
-  const clean = cleanAcpSettings(raw);
+  const clean = cleanAcpSettings(raw, allowedAcpCommands());
   await putJson(store, ACP_KEY, clean);
   await putJson(store, MODELS_KEY, cleanModelSettings(await getJson(store, MODELS_KEY), clean.backends));
   return clean;
