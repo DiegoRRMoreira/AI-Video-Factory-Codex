@@ -6,6 +6,7 @@ import { cleanSeries } from "./series.ts";
 import { acquireLock } from "./lock.ts";
 import { readEpisodeSummary, saveEpisodeSnapshot, type SummaryList } from "./summaries.ts";
 import { GATES, motionModeOf, STAGES, type EpisodeInput, type EpisodeState, type Gate, type MotionMode } from "./state.ts";
+import { normalizePlan, planScript, readPlanEdit } from "./footage.ts";
 
 /*
  * İnsan kararları: onay, seçim, düzenleme. Ağır bağımlılık (Remotion, Agent SDK) içermez;
@@ -182,6 +183,9 @@ export function editNarration(state: EpisodeState, sceneId: string, narration: s
   const text = narration.trim();
   if (scene.narration === text) return;
   scene.narration = text;
+  // Footage kurgusunda vuruşun anlatımı da güncellenir (elle kurgu düzenlemesi ve "anlatım kazanır" kuralı onu okur).
+  const beat = state.footagePlan?.beats.find((b) => b.id === sceneId);
+  if (beat) beat.narration = text;
   // Eski ses yeni metni okumaz.
   delete state.voice?.[sceneId];
   delete state.timeline;
@@ -189,6 +193,26 @@ export function editNarration(state: EpisodeState, sceneId: string, narration: s
   delete state.waitingFor;
   reviewAgain(state);
   invalidateFrom(state, "voice");
+}
+
+/**
+ * Footage kurgusunu elle düzenler (onaydan önce): vuruş ve parça sırası, silme, aralık, kırpma odağı, kadraj, ses,
+ * hava ve yazılar. Kurallar ajanın kurgusundaki gibi uygulanır; vuruşlar yeniden numaralanır, senaryo kurgudan yeniden
+ * kurulur, eski zamanlama silinir (kesilmiş parçalar parmak iziyle yeniden kullanılır).
+ */
+export function editFootagePlan(state: EpisodeState, raw: unknown): void {
+  if (state.approvals?.script) throw new LocalizedError(msg("err.action.scriptApproved"));
+  if (!state.input.footage || !state.footagePlan) throw new LocalizedError(msg("err.action.scriptFirst"));
+  const narrations = Object.fromEntries((state.script?.scenes ?? []).map((s) => [s.id, s.narration]));
+  const plan = normalizePlan(readPlanEdit(raw, narrations), state.input.footage, { addMissingTexts: false });
+  state.footagePlan = plan;
+  state.script = planScript(plan);
+  // Onaydan önce ses yoktur; yine de kurgu değişince eski sesler ve zamanlama kullanılmaz.
+  delete state.voice;
+  delete state.footageCuts;
+  delete state.timeline;
+  delete state.lastError;
+  invalidateFrom(state, "cast");
 }
 
 export function setMotion(state: EpisodeState, motionMode: MotionMode, aiClipRatio?: number): void {

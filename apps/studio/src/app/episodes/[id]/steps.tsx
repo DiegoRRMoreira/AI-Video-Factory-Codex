@@ -2,7 +2,7 @@
 import { ShotIntentDetails } from "./shot-intent";
 import { ResearchPanel } from "./research-panel";
 import { NarrationEditor, NarrationUndo } from "./narration-editor";
-import { FootagePlanView, frameFor } from "./footage-plan";
+import { FootagePlanView, frameFor, PLAN_DIRTY } from "./footage-plan";
 import { VoiceAuditCard } from "./voice-audit-card";
 import { PronunciationPanel } from "./pronunciation-panel";
 import { ArchivePicker } from "./archive-picker";
@@ -58,7 +58,7 @@ export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeRespon
   }
   const words = state.script.scenes.reduce((n, s) => n + s.narration.split(/\s+/).filter(Boolean).length, 0);
   const chars = state.script.scenes.reduce((n, s) => n + s.narration.length, 0);
-  const unsaved = state.script.scenes.some((s) => dirtyScenes[`${state.id}:${s.id}`]);
+  const unsaved = [...state.script.scenes.map((s) => s.id), PLAN_DIRTY].some((id) => dirtyScenes[`${state.id}:${id}`]);
   // Footage bölümü: senaryo kurgudur (vuruşlar ve parçalar); araştırma ve hikâye kartı yok, maliyet tahmini modun değil.
   const footage = state.input.footage && state.footagePlan;
   return (
@@ -99,7 +99,7 @@ export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeRespon
         )}
       </div>
       {unsaved && <p className="text-sm text-muted">{t("edit.unsaved")}</p>}
-      {footage ? <FootagePlanView state={state} plan={footage} busy={busy} approved={approved} act={act} onDirtyChange={markDirty} /> : <ol className="grid gap-3">
+      {footage ? <FootagePlanView key={JSON.stringify(footage)} state={state} plan={footage} busy={busy} approved={approved} act={act} onDirtyChange={markDirty} /> : <ol className="grid gap-3">
         {state.script.scenes.map((scene, i) => {
           const voice = state.voice?.[scene.id];
           return (

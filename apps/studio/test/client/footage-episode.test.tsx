@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { EpisodeState } from "@ys/pipeline/light";
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act as reactAct, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScriptTab, ShotsTab } from "../../src/app/episodes/[id]/steps.tsx";
 import { frameFor } from "../../src/app/episodes/[id]/footage-plan.tsx";
@@ -54,9 +54,8 @@ describe("footage bölümü", () => {
     expect(tabsOf(footageState())).toEqual(["overview", "script", "shots", "costs", "activity"]);
   });
 
-  it("kurgu sekmesi: vuruşlar, parçalar (kare, aralık, kadraj, ses), yazılar; onay kurguyu onaylar", () => {
-    const act = okAct();
-    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: cuts }))} busy={false} act={act} />);
+  it("onaylı kurgu salt okunur: vuruşlar, parçalar (kare, aralık, kadraj, ses), yazılar", () => {
+    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: cuts, approvals: { script: "t" } }))} busy={false} act={okAct()} />);
     expect(container.querySelector("[data-footage-plan]")).toBeTruthy();
     expect(screen.queryByRole("button", { name: tr("research.title") })).toBeNull();
     const first = container.querySelector('[data-segment="b1-1"]') as HTMLElement;
@@ -79,17 +78,73 @@ describe("footage bölümü", () => {
     expect(screen.getByText(tr("footage.plan.beatSec", { sec: "5.2" }))).toBeTruthy();
     expect(screen.getByText(tr("footage.mood.warm"))).toBeTruthy();
     expect(container.querySelector('[data-overlay-item="hook"]')!.textContent).toContain("Kanca");
-    expect(screen.getAllByRole("textbox")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: tr("footage.plan.approve") }));
-    expect(act).toHaveBeenCalledWith({ type: "approve-script" });
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it("zamanlanmamış kurgu ve yazısız plan; senaryoda olmayan vuruş anlatımı plandan gelir; İngilizce", () => {
+  it("onaysız kurgu düzenlenir: sıra, silme, aralık, odak, kadraj, ses, hava, yazı; kaydedilmeden onay kilitli", async () => {
+    const act = okAct();
+    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: cuts }))} busy={false} act={act} />);
+    const approve = () => screen.getByRole("button", { name: new RegExp(tr("footage.plan.approve")) }) as HTMLButtonElement;
+    expect(approve().disabled).toBe(false);
+    expect(screen.queryByText(tr("footage.edit.unsaved"))).toBeNull();
+    // Zamanlanmış süre gösterilir; düzenleme başlayınca gizlenir.
+    expect(screen.getByText(tr("footage.plan.beatSec", { sec: "5.2" }))).toBeTruthy();
+    const label = (key: Parameters<typeof tr>[0]) => screen.getAllByLabelText(tr(key));
+    fireEvent.change(label("footage.edit.from")[0]!, { target: { value: "1.5" } });
+    fireEvent.change(label("footage.edit.to")[0]!, { target: { value: "3" } });
+    fireEvent.change(label("footage.edit.seconds")[0]!, { target: { value: "2.5" } });
+    fireEvent.change(label("footage.edit.focus")[0]!, { target: { value: "0.8" } });
+    fireEvent.change(label("footage.edit.fit")[0]!, { target: { value: "contain" } });
+    fireEvent.change(label("footage.edit.audio")[0]!, { target: { value: "original" } });
+    expect((label("footage.edit.audio")[1] as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.change(label("footage.edit.mood")[0]!, { target: { value: "dramatic" } });
+    expect(screen.queryByText(tr("footage.plan.beatSec", { sec: "5.2" }))).toBeNull();
+    expect(screen.getByText(tr("footage.edit.unsaved"))).toBeTruthy();
+    expect(approve().disabled).toBe(true);
+    // Anlatım düzenleyicisi kurgu kaydedilene dek kilitli.
+    expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(true);
+    fireEvent.click(label("footage.edit.right")[0]!);
+    fireEvent.click(label("footage.edit.left")[1]!);
+    fireEvent.click(label("footage.edit.remove")[1]!);
+    fireEvent.click(label("footage.edit.beatDown")[0]!);
+    fireEvent.click(label("footage.edit.beatUp")[1]!);
+    fireEvent.change(label("footage.edit.text")[0]!, { target: { value: "Yeni kanca" } });
+    fireEvent.change(label("footage.edit.style")[0]!, { target: { value: "title" } });
+    fireEvent.change(label("footage.edit.position")[0]!, { target: { value: "center" } });
+    fireEvent.change(label("footage.edit.beat")[0]!, { target: { value: "b2" } });
+    await reactAct(async () => void fireEvent.click(screen.getByRole("button", { name: new RegExp(tr("footage.edit.save")) })));
+    const sent = act.mock.calls.at(-1)![0] as { type: string; plan: { beats: { id: string; mood: string; segments: { fromMs: number; toMs: number; focusX: number; fit: string; audio: string }[] }[]; overlays: object[] } };
+    expect(sent.type).toBe("edit-footage");
+    expect(sent.plan.beats.map((b) => b.id)).toEqual(["b1", "b2"]);
+    expect(sent.plan.beats[0]).toMatchObject({ mood: "dramatic", segments: [{ fromMs: 1500, toMs: 3000, focusX: 0.8, fit: "contain", audio: "original" }] });
+    expect(sent.plan.overlays).toEqual([{ text: "Yeni kanca", style: "title", beat: "b2", position: "center" }]);
+    // Geri al taslağı sunucudaki kurguya döndürür.
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(tr("footage.edit.reset")) }));
+    expect(screen.queryByText(tr("footage.edit.unsaved"))).toBeNull();
+    expect(container.querySelectorAll("[data-segment]")).toHaveLength(3);
+    fireEvent.click(screen.getByLabelText(tr("footage.edit.textRemove")));
+    expect(screen.queryByLabelText(tr("footage.edit.text"))).toBeNull();
+    expect(screen.getByText(tr("footage.edit.unsaved"))).toBeTruthy();
+  });
+
+  it("vuruş silinince yazıları da gider; son vuruş ve tek parça silinemez", () => {
+    renderIn(<ScriptTab data={makeData(footageState())} busy={false} act={okAct()} />);
+    const label = (key: Parameters<typeof tr>[0]) => screen.getAllByLabelText(tr(key)) as HTMLButtonElement[];
+    expect(label("footage.edit.remove")[2]!.disabled).toBe(true);
+    fireEvent.click(label("footage.edit.beatRemove")[0]!);
+    expect(screen.queryByLabelText(tr("footage.edit.text"))).toBeNull();
+    expect(label("footage.edit.beatRemove")[0]!.disabled).toBe(true);
+  });
+
+  it("onay düğmesi kurguyu onaylar; yazısız plan; senaryoda olmayan vuruş anlatımı plandan gelir; İngilizce", () => {
+    const act = okAct();
     const state = footageState({ footagePlan: { ...plan, overlays: [] }, script: { scenes: [] } as never });
-    renderIn(<ScriptTab data={makeData(state)} busy={false} act={okAct()} />, "en");
+    renderIn(<ScriptTab data={makeData(state)} busy={false} act={act} />, "en");
     expect(screen.queryByText(en("footage.plan.overlays"))).toBeNull();
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Yola çıktık.");
-    expect(screen.getByText(en("footage.plan.range", { from: "1.0", to: "4.0" }))).toBeTruthy();
+    expect((document.querySelector("textarea") as HTMLTextAreaElement).value).toBe("Yola çıktık.");
+    expect((screen.getAllByLabelText(en("footage.edit.from"))[0] as HTMLInputElement).value).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(en("footage.plan.approve")) }));
+    expect(act).toHaveBeenCalledWith({ type: "approve-script" });
   });
 
   it("çekimler sekmesi: kare taranmış görüntüden; yeniden çizim ve notla yeniden oluşturma yok", () => {

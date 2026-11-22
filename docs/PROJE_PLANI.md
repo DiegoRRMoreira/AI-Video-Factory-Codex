@@ -569,7 +569,10 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
   yeniden oluşturma footage'da yoktur. Kapak, render edilmiş Short'un kanca anındaki karesidir (dikey).
 - Yerel STT: `YS_WHISPER` (whisper-cli) ve `YS_WHISPER_MODEL` (ggml modeli) verilirse whisper.cpp ücretsiz olduğu için
   Scribe'dan önce seçilir (doğrulanmadı).
-- Açık işler: kurgunun Stüdyo'da elle düzeltilmesi (parça sırası, aralık, kırpma), footage kareleri için görsel denetim.
+- Kurgu onaydan önce Stüdyo'da elle düzeltilir: vuruş ve parça sırası, silme, aralık, resim süresi, kırpma odağı,
+  kadraj, ses, hava, yazılar. Taslak "Kurguyu kaydet" ile gönderilir, kurallar sunucuda yine uygulanır; kaydedilmemiş
+  değişiklik varken onay kilitlidir.
+- Açık işler: footage kareleri için görsel denetim; elle yeni parça ya da vuruş ekleme.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

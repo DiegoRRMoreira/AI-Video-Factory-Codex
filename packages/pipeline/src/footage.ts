@@ -209,7 +209,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * ve sessiz video susar; anlatım kapalıysa metin silinir; anlatımlı vuruşta kaynak konuşması ortam sesine iner (iki ses
  * üst üste anlaşılmaz, anlatım kazanır); kullanıcının yazıları eksikse eklenir. Boş kalan kurgu hatadır.
  */
-export function normalizePlan(out: FootageEditOut, input: FootageInput): FootagePlan {
+export function normalizePlan(out: FootageEditOut, input: FootageInput, opts: { addMissingTexts?: boolean } = {}): FootagePlan {
   const byId = new Map(input.sources.map((s) => [s.id, s]));
   const beats: FootageBeat[] = [];
   const beatOf = new Map<number, string>();
@@ -244,12 +244,75 @@ export function normalizePlan(out: FootageEditOut, input: FootageInput): Footage
     return beat && text ? [{ text, style: o.style, beat, position: o.position }] : [];
   });
   // Kullanıcının yazısı kurguda yoksa sırayla vuruşlara dağıtılır (verdiği yazı kaybolmasın).
-  const missing = input.texts.map((t) => t.trim()).filter((t) => t && !overlays.some((o) => o.text === t));
+  // Elle düzenlemede kullanıcı kendi yazısını bilerek silmiş olabilir: yeniden eklenmez.
+  const missing = opts.addMissingTexts === false ? [] : input.texts.map((t) => t.trim()).filter((t) => t && !overlays.some((o) => o.text === t));
   missing.forEach((text, i) => {
     const beat = beats[Math.min(beats.length - 1, Math.floor(((i + 0.5) / missing.length) * beats.length))]!.id;
     overlays.push({ text, style: "label", beat, position: "top" });
   });
   return { title: out.title.trim(), beats, overlays };
+}
+
+/** Kurgunun senaryosu: vuruş başına bir sahne (seslendirme sahne başına çalışır). */
+export function planScript(plan: FootagePlan) {
+  return {
+    scenes: plan.beats.map((b) => ({ id: b.id, beatId: b.id, narration: b.narration, visualIntent: b.segments.map((s) => s.why).join("; "), emotion: b.mood, location: "" })),
+  };
+}
+
+const MOODS = ["neutral", "day", "warm", "cool", "night", "dramatic"] as const;
+const FITS = ["cover", "contain"] as const;
+const AUDIOS = ["original", "ambient", "mute"] as const;
+const STYLES = ["hook", "title", "label", "cta"] as const;
+const POSITIONS = ["top", "center", "bottom"] as const;
+/** Elle düzenlemenin sınırları (ajanınkinden geniş: kullanıcı parça ekleyemez ama bölmeleri birleştirebilir). */
+export const PLAN_EDIT = { beats: 20, segments: 8, overlays: 12, text: 60, why: 200 };
+
+/**
+ * Stüdyo'dan gelen elle düzenlenmiş kurguyu (FootagePlan biçimi, güvenilmez) ajan çıktısı biçimine çevirir; biçim
+ * bozuksa çevrilebilir hata. Anlatım senaryodaki güncel metinden gelir (anlatım ayrı düzenlenir). Kurallar sonra
+ * normalizePlan'da uygulanır (kaynağa sığdırma, sessiz kaynak, anlatım kazanır).
+ */
+export function readPlanEdit(raw: unknown, narrations: Record<string, string>): FootageEditOut {
+  const bad = () => new LocalizedError(msg("err.footage.editInvalid"));
+  const obj = (v: unknown) => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+  const pick = <T extends string>(list: readonly T[], v: unknown): T | undefined => list.find((x) => x === v);
+  const plan = obj(raw);
+  const beats = Array.isArray(plan?.beats) ? plan.beats : undefined;
+  const overlays = Array.isArray(plan?.overlays) ? plan.overlays : undefined;
+  if (!plan || !beats?.length || beats.length > PLAN_EDIT.beats || !overlays || overlays.length > PLAN_EDIT.overlays) throw bad();
+  const ids: string[] = [];
+  const out: FootageEditOut = {
+    title: typeof plan.title === "string" ? plan.title.slice(0, 100) : "",
+    beats: beats.map((b) => {
+      const beat = obj(b);
+      const segments = Array.isArray(beat?.segments) ? beat.segments : undefined;
+      const mood = pick(MOODS, beat?.mood);
+      if (!beat || typeof beat.id !== "string" || !mood || !segments?.length || segments.length > PLAN_EDIT.segments) throw bad();
+      ids.push(beat.id);
+      return {
+        narration: narrations[beat.id] ?? (typeof beat.narration === "string" ? beat.narration : ""),
+        mood,
+        segments: segments.map((s) => {
+          const seg = obj(s);
+          const fromMs = num(seg?.fromMs), toMs = num(seg?.toMs), focusX = num(seg?.focusX);
+          const fit = pick(FITS, seg?.fit), audio = pick(AUDIOS, seg?.audio);
+          if (!seg || typeof seg.source !== "string" || fromMs === undefined || toMs === undefined || focusX === undefined || !fit || !audio) throw bad();
+          return { source: seg.source, fromSec: Math.max(0, fromMs) / 1000, toSec: Math.max(0, toMs) / 1000, focusX: Math.min(1, Math.max(0, focusX)), fit, audio, why: typeof seg.why === "string" ? seg.why.slice(0, PLAN_EDIT.why) : "" };
+        }),
+      };
+    }),
+    overlays: [],
+  };
+  out.overlays = overlays.map((o) => {
+    const overlay = obj(o);
+    const style = pick(STYLES, overlay?.style), position = pick(POSITIONS, overlay?.position);
+    const beat = typeof overlay?.beat === "string" ? ids.indexOf(overlay.beat) + 1 : 0;
+    if (!overlay || typeof overlay.text !== "string" || !style || !position || beat < 1) throw bad();
+    return { text: overlay.text.slice(0, PLAN_EDIT.text), style, beat, position };
+  });
+  return out;
 }
 
 const lengthOf = (s: FootageSegment) => s.toMs - s.fromMs;

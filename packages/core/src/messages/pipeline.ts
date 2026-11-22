@@ -378,6 +378,7 @@ export const PIPELINE_MESSAGES = {
   "err.footage.noVideo": { tr: "Dosyada görüntü akışı yok (video ya da resim değil)", en: "The file has no picture stream (not a video or image)" },
   "err.footage.type": { tr: "Desteklenmeyen dosya türü: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)", en: "Unsupported file type: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)" },
   "err.footage.none": { tr: "Footage bölümü için en az bir video ya da resim gerekli", en: "A footage episode needs at least one video or image" },
+  "err.footage.editInvalid": { tr: "Geçersiz kurgu düzenlemesi (vuruş, parça ya da yazı biçimi bozuk)", en: "Invalid edit (a beat, part or text is malformed)" },
   "err.footage.emptyPlan": { tr: "Kurgu boş kaldı: ajanın seçtiği parçaların hiçbiri kaynaklara uymadı", en: "The edit came out empty: none of the parts the editor picked fit the sources" },
   "err.footage.duration": { tr: "Short süresi {min}–{max} sn olmalı (istenen {sec} sn)", en: "A Short must last {min}–{max} s (asked for {sec} s)" },
   "log.footage.scan": { tr: "🎞 {id}: {kind}, {sec} sn, {frames} kare{speech}", en: "🎞 {id}: {kind}, {sec} s, {frames} frames{speech}" },

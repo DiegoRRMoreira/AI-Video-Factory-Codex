@@ -76,7 +76,9 @@ whole over a blurred copy), timeline (captions, texts, the original sound, music
 render. Where narration plays over a part, its own speech drops to a quiet ambience so the two never talk over each
 other. In the Studio, choose **New episode → Short from your footage**; files upload as you pick them (up to 1 GB each,
 `YS_FOOTAGE_MAX_MB` changes it). The Script tab then shows the edit (each beat's parts with a frame, range, framing and
-sound, the narration to edit, the on-screen texts); approving it cuts and builds the preview, and the Shots tab plays it
+sound, the narration to edit, the on-screen texts). Before approving you can rearrange or remove beats and parts,
+change a part's range, crop focus, framing and sound, a beat's music mood and the texts, then *Save the edit*;
+approving it cuts and builds the preview, and the Shots tab plays it
 before you approve the render. The cover image is the rendered Short's frame where the hook is fully on screen.
 
 ## Character bank

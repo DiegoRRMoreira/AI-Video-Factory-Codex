@@ -1,4 +1,5 @@
 import {
+  editFootagePlan,
   acquireLock,
   saveNarrationEdit,
   undoNarrationEdit,
@@ -61,6 +62,7 @@ export type StudioAction =
   | { type: "set-short"; enabled: boolean }
   | { type: "reuse-character"; castId: string; key: string }
   | { type: "set-series"; series?: string }
+  | { type: "edit-footage"; plan: unknown }
   | { type: "cancel" };
 
 /** Stüdyodaki her insan kararı ve iş başlatma buradan geçer. */
@@ -97,6 +99,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         else startJob(id, "job.concept", ["episode", "run", id, "--until", "concept"]);
         break;
       }
+      case "edit-footage":
+        await episodes.update(id, (s) => editFootagePlan(s, action.plan));
+        break;
       case "revoke-script":
         await episodes.update(id, (s) => revokeApproval(s, "script"));
         break;

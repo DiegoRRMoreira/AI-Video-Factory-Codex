@@ -1147,6 +1147,18 @@ describe("POST /api/episodes/[id]/action", () => {
     expect(server.getJob("job-prev")?.label).toBe("job.preview");
   });
 
+  it("footage kurgusu elle düzenlenir; onaydan sonra düzenlenmez", async () => {
+    const sources = [{ id: "f1", key: "k/f1.mp4", name: "a.mp4", ext: "mp4", kind: "video", durationMs: 20000, width: 1920, height: 1080, audio: true }];
+    const plan = { title: "T", beats: [{ id: "b1", narration: "", mood: "day", segments: [{ source: "f1", fromMs: 0, toMs: 3000, focusX: 0.5, fit: "cover", audio: "mute", why: "" }] }], overlays: [] };
+    const footage = { sources, narration: true, transcribe: true, texts: [] } as unknown as NonNullable<EpisodeInput["footage"]>;
+    await saveEpisode("foot-edit", { footagePlan: plan, script: { scenes: [] } } as unknown as Partial<EpisodeState>, { footage });
+    await ok("foot-edit", { type: "edit-footage", plan: { ...plan, beats: [{ ...plan.beats[0], mood: "night" }] } });
+    expect((await load("foot-edit")).footagePlan!.beats[0]!.mood).toBe("night");
+    await fail("foot-edit", { type: "edit-footage", plan: { beats: [] } }, "Geçersiz kurgu");
+    await saveEpisode("foot-ok", { footagePlan: plan, approvals: { script: "t" } } as unknown as Partial<EpisodeState>, { footage });
+    await fail("foot-ok", { type: "edit-footage", plan }, "Senaryo onaylandı");
+  });
+
   it("senaryo düzenleme, onay geri alma, aday seçimi", async () => {
     await saveEpisode("a4", {
       script,

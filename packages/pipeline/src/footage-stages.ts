@@ -6,7 +6,7 @@ import { footageEditor, type AgentResult } from "@ys/agents";
 import { errorText, LocalizedError, msg, type Text, type Timeline, type WordTiming } from "@ys/core";
 import type { MediaGateway, RunOptions } from "@ys/media-gateway";
 import type { AssetStore } from "@ys/storage";
-import { FOOTAGE, FOOTAGE_TYPES, fitCuts, footageKindOf, footageTimeline, frameTimes, isFootageExt, normalizePlan, type FootageCut, type FootageSource } from "./footage.ts";
+import { FOOTAGE, FOOTAGE_TYPES, fitCuts, footageKindOf, footageTimeline, frameTimes, isFootageExt, normalizePlan, planScript, type FootageCut, type FootageSource } from "./footage.ts";
 import { cutVideo, extractAudio, frameImage, probeMedia, sampleFrame } from "./footage-media.ts";
 import type { EpisodeState, Stage } from "./state.ts";
 
@@ -188,9 +188,7 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
       const plan = normalizePlan(out, footage);
       state.footagePlan = plan;
       state.story = { title: plan.title || state.input.topic, logline: state.input.topic, premise: "", hook: plan.beats[0]!.narration, beats: [] };
-      state.script = {
-        scenes: plan.beats.map((b) => ({ id: b.id, beatId: b.id, narration: b.narration, visualIntent: b.segments.map((s) => s.why).join("; "), emotion: b.mood, location: "" })),
-      };
+      state.script = planScript(plan);
       // Yeni kurgu: eski zamanlama ve kesimler geçersiz.
       delete state.footageCuts;
       ctx.log(msg("log.footage.plan", { beats: plan.beats.length, segments: plan.beats.reduce((n, b) => n + b.segments.length, 0), overlays: plan.overlays.length }));
