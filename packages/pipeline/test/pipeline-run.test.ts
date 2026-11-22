@@ -1273,11 +1273,19 @@ describe("timeline, render ve inceleme", () => {
       if (n === 3) a.checks.off_story = { evidence: "the frame shows the desk and Ada", verdict: "na" };
       return a;
     };
-    let round = 0;
+    const seen = new Set<string>();
     onAgent("sceneCritic", (items: { shotId: string }[]) => {
-      // İlk turda ilk grubun dört karesi dört ayrı biçimde geçersiz; yeniden istenince düzgün.
-      const first = round++ === 0;
-      return { shots: items.map((i, n) => (first ? lazy(i.shotId, n) : checked(i.shotId))), lessons: [] };
+      // İlk grubun (s1-sh1 ile başlayan) dört karesi ilk istendiklerinde dört ayrı biçimde geçersiz; yeniden istenince
+      // düzgün. Gruplar eşzamanlı istenir: hangisinin önce geldiği değil, karenin kimliği belirler (CI'da sıra değişti).
+      const firstGroup = items[0]?.shotId === "s1-sh1";
+      return {
+        shots: items.map((i, n) => {
+          const fresh = !seen.has(i.shotId);
+          seen.add(i.shotId);
+          return firstGroup && fresh ? lazy(i.shotId, n) : checked(i.shotId);
+        }),
+        lessons: [],
+      };
     });
     const done = await h.pipeline.run(id, { only: "review" });
     expect(Object.keys(done.review!.shots)).toHaveLength(7);
