@@ -6,10 +6,12 @@ import type { RenderAuditSummary } from "./render-audit.ts";
 import type { StyleComparison, StyleReference, styleSamples } from "./style-comparison.ts";
 import type { ArchiveImage, ArchiveCandidate } from "@ys/core";
 import type { CastOut, LessonTarget, MotionMode, ScriptOut, ShotPlanOut, StoryOut, StyleBibleOut } from "@ys/agents";
-import type { Ambience, AssetCheck, BudgetTier, FlagSpec, LineStyle, MapSpec, Msg, SceneBelow, ShotReviewRecord, Timeline, VectorShot, WordTiming } from "@ys/core";
+import type { Ambience, AssetCheck, BudgetTier, FlagSpec, LineStyle, MapSpec, MotionFilm, Msg, SceneBelow, ShotReviewRecord, Timeline, VectorShot, WordTiming } from "@ys/core";
 import { scenesBelow, stylePackOf } from "@ys/core";
 import type { FootageAssets, FootageCut, FootageInput, FootagePlan, FootageScan } from "./footage.ts";
 import type { YoutubeInput, YoutubeState } from "./youtube.ts";
+import type { MotionInput } from "./motion.ts";
+import type { FilmIssue } from "@ys/video/film";
 
 export type { MotionMode };
 
@@ -132,6 +134,11 @@ export interface EpisodeInput {
    * etmez; seçilen adaylar ayrı footage Short bölümleri olur (youtube.ts).
    */
   youtube?: YoutubeInput;
+  /**
+   * Hareketli grafik filmi (22 Kas): insan figürü ve çizim olmadan, yazı, veri, diyagram, kart, parçacık ve 3D nesneden
+   * koddan çizilen film (motion.ts). Verilince stil, kadro, konsept, kare, kesim ve inceleme aşamaları atlanır.
+   */
+  motion?: MotionInput;
   /** Bu Short bir YouTube analizinin adayından üretildi (Stüdyo analize ve videodaki yerine bağlar). */
   fromYoutube?: { analysis: string; candidate: string; url: string };
   width: number;
@@ -159,8 +166,8 @@ export interface PlannedShotState {
   intent?: ShotIntent;
   id: string;
   sceneId: string;
-  /** footage: kullanıcının videosundan kesilmiş parça (footage modu). */
-  kind: "still_motion" | "ai_clip" | "footage";
+  /** footage: kullanıcının videosundan kesilmiş parça (footage modu); motion_graphic: hareketli grafik filminin sahnesi (motion modu). */
+  kind: "still_motion" | "ai_clip" | "footage" | "motion_graphic";
   /** Bölüm başına göre. */
   startMs: number;
   endMs: number;
@@ -303,6 +310,14 @@ export interface EpisodeState {
   footageCheck?: Record<string, { verdict: "ok" | "subject_cut" | "empty"; evidence: string; fixed?: { focusX: number; fit: "cover" | "contain" } }>;
   /** YouTube analizi: indirme, döküm, sahneler, pencere analizleri ve rapor. */
   youtube?: YoutubeState;
+  /** Motion modu: yönetmenin kod kurallarından geçmiş filmi (senaryo aşaması). */
+  motionFilm?: MotionFilm;
+  /** Anlatıma göre vuruşla uzatılmış film (çekim aşaması); timeline bundan kurulur. */
+  motionTimed?: MotionFilm;
+  /** Filmin kod denetimi (kalan bulgular). */
+  motionLint?: FilmIssue[];
+  /** Yapımcının "notla yeniden yaz" notu: senaryo aşaması önceki filmi bu notla düzelttirir, sonra siler. */
+  motionNote?: string;
   keyframes?: Record<string, AssetRef>;
   /** Human-selected real archive inserts; original generated shots stay available for restoration. */
   archives?: Record<string, ArchiveImage>;
@@ -404,7 +419,7 @@ export function isApproved(state: EpisodeState, gate: Gate): boolean {
   // YouTube analizinde onaylanacak bir şey yok: rapor biter, Short'lar kendi bölümlerinde onaylanır.
   if (state.input.youtube) return true;
   // Footage modunda konsept (karakter/mekân seçimi) yok: kapı kendiliğinden geçer.
-  if (gate === "concept" && state.input.footage) return true;
+  if (gate === "concept" && (state.input.footage || state.input.motion)) return true;
   // Barajı geçemeyen sahne varken render otomatik onaylanmaz: yapımcı ya yeniden oluşturur ya da bilerek onaylar (12 Kas).
   if (gate === "preview" && draftBelow(state).length) return Boolean(state.approvals?.preview);
   return Boolean(state.input.autoApprove || state.approvals?.[gate]);

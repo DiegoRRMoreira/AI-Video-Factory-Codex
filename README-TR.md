@@ -17,6 +17,7 @@ Bir konudan seslendirilmiş, animasyonlu YouTube videosu üretin. Claude ajanlar
 - **Birden fazla dilde seslendirilmiş video:** eşzamanlı altyazı, dudak hareketi, müzik ve ses efektleri. Stüdyo Türkçe ve İngilizce kullanılabilir.
 - **Yayın paketi:** video, `.srt` altyazı, başlık, açıklama, bölümler, etiketler, kapak görseli ve yatay bölümlerden dikey Short.
 - **Kendi görüntünüzden Short:** videolarınızı ve resimlerinizi yükleyin, süreyi seçin (15–180 sn); AI en iyi anları seçer, 9:16'ya kadrajlar, anlatım ekler ya da asıl konuşmayı korur, altyazı, ekran yazıları, müzik ve efekt sesleriyle birlikte işler.
+- **Hareketli grafik filmi:** insan figürü ve çizim yok. Yönetmen ajanı bir ritim çizelgesi ve kinetik yazı, grafik, sistem diyagramı, kart montajı, parçacık alanı ve basit 3D nesneden sahneler yazar; kod bunları vuruşa oturtarak çizer, aynı tempoda sentezlenen müzik ve efekt ekler. Bir brif, isteğe bağlı marka renkleri ve logo ya da ekran görüntüleri verirsiniz; 16:9 ya da 9:16, anlatım isteğe bağlı.
 - **YouTube videosundan Short:** sahibi olduğunuz bir videonun adresini verin; video indirilip sahne sahne incelenir, sahne günlüğü, kesilecek yerler ve puanlı Short adayları çıkar. Seçtiğiniz adaylar asıl konuşması altyazılı dikey Short olur.
 - **ACP ile istediğiniz model:** Claude'un yanında her ajan, Antigravity (`agy`) gibi bir Agent Client Protocol ajanında ve onun Gemini, Claude ya da GPT-OSS modelleriyle çalışabilir; seçim Modeller sayfasında ajan başına yapılır.
 - **Üretim boyunca inceleme:** senaryo/konsept onayları, çekim önizlemeleri, çizim denetimleri, seçili çekimleri yenileme ve çıktı denetimleri.
@@ -73,6 +74,13 @@ Bunun yerine kendi videolarınızdan ve resimlerinizden dikey Short kesmek için
 
 ```sh
 pnpm ys episode new --footage gezi.mp4 --footage gundogumu.jpg --sec 30 --overlay "Hayatımın sabahı" --manual
+```
+
+Ya da bir briften hareketli grafik filmi yapın (anlatımsız film ücretli API kullanmaz):
+
+```sh
+pnpm ys episode new --film --topic "Relay dağıtımları 40 dakikadan 12'ye indiriyor" --sec 30 --color "#2563eb" --asset logo.png
+pnpm ys episode run <kimlik>
 ```
 
 Ya da uzun bir YouTube videonuzu Short için analiz ettirin ([yt-dlp](https://github.com/yt-dlp/yt-dlp) gerekir):

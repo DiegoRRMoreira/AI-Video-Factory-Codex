@@ -100,7 +100,7 @@ export class EpisodeRepo {
 }
 
 /** Bölümün depodaki kendi dosyaları: inceleme kareleri, efekt ve müzik izleri; durum ve çalışma kilidi en sonda. */
-export const episodePrefixes = (id: string): string[] => [`assets/stills/${id}/`, `assets/sfx/${id}/`, `assets/music/${id}/`, `assets/footage/${id}/`, `assets/youtube/${id}/`, `episodes/${id}/`];
+export const episodePrefixes = (id: string): string[] => [`assets/stills/${id}/`, `assets/sfx/${id}/`, `assets/music/${id}/`, `assets/footage/${id}/`, `assets/youtube/${id}/`, `assets/motion/${id}/`, `episodes/${id}/`];
 
 /**
  * Bölümü depodan siler (yarım kalmış ya da bitmiş); silinen dosya sayısını döner. Durum dosyası en son gider: yarıda
@@ -216,6 +216,23 @@ export function editFootagePlan(state: EpisodeState, raw: unknown): void {
   invalidateFrom(state, "cast");
 }
 
+/**
+ * Hareketli grafik filmini yönetmene notla yeniden yazdırır (senaryo onayından önce): not saklanır, senaryo aşaması
+ * yeniden açılır; yönetmen önceki filmi ve notu görür (motion-stages.ts).
+ */
+export function remakeFilm(state: EpisodeState, note: string): void {
+  if (state.approvals?.script) throw new LocalizedError(msg("err.action.scriptApproved"));
+  if (!state.input.motion || !state.motionFilm) throw new LocalizedError(msg("err.action.scriptFirst"));
+  const text = note.trim().slice(0, 600);
+  if (!text) throw new LocalizedError(msg("err.action.noNote"));
+  state.motionNote = text;
+  delete state.motionTimed;
+  delete state.voice;
+  delete state.timeline;
+  delete state.lastError;
+  invalidateFrom(state, "script");
+}
+
 export function setMotion(state: EpisodeState, motionMode: MotionMode, aiClipRatio?: number): void {
   if (state.approvals?.concept) throw new LocalizedError(msg("err.action.conceptApproved"));
   // Görsel ve vektör modlarının konsept varlıkları farklıdır (PNG/JPEG ↔ SVG); geçişte konsept yeniden üretilir.
@@ -235,6 +252,7 @@ export function setMotion(state: EpisodeState, motionMode: MotionMode, aiClipRat
 export function redrawShots(state: EpisodeState, shotIds: string[]): void {
   // Footage çekimleri kullanıcının görüntüsüdür: yeniden çizilecek kare yok (kurgu, senaryo onayı geri alınarak değişir).
   if (state.input.footage) throw new LocalizedError(msg("err.action.footage"));
+  if (state.input.motion) throw new LocalizedError(msg("err.action.film"));
   const known = new Set(state.shots?.map((s) => s.id));
   const ids = shotIds.filter((id) => known.has(id));
   if (ids.length === 0) throw new LocalizedError(msg("err.action.noShots"));

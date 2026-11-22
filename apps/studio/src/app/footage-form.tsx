@@ -19,7 +19,7 @@ interface Item {
 }
 
 /** Tek dosyayı bekleme alanına yükler; gövde dosyanın kendisidir. */
-async function uploadFile(file: File): Promise<{ key: string } | { error: string }> {
+export async function uploadFile(file: File): Promise<{ key: string } | { error: string }> {
   try {
     const res = await fetch("/api/footage", {
       method: "POST",

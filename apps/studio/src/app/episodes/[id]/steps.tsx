@@ -3,6 +3,7 @@ import { ShotIntentDetails } from "./shot-intent";
 import { ResearchPanel } from "./research-panel";
 import { NarrationEditor, NarrationUndo } from "./narration-editor";
 import { FootagePlanView, frameFor, PLAN_DIRTY } from "./footage-plan";
+import { FilmTreatment } from "./film-treatment";
 import { VoiceAuditCard } from "./voice-audit-card";
 import { PronunciationPanel } from "./pronunciation-panel";
 import { ArchivePicker } from "./archive-picker";
@@ -61,13 +62,16 @@ export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeRespon
   const unsaved = [...state.script.scenes.map((s) => s.id), PLAN_DIRTY].some((id) => dirtyScenes[`${state.id}:${id}`]);
   // Footage bölümü: senaryo kurgudur (vuruşlar ve parçalar); araştırma ve hikâye kartı yok, maliyet tahmini modun değil.
   const footage = state.input.footage && state.footagePlan;
+  // Hareketli grafik filmi: senaryo filmin tarifidir (ritim çizelgesi ve sahneler).
+  const film = state.input.motion && state.motionFilm;
+  const plain = !footage && !film;
   return (
     <div className="grid gap-5">
-      {!footage && <ResearchPanel key={state.id} id={state.id} busy={busy} scenes={state.script.scenes} onRewrite={state.story ? () => act({ type: "rewrite-script" }) : undefined} />}
+      {plain && <ResearchPanel key={state.id} id={state.id} busy={busy} scenes={state.script.scenes} onRewrite={state.story ? () => act({ type: "rewrite-script" }) : undefined} />}
       <VoiceAuditCard key={`voice-${state.id}`} state={state} busy={busy} act={act} />
       <PronunciationPanel key={`pronunciation-${state.id}`} id={state.id} busy={busy} version={JSON.stringify([state.pronunciationOverrides, state.pronunciationPlan, state.voice, state.script])} />
       {state.narrationEdit && <NarrationUndo key={`${state.id}-${state.narrationEdit.id}`} id={state.id} editId={state.narrationEdit.id} busy={busy} act={act} />}
-      {state.story && !footage && (
+      {state.story && plain && (
         <div className="grid gap-4 rounded-xl border border-line bg-panel-2/50 p-4 text-sm md:grid-cols-2">
           <div>
             <div className="label">{t("script.logline")}</div>
@@ -89,7 +93,7 @@ export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeRespon
         </span>
         {!approved && (
           <button className="btn-primary" disabled={busy || unsaved} onClick={() => act({ type: "approve-script" })}>
-            <Check size={16} /> {footage ? t("footage.plan.approve") : t("script.approve")} {!footage && <span className="font-normal opacity-70">({costOf(est, AFTER_SCRIPT, fmt)})</span>}
+            <Check size={16} /> {footage ? t("footage.plan.approve") : film ? t("film.approve") : t("script.approve")} {plain && <span className="font-normal opacity-70">({costOf(est, AFTER_SCRIPT, fmt)})</span>}
           </button>
         )}
         {approved && state.approvals?.script && !state.approvals?.concept && !state.input.autoApprove && (
@@ -99,7 +103,7 @@ export function ScriptTab({ data, busy, act, focusScene }: { data: EpisodeRespon
         )}
       </div>
       {unsaved && <p className="text-sm text-muted">{t("edit.unsaved")}</p>}
-      {footage ? <FootagePlanView key={JSON.stringify(footage)} state={state} plan={footage} busy={busy} approved={approved} act={act} onDirtyChange={markDirty} /> : <ol className="grid gap-3">
+      {film ? <FilmTreatment state={state} film={film} busy={busy} approved={approved} act={act} onDirtyChange={markDirty} /> : footage ? <FootagePlanView key={JSON.stringify(footage)} state={state} plan={footage} busy={busy} approved={approved} act={act} onDirtyChange={markDirty} /> : <ol className="grid gap-3">
         {state.script.scenes.map((scene, i) => {
           const voice = state.voice?.[scene.id];
           return (
@@ -591,8 +595,8 @@ export function ShotsTab({ data, busy, act, workspace = false, active = true, is
         setPlaying((p) => ({ shot: id, seek: (p?.seek ?? 0) + 1 }));
       }
     : undefined;
-  // Footage çekimleri yeniden çizilmez (kullanıcının görüntüsü): kare yenileme düğmeleri yok.
-  const footage = Boolean(state.input.footage);
+  // Footage çekimleri yeniden çizilmez (kullanıcının görüntüsü), film sahneleri koddan çizilir: kare yenileme düğmeleri yok.
+  const footage = Boolean(state.input.footage || state.input.motion);
   const imageMode = (modeOf(state.input)) !== "vector" && !footage;
   const failedQa = shots.filter((s) => !state.archives?.[s.id] && state.qa?.[s.id] && !state.qa[s.id]!.passed).map((s) => s.id);
   const kfRow = data.estimates[modeOf(state.input)].rows.find((r) => r.stage === "keyframes");

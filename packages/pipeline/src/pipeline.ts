@@ -130,6 +130,7 @@ import { stillMoment } from "@ys/video/moment";
 import { withSets } from "./set-dressing.ts";
 import { restoreWords, sayPlan } from "./pronounce.ts";
 import { MUSIC_RATE, musicTrack } from "@ys/video/music";
+import { scoreTrack } from "@ys/video/score";
 import { mixSfx, sfxEvents, wavFile } from "@ys/video/sfx";
 import { findReferences, findVectorSources, rasterizeSvg, searchQuery, type References } from "./reference.ts";
 import { frameRank, judgeFrame, QA_MAX_BYTES, redrawPrompt } from "./qa.ts";
@@ -152,6 +153,8 @@ import { existingSamples, loadStyleSamples, SAMPLE_BRIEF, STYLE_SAMPLES_ID, STYL
 import { shortRange, shortTimeline } from "./short.ts";
 import { addFootageSources, checkFootageInput, footageStages } from "./footage-stages.ts";
 import { youtubeStages } from "./youtube-stages.ts";
+import { addMotionImage, checkMotionInput, motionStages } from "./motion-stages.ts";
+import type { MotionInput } from "./motion.ts";
 import { createYoutubeShorts } from "./youtube-shorts.ts";
 import type { YoutubeInput } from "./youtube.ts";
 import { posterMs } from "./footage.ts";
@@ -429,6 +432,23 @@ export class EpisodePipeline {
     return state;
   }
 
+  /**
+   * Hareketli grafik filmi bölümü: kullanıcının görselleri (yerel yollar: logo, ekran görüntüsü) bölüme eklenir, sonra
+   * durum yazılır. Ekleme yarıda düşerse eklenen görseller silinir.
+   */
+  async createMotion(input: EpisodeInput & { motion: MotionInput }, files: { name: string; path: string }[] = []): Promise<EpisodeState> {
+    checkMotionInput({ targetSec: input.targetSec, motion: { ...input.motion, images: [], pending: files.map((f) => ({ key: f.path, name: f.name })) } });
+    const state = newEpisodeState({ ...input, motion: { ...input.motion, images: [] } });
+    try {
+      for (const f of files) await addMotionImage(this.deps.store, state, f.name, new Uint8Array(await readFile(f.path)));
+    } catch (e) {
+      await deletePrefix(this.deps.store, `assets/motion/${state.id}/`);
+      throw e;
+    }
+    await this.save(state);
+    return state;
+  }
+
   /** YouTube analiz bölümü: adres doğrulanmış girdiyle (youtubeInput) açılır; indirme ve analiz çalıştırmada. */
   async createYoutube(input: EpisodeInput & { youtube: YoutubeInput }): Promise<EpisodeState> {
     const state = newEpisodeState(input);
@@ -660,7 +680,7 @@ export class EpisodePipeline {
       state.stats![stage] = { ...state.stats![stage]!, endedAt: new Date().toISOString(), durationMs: Date.now() - started };
     };
     try {
-      await (state.input.youtube ? this.youtube[stage] : ((state.input.footage ? this.footage[stage] : undefined) ?? this.stages[stage]))(state, opts);
+      await (state.input.youtube ? this.youtube[stage] : ((state.input.footage ? this.footage[stage] : state.input.motion ? this.motion[stage] : undefined) ?? this.stages[stage]))(state, opts);
       // Newly planned shot ids can describe different content; prior explicit image choices need a new review.
       if (stage === "shots") delete state.archives;
     } catch (e) {
@@ -1668,13 +1688,12 @@ export class EpisodePipeline {
     );
     const outDir = join(dir, "stills");
     await mkdir(outDir, { recursive: true });
-    // Manim tahtaları render klasöründe yoksa (taslak) kare çıkarmadan önce yazılır.
-    for (const v of timeline.visuals) {
-      if (!v.overlay) continue;
-      const target = join(dir, "public", ...v.overlay.split("/"));
+    // Manim tahtaları ve film görselleri render klasöründe yoksa (taslak) kare çıkarmadan önce yazılır.
+    for (const key of [...timeline.visuals.flatMap((v) => (v.overlay ? [v.overlay] : [])), ...(timeline.motion?.images ?? [])]) {
+      const target = join(dir, "public", ...key.split("/"));
       if (existsSync(target)) continue;
       await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, await this.bytes(v.overlay));
+      await writeFile(target, await this.bytes(key));
     }
     return renderStills({
       timeline,
@@ -2613,12 +2632,13 @@ export class EpisodePipeline {
    * olarak tek ize yazılır ve timeline'a "music" sesi olarak eklenir.
    */
   private async music(state: EpisodeState, timeline: Timeline): Promise<void> {
-    const { samples, sections } = musicTrack(timeline, state.id);
+    // Hareketli grafik filmi kendi temposunda ve ritim çizelgesinde çalar (motion-film/score.ts).
+    const { samples, sections } = timeline.motion ? scoreTrack(timeline, state.id) : (({ samples, sections }) => ({ samples, sections: sections.map((s) => s.mood) }))(musicTrack(timeline, state.id));
     const bytes = wavFile(samples, MUSIC_RATE);
     const key = `assets/music/${state.id}/${createHash("sha256").update(bytes).digest("hex").slice(0, 16)}.wav`;
     await this.deps.store.put(key, bytes, "audio/wav");
     timeline.audio.push({ role: "music", assetUrl: key, fromFrame: 0, durationInFrames: timeline.durationInFrames, volume: 1 });
-    this.log(msg("log.music.done", { n: sections.length, moods: sections.map((s) => s.mood).join(" → "), kb: Math.round(bytes.length / 1024) }));
+    this.log(msg("log.music.done", { n: sections.length, moods: sections.join(" → "), kb: Math.round(bytes.length / 1024) }));
   }
 
   /** Timeline'a gömülecek SVG'ler: seçili karakter/mekân varlıkları ve çizilmiş nesneler (eksik 3D figürler tamamlanır). */
@@ -2705,6 +2725,12 @@ export class EpisodePipeline {
   /** Footage modunun aşamaları (footage-stages.ts); verilmeyen aşama normal aşamadır. */
   private get footage(): ReturnType<typeof footageStages> {
     return (this.footageMap ??= footageStages(this.footageContext));
+  }
+
+  private motionMap?: ReturnType<typeof motionStages>;
+  /** Motion modunun aşamaları (motion-stages.ts); verilmeyen aşama normal aşamadır. */
+  private get motion(): ReturnType<typeof motionStages> {
+    return (this.motionMap ??= motionStages(this.footageContext));
   }
 
   private youtubeMap?: ReturnType<typeof youtubeStages>;
@@ -3191,7 +3217,7 @@ export class EpisodePipeline {
       const files = timeline.visuals.filter((v) => v.assetUrl);
       // Footage parçaları kesilirken render biçimine getirildi (footage-media.ts cutVideo); yeniden kodlanmaz.
       const clipKeys = new Set(files.filter((v) => v.kind !== "still_motion" && v.kind !== "footage").map((v) => v.assetUrl));
-      const keys = new Set([...files.map((v) => v.assetUrl), ...timeline.visuals.flatMap((v) => (v.overlay ? [v.overlay] : [])), ...timeline.audio.map((a) => a.assetUrl)]);
+      const keys = new Set([...files.map((v) => v.assetUrl), ...timeline.visuals.flatMap((v) => (v.overlay ? [v.overlay] : [])), ...timeline.audio.map((a) => a.assetUrl), ...(timeline.motion?.images ?? [])]);
       for (const key of keys) {
         const target = join(publicDir, ...key.split("/"));
         await mkdir(dirname(target), { recursive: true });

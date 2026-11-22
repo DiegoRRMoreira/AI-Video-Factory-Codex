@@ -12,6 +12,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/studio/tsconfig.json",
     "motion:preview": "tsx scripts/preview-scene-motion.ts",
+    "motion:film": "tsx scripts/preview-motion-film.ts",
     "typography:preview": "tsx scripts/preview-typography.ts",
     "reference:preview": "tsx scripts/preview-reference-style.ts",
     "audio:audit:preview": "tsx scripts/preview-shot-audio.ts",

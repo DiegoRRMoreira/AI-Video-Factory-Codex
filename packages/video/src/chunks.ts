@@ -75,6 +75,8 @@ export async function chunkKeys(timeline: Timeline, ranges: ChunkRange[], public
       }
     }
   }
+  // Hareketli grafik filmi: görünümü ve görsellerinin içeriği (yalnız film varsa; eski bölümlerin önbelleği geçerli kalır).
+  const motion = timeline.motion ? { look: timeline.motion, images: await Promise.all(timeline.motion.images.map((f) => fileKey(publicDir, f, memo))) } : undefined;
   for (const { from, to } of ranges) {
     const shots = timeline.visuals.flatMap((v, i) => (v.fromFrame < to && v.fromFrame + v.durationInFrames + tail(i) > from ? [{ v, first: i === 0, last: i === last, cut: cuts[i] ?? null, tail: tail(i) }] : []));
     const assets: Record<string, unknown> = {};
@@ -105,6 +107,7 @@ export async function chunkKeys(timeline: Timeline, ranges: ChunkRange[], public
           speech,
           pages: shown,
           ...(overlays.length ? { overlays } : {}),
+          ...(motion ? { motion } : {}),
         }),
       ).slice(0, 32),
     );

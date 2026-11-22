@@ -600,6 +600,28 @@ katmanı, ilk ajan agy; rapor + aday seçimi.
 - Stüdyo: Yeni bölüm → "YouTube'dan" (hak onayı zorunlu); bölümün Analiz sekmesi rapor, adaylar ve Short üretimi;
   Modeller sayfasında ACP ajanları. CLI: `episode new --youtube`, `episode shorts <id> --candidates`.
 
+### 16.3 Hareketli grafik filmi (motion modu, 22 Kas 2026)
+
+Kullanıcı: "huashu-motion reposunu incele, bizde olmayan, insan görünümü de olmayan, SVG çizimimizden başka bir video
+yapma hattı yap." Kararlar: kinetik yazı, veri hikayesi, sistem diyagramı, kart ızgarası + alan + 3D; varsayılan
+anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkleri; 16:9, 9:16 seçilebilir.
+
+- **Mimari:** yönetmen ajanı yalnız JSON tarif yazar (`MotionFilm`: tempo, palet, yazı çifti, ritim çizelgesi,
+  vuruşla ölçülen sahneler); her şeyi Remotion içinde kod çizer. Modelin kodu çalışmaz, ikinci render motoru yok
+  (2 Kas kararı). huashu'nun fikirleri yeniden yazıldı, kod ve istem metni alınmadı; ölçtüğü eşikler kaynağıyla kodda.
+- **Kurallar kodda:** geçersiz sahne atılır, ilk sahne sert kesme, parlama en çok iki, yazı okunacak kadar ve öğeler
+  sığacak kadar sahne uzar, film hedefin 1,25 katını aşarsa sondan kısalır, vurgu kullanıcının rengi, okunmayan mürekkep
+  siyah/beyaza döner, brifte olmayan sayı "temsili veri" rozeti alır. Denetimin kanca, boşluk, patlama, düzlük ve
+  sıkışma bulguları yönetmene bir kez gider.
+- **Aşamalar:** story = görseller (Stüdyo yüklemesi), script = yönetmen + denetim, voice (isteğe bağlı), shots =
+  sahneler anlatıma vuruşla uzar, timeline = sahne başına film görseli, filmin temposunda müzik (ritim çizelgesine göre
+  davul, bas, pad; duruşta sessizlik) ve efekt; render, paket ve Short normal. Stil, kadro, konsept, kare, kesim ve
+  inceleme boş.
+- **Stüdyo:** Yeni bölüm → "Hareketli grafik filmi"; Senaryo sekmesinde ritim çizelgesi, sahneler, bulgular ve "notla
+  yeniden yaz". CLI: `episode new --film`.
+- **Doğrulama (22 Kas):** gerçek brifle agy/Gemini 4 Neon yönetmeni 60 sn'de 14 sahne, 120 BPM, 32 sn; denetim
+  temiz, render, paket ve dikey Short tamam, ücretli API yok.
+
 ## 17. Pazar Haritası (Ekim 2026)
 
 Pazar her ay değişiyor. Son 6 ayda Sora kapandı, Kling 4.0, Seedance 2.5, Wan 3.0 ve Gemini Omni çıktı. Bu yüzden mimari **"model değil, yetenek"** üzerine kurulu. Aşağıdaki liste bugünkü durum. Model Scout ajanı (§16) bu listeyi canlı tutar.

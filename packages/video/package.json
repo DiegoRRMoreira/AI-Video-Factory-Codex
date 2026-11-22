@@ -13,6 +13,8 @@
     "./voice-audit": "./src/voice-audit.ts",
     "./music": "./src/music.ts",
     "./sfx": "./src/sfx.ts",
+    "./film": "./src/motion-film/index.ts",
+    "./score": "./src/motion-film/score.ts",
     "./sets": "./src/setDressing.ts",
     "./tools": "./src/tools.ts"
   },

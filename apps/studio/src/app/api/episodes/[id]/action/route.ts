@@ -1,5 +1,6 @@
 import {
   editFootagePlan,
+  remakeFilm,
   acquireLock,
   saveNarrationEdit,
   undoNarrationEdit,
@@ -64,6 +65,7 @@ export type StudioAction =
   | { type: "reuse-character"; castId: string; key: string }
   | { type: "set-series"; series?: string }
   | { type: "edit-footage"; plan: unknown }
+  | { type: "remake-film"; note: unknown }
   | { type: "make-shorts"; candidates: unknown; review?: unknown; music?: unknown }
   | { type: "cancel" };
 
@@ -97,12 +99,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       case "approve-script": {
         const state = await episodes.update(id, (s) => approve(s, "script"));
         // Footage bölümünde konsept yok: onaydan sonra ses, kesim ve timeline önizleme onayına kadar sürer.
-        if (state.input.footage) startJob(id, "job.produce", ["episode", "run", id]);
+        if (state.input.footage || state.input.motion) startJob(id, "job.produce", ["episode", "run", id]);
         else startJob(id, "job.concept", ["episode", "run", id, "--until", "concept"]);
         break;
       }
       case "edit-footage":
         await episodes.update(id, (s) => editFootagePlan(s, action.plan));
+        break;
+      case "remake-film":
+        // Yönetmen filmi notla yeniden yazar; senaryo kapısında yine durur.
+        await episodes.update(id, (s) => remakeFilm(s, typeof action.note === "string" ? action.note : ""));
+        startJob(id, "job.script", ["episode", "run", id, "--until", "script"]);
         break;
       case "revoke-script":
         await episodes.update(id, (s) => revokeApproval(s, "script"));

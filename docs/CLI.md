@@ -113,6 +113,35 @@ captions, the hook as an on-screen text) and produces them right away; `--review
 cut can be changed in the Studio first, `--no-music` leaves the music out. In the Studio: **New episode → From YouTube**,
 then the episode's **Analysis** tab shows the report and makes Shorts from the candidates you tick.
 
+## Motion-graphics films
+
+`episode new --film` makes a film with no people and no drawings, from a brief:
+
+```sh
+pnpm ys episode new --film --topic "Relay cuts deploys from 40 to 12 minutes with a shared cache" --sec 30 --color "#2563eb" --asset logo.png --asset dashboard.png
+pnpm ys episode run <id>
+pnpm ys episode show <id>
+```
+
+- `--topic` is the brief: what the film says and any real numbers. Chart values, counters and card figures are taken
+  only from it; a number the brief does not contain is shown with an "illustrative data" badge on every frame.
+- `--sec 10–180` (default 30), `--vertical` for 9:16, `--color` brand colours (`#RRGGBB`, repeatable; the accent is one
+  of them), `--asset` logo or screenshots (jpg, png, webp; up to 12), used in cards and the closing 3D scene, `--lang`.
+- Without `--narration` there is no voice and no paid API: the on-screen text, the cuts and the music carry the film.
+  With it (`--voice <id>` picks the voice), each scene gets a sentence, scenes stretch on the beat to fit the voice and
+  captions are burned in.
+
+The `motion-director` agent (one call, model on the Studio's Models page) writes a rhythm sheet (hook, build, stop,
+peak, resolve, in bars with an energy level) and scenes measured in beats, each in one language: kinetic type (slam,
+mask rise, word by word, chapter counter, a highlight pill), data (bars from zero, a line that draws to its point, a
+counter), a system diagram (nodes, edges drawing on, packets travelling on the beat), cards (a grid or a full-frame
+montage cut on the beat), a particle field or a 3D object. Code checks the plan (a hook within 3 s, a burst of cuts near
+the middle, no more than two bars without something new, readable text, elements that fit their scene); readability
+and fit are fixed in code, the rest goes back to the director once. Transitions (cut, flash, colour flip, flood, iris,
+whip, push-through), the camera and the score share the film's tempo; sound effects land on the cuts and elements.
+`episode show` prints the rhythm sheet, the scenes and any remaining check findings. In the Studio: **New episode →
+Motion-graphics film**; the Script tab shows the treatment and **Remake with a note** sends a note to the director.
+
 ## Agents through ACP
 
 Every agent normally runs on Claude through the Agent SDK. On the Studio's **Models** page you can also add an

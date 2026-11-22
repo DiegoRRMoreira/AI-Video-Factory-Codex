@@ -18,3 +18,4 @@ export * from "./summaries.ts";
 export * from "./footage.ts";
 export * from "./youtube.ts";
 export * from "./youtube-shorts.ts";
+export * from "./motion.ts";

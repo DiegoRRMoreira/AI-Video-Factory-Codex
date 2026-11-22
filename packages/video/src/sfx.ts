@@ -7,6 +7,7 @@ import { bubbleSize, sayWindow } from "./bubble.ts";
 import { emptyBubble } from "./staging.ts";
 import { cutsOf } from "./cut.ts";
 import { overlayRevealSec } from "./overlay-timing.ts";
+import { filmSounds } from "./motion-film/sounds.ts";
 
 /**
  * Kareye kilitli efekt sesleri: olaylar timeline'daki animasyonlardan çıkarılır (render'ın kullandığı zamanlamalarla),
@@ -14,7 +15,9 @@ import { overlayRevealSec } from "./overlay-timing.ts";
  * kaymaz: aynı timeline her zaman aynı sesi verir.
  */
 
-export type Sound = "pop" | "tick" | "type" | "ding" | "whoosh" | "scratch" | "clap" | "applause" | "cheer" | "murmur" | "chant" | "march";
+export type Sound = "pop" | "tick" | "type" | "ding" | "whoosh" | "scratch" | "clap" | "applause" | "cheer" | "murmur" | "chant" | "march" | FilmSound;
+/** Hareketli grafik filminin vurgu sesleri (motion-film/sounds.ts): kesmenin ağırlığı, düşüş, yükseliş, iniş. */
+export type FilmSound = "hit" | "impact" | "riser" | "subdrop" | "thud";
 
 export interface SfxEvent {
   /** Bölüm başından kare. */
@@ -26,6 +29,8 @@ export interface SfxEvent {
   pitch?: number;
   /** Kalabalık sesinde kişi sayısı (crowdVoices): gürlük ve doku. */
   voices?: number;
+  /** Kazanç (1 = olağan; film öğelerinin hafif tıkları için). */
+  gain?: number;
 }
 
 const local = (p: number, a: VectorAnim) => Math.min(1, Math.max(0, (p - a.start) / Math.max(0.0001, a.end - a.start)));
@@ -35,6 +40,7 @@ const easeOut = (k: number) => 1 - (1 - k) ** 3;
 export function sfxEvents(timeline: Timeline): SfxEvent[] {
   const out: SfxEvent[] = [];
   for (const v of timeline.visuals) {
+    if (v.film && timeline.motion) out.push(...filmSounds(v.film, v.fromFrame, v.durationInFrames, timeline.motion.bpm, timeline.fps));
     if (!v.vector) continue;
     const at = (p: number) => Math.round(v.fromFrame + p * v.durationInFrames);
     const span = (a: VectorAnim) => a.end - a.start;
@@ -363,6 +369,51 @@ export function synth(e: SfxEvent, fps: number, seed: number): Float32Array {
       }
       return out;
     }
+    case "hit": {
+      // Kesme vuruşu: düşen perdeli kısa bas gövde + tok tıklama.
+      let phase = 0;
+      return make(0.28, (t) => {
+        phase += (2 * Math.PI * (55 + 110 * Math.exp(-t * 30)) * pitch) / SFX_RATE;
+        return (Math.sin(phase) * Math.exp(-t * 14) + rnd() * 0.5 * Math.exp(-t * 120)) * 0.6;
+      });
+    }
+    case "thud": {
+      // İniş: kısa, yumuşak gövde (yazının oturduğu an).
+      let phase = 0;
+      return make(0.16, (t) => {
+        phase += (2 * Math.PI * (70 + 60 * Math.exp(-t * 40)) * pitch) / SFX_RATE;
+        return Math.sin(phase) * Math.exp(-t * 26) * 0.5;
+      });
+    }
+    case "impact": {
+      // Düşüş anı: derin gümbürtü + açılan gürültü (zil gibi) + uzun kuyruk.
+      let phase = 0;
+      let y = 0;
+      return make(1.1, (t) => {
+        phase += (2 * Math.PI * (40 + 90 * Math.exp(-t * 12))) / SFX_RATE;
+        y += 0.35 * (rnd() - y);
+        return (Math.sin(phase) * Math.exp(-t * 3.2) * 0.8 + (rnd() - y) * Math.exp(-t * 5) * 0.35) * 0.7;
+      });
+    }
+    case "subdrop": {
+      // Alçalan alt bas (60 → 30 Hz): düşüşün altını doldurur.
+      let phase = 0;
+      return make(1.2, (t) => {
+        phase += (2 * Math.PI * (30 + 30 * Math.exp(-t * 2.5))) / SFX_RATE;
+        return Math.sin(phase) * Math.min(1, t / 0.01) * Math.exp(-t * 2.2) * 0.75;
+      });
+    }
+    case "riser": {
+      // Yükseliş: süzgeci açılan, gürleşen gürültü; tam kesmede biter.
+      const dur = Math.max(0.2, (e.frames ?? fps) / fps);
+      let y = 0;
+      return make(dur, (t) => {
+        const u = t / dur;
+        const fc = 300 + 5200 * u * u;
+        y += (1 - Math.exp((-2 * Math.PI * fc) / SFX_RATE)) * (rnd() - y);
+        return y * u ** 2 * Math.min(1, (dur - t) / 0.01) * 0.55;
+      });
+    }
     case "scratch": {
       // Kalem: yüksek geçiren gürültü, düzensiz vuruşlarla genlik oynar; başı ve sonu yumuşak.
       const dur = (e.frames ?? 1) / fps;
@@ -384,7 +435,8 @@ export function mixSfx(events: SfxEvent[], totalFrames: number, fps: number): In
   events.forEach((e, i) => {
     const s = synth(e, fps, i + 1);
     const from = Math.round((e.frame / fps) * SFX_RATE);
-    for (let k = 0; k < s.length && from + k < mix.length; k++) mix[from + k]! += s[k]!;
+    const gain = e.gain ?? 1;
+    for (let k = 0; k < s.length && from + k < mix.length; k++) mix[from + k]! += s[k]! * gain;
   });
   const out = new Int16Array(mix.length);
   for (let i = 0; i < mix.length; i++) out[i] = Math.round(Math.tanh(mix[i]! * 1.2) * 0.9 * 32767);

@@ -1,5 +1,5 @@
 import { BudgetTier, LineStyle, STYLE_AUTO, STYLE_CUSTOM, stylePackOf } from "@ys/core";
-import { cleanSeries, loadCustomStyle, newEpisodeState, UPLOAD_KEY, withBankChoice, youtubeInput, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
+import { cleanSeries, loadCustomStyle, MOTION, newEpisodeState, UPLOAD_KEY, withBankChoice, youtubeInput, type EpisodeInput, type MotionMode } from "@ys/pipeline/light";
 import { msg } from "@ys/core/messages";
 import { apiError, errorResponse, readJson } from "../../../lib/api";
 import { repo, startJob, store } from "../../../lib/server";
@@ -61,6 +61,8 @@ interface CreateBody {
   footage?: { uploads?: unknown; sec?: unknown; narration?: unknown; transcribe?: unknown; texts?: unknown };
   /** YouTube'dan Short: adres, aday sayısı, Short süresi, konuşma tanıma ve hak onayı. */
   youtube?: { url?: unknown; count?: unknown; minSec?: unknown; maxSec?: unknown; transcribe?: unknown; rights?: unknown };
+  /** Hareketli grafik filmi: yüklenmiş görseller (api/footage, yalnız resim), süre, kare oranı, renkler, anlatım. */
+  motion?: { uploads?: unknown; sec?: unknown; vertical?: unknown; colors?: unknown; narration?: unknown };
 }
 
 const num = (v: unknown) => (v === undefined || v === null || v === "" ? undefined : Number(v));
@@ -144,6 +146,50 @@ async function createFootage(req: Request, body: CreateBody): Promise<Response> 
   return Response.json({ id: state.id });
 }
 
+/**
+ * Hareketli grafik filmi: brif zorunlu; görseller bekleme alanından bölüme işin ilk aşamasında alınır (imza orada da
+ * denetlenir). Yatay 1920×1080 ya da dikey 1080×1920, senaryo onayında durur (filmin tarifi gözden geçirilir).
+ */
+async function createMotion(req: Request, body: CreateBody): Promise<Response> {
+  const m = body.motion!;
+  if (typeof body.topic !== "string" || !body.topic.trim()) return apiError(req, msg("api.topic"));
+  const raw: unknown[] = Array.isArray(m.uploads) ? m.uploads : [];
+  const uploads = raw.flatMap((u) => {
+    const { key, name } = (u ?? {}) as { key?: unknown; name?: unknown };
+    return typeof key === "string" && UPLOAD_KEY.test(key) && /\.(jpe?g|png|webp)$/.test(key) && typeof name === "string" ? [{ key, name: name.slice(-120) }] : [];
+  });
+  if (uploads.length !== raw.length || uploads.length > MOTION.images) return apiError(req, msg("api.motion.uploads"));
+  for (const u of uploads) if (!(await store().list(u.key)).includes(u.key)) return apiError(req, msg("api.motion.uploads"));
+  const sec = Number(m.sec ?? 30);
+  if (!Number.isFinite(sec) || sec < MOTION.minSec || sec > MOTION.maxSec) return apiError(req, msg("api.motion.sec"));
+  const budget = Number(body.budgetUsd ?? 5);
+  if (!Number.isFinite(budget) || budget <= 0) return apiError(req, msg("api.budget"));
+  const colors = (Array.isArray(m.colors) ? m.colors : []).filter((c): c is string => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 6);
+  const lang = typeof body.lang === "string" && /^[a-z]{2,3}(-[A-Z]{2})?$/.test(body.lang) ? body.lang : "tr";
+  const vertical = m.vertical === true;
+  const input: EpisodeInput = {
+    topic: body.topic.trim().slice(0, 2000),
+    lang,
+    targetSec: Math.round(sec),
+    tier: BudgetTier.catch("standard").parse(body.tier),
+    aiClipRatio: 0,
+    budgetUsd: budget,
+    voiceId: typeof body.voiceId === "string" && body.voiceId ? body.voiceId : undefined,
+    autoApprove: false,
+    captions: body.captions !== false,
+    sfx: body.sfx !== false,
+    music: body.music !== false,
+    motion: { colors, images: [], ...(uploads.length ? { pending: uploads } : {}), narration: m.narration === true },
+    width: vertical ? 1080 : 1920,
+    height: vertical ? 1920 : 1080,
+    fps: 30,
+  };
+  const state = newEpisodeState(input);
+  await repo().save(state);
+  startJob(state.id, "job.script", ["episode", "run", state.id, "--until", "script"]);
+  return Response.json({ id: state.id });
+}
+
 /** Bölümü oluşturur ve senaryo üretimini hemen başlatır (stil → hikâye → senaryo, sonra onay bekler). */
 export async function POST(req: Request) {
   let body: CreateBody;
@@ -154,6 +200,7 @@ export async function POST(req: Request) {
   }
   if (body.footage !== undefined) return createFootage(req, body);
   if (body.youtube !== undefined) return createYoutube(req, body);
+  if (body.motion !== undefined) return createMotion(req, body);
   if (typeof body.topic !== "string" || !body.topic.trim()) return apiError(req, msg("api.topic"));
   const minutes = Number(body.minutes ?? 3);
   const budget = Number(body.budgetUsd ?? 20);

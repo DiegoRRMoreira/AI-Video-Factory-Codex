@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ShotIntent } from "./intent.ts";
 import { Typography } from "./typography.ts";
 import { ArchiveCandidate } from "./archive.ts";
+import { MotionLook, MotionScene } from "./motion-film.ts";
 
 // ---------- Temel sözlük ----------
 
@@ -174,6 +175,8 @@ export const TimelineVisual = z.object({
   playbackRate: z.number().min(0.5).max(2).default(1),
   /** Vektör olmayan çekimin müzik havası (footage modu); vektör çekimde vector.mood geçerli. */
   mood: VectorMood.optional(),
+  /** Hareketli grafik filminin sahnesi (motion modu): render bunu koddan çizer (video/src/motion-film); assetUrl kullanılmaz. */
+  film: MotionScene.optional(),
 });
 
 export const TimelineAudio = z.object({
@@ -222,5 +225,7 @@ export const Timeline = z.object({
   texture: Texture.default("none"),
   /** Vektör sahnesi dışındaki ekran yazıları (footage modu); eski timeline'da yok. */
   overlays: z.array(TimelineOverlay).optional(),
+  /** Hareketli grafik filminin tempo, palet, yazı ve görselleri (motion modu); eski timeline'da yok. */
+  motion: MotionLook.optional(),
 });
 export type Timeline = z.infer<typeof Timeline>;

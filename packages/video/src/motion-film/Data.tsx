@@ -1,0 +1,172 @@
+import type { MotionData } from "@ys/core";
+import type { PartProps } from "./context.ts";
+import { clamp01, countAt, enterK, expoOut, FILM, formatValue } from "./timing.ts";
+
+/** Veri hikayesi (kanıt): çubuklar sıfırdan büyür, çizgi noktadan noktaya çizilir, sayı sayarak oturur; not vurgulanan noktaya iner. */
+export function Data(p: PartProps) {
+  const d = p.scene.data!;
+  const { box, colors, heading, body, frame, fps, enters, lang } = p;
+  const titleSize = Math.round(Math.min(box.h * 0.085, box.w * (p.height > p.width ? 0.075 : 0.05), 72));
+  const small = Math.round(titleSize * 0.5);
+  const tq = enterK(frame, enters[0]!, fps);
+  const decimals = Math.max(0, ...d.points.map((x) => (String(x.value).split(".")[1] ?? "").length).map((n) => Math.min(2, n)));
+  // Harfli birim ayrı yazılır ("27 dk"), simge bitişik ("40%").
+  const unit = d.unit ? (/^\p{L}/u.test(d.unit) ? ` ${d.unit}` : d.unit) : "";
+  const fmt = (v: number) => `${formatValue(v, decimals, lang)}${unit}`;
+  const chart = { x: box.x, y: box.y + titleSize * 1.9, w: box.w, h: box.h - titleSize * 1.9 - small * 3.2 };
+  const calloutAt = d.callout ? enters.at(-1)! : undefined;
+
+  return (
+    <div style={{ position: "absolute", inset: 0, color: colors.fg }}>
+      <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: p.scene.illustrative ? box.w * 0.76 : box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, lineHeight: 1.1, opacity: tq, transform: `translateY(${(1 - tq) * 30}px)` }}>
+        {d.title}
+      </div>
+      {d.chart === "bars" && <Bars d={d} p={p} chart={chart} fmt={fmt} small={small} />}
+      {d.chart === "line" && <Line d={d} p={p} chart={chart} fmt={fmt} small={small} />}
+      {d.chart === "count" && <Count d={d} p={p} chart={chart} size={titleSize} />}
+      {calloutAt !== undefined && (
+        <Callout text={d.callout!} q={enterK(frame, calloutAt, fps)} at={calloutPoint(d, chart, p, small * 1.5)} colors={colors} font={body} size={Math.round(small * 1.5)} />
+      )}
+      {d.source && (
+        <div data-source="" style={{ position: "absolute", left: box.x, top: box.y + box.h - small * 1.4, fontFamily: body.family, fontWeight: body.weight, fontSize: small, opacity: 0.6 * tq }}>
+          {d.source}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+
+/** Değer ekseni: sıfır her zaman tabanda (çubuklar sıfırdan başlar), üstte %12 pay. */
+function scaleOf(d: MotionData): { lo: number; hi: number } {
+  const values = d.points.map((x) => x.value);
+  const lo = Math.min(0, ...values);
+  const hi = Math.max(...values, 0);
+  return { lo, hi: hi === lo ? lo + 1 : hi + (hi - lo) * 0.12 };
+}
+
+/** Çubuğun ya da noktanın merkezi (px). */
+function pointAt(d: MotionData, chart: Box, i: number): { x: number; y: number } {
+  const { lo, hi } = scaleOf(d);
+  const n = d.points.length;
+  // Çizgide uçlar kenardan %6 içeride: uç noktanın halkası ve etiketi kesilmesin.
+  const x = d.chart === "bars" ? chart.x + ((i + 0.5) / n) * chart.w : chart.x + chart.w * (0.06 + 0.88 * (i / Math.max(1, n - 1)));
+  return { x, y: chart.y + chart.h - ((d.points[i]!.value - lo) / (hi - lo)) * chart.h };
+}
+
+/** Notun alt ortası: vurgulanan noktanın üstünde, grafiğin içinde (başlık satırına ve rozete taşmaz). */
+function calloutPoint(d: MotionData, chart: Box, p: PartProps, size: number): { x: number; y: number } {
+  if (d.chart === "count") return { x: chart.x + chart.w / 2, y: chart.y + chart.h * 0.78 };
+  const i = Math.min(d.highlight ?? d.points.length - 1, d.points.length - 1);
+  const pt = pointAt(d, chart, i);
+  return { x: Math.min(Math.max(pt.x, chart.x + p.box.w * 0.18), chart.x + chart.w - p.box.w * 0.18), y: Math.max(chart.y + size * 1.9, pt.y - chart.h * 0.16) };
+}
+
+function Bars({ d, p, chart, fmt, small }: { d: MotionData; p: PartProps; chart: Box; fmt: (v: number) => string; small: number }) {
+  const { lo, hi } = scaleOf(d);
+  const n = d.points.length;
+  const base = chart.y + chart.h - ((0 - lo) / (hi - lo)) * chart.h;
+  const bw = (chart.w / n) * 0.62;
+  return (
+    <>
+      <div style={{ position: "absolute", left: chart.x, top: base, width: chart.w, height: 2, background: p.colors.fg, opacity: 0.35 }} />
+      {d.points.map((pt, i) => {
+        const at = p.enters[1 + i]!;
+        // Çubuk 0,6 sn'de büyür; değer çubukla birlikte sayar.
+        const g = expoOut((p.frame - at) / (0.6 * p.fps));
+        const v = pt.value * g;
+        const top = chart.y + chart.h - ((Math.max(v, 0) - lo) / (hi - lo)) * chart.h;
+        const bottom = chart.y + chart.h - ((Math.min(v, 0) - lo) / (hi - lo)) * chart.h;
+        const hot = d.highlight === i;
+        const c = hot ? p.colors.accent : p.colors.fg;
+        const x = chart.x + ((i + 0.5) / n) * chart.w - bw / 2;
+        const shown = p.frame >= at;
+        return (
+          <div key={i} data-bar={i}>
+            <div style={{ position: "absolute", left: x, top, width: bw, height: Math.max(0, bottom - top), background: c, opacity: d.highlight === undefined || hot ? 1 : 0.32, borderRadius: Math.min(10, bw * 0.08) }} />
+            {shown && (
+              <div style={{ position: "absolute", left: x - bw * 0.3, width: bw * 1.6, top: top - small * 1.9, textAlign: "center", fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: small * 1.25, fontVariantNumeric: "tabular-nums", opacity: clamp01(g * 2) }}>
+                {fmt(v)}
+              </div>
+            )}
+            <div style={{ position: "absolute", left: x - bw * 0.3, width: bw * 1.6, top: chart.y + chart.h + small * 0.5, textAlign: "center", fontFamily: p.body.family, fontWeight: p.body.weight, fontSize: small, opacity: shown ? 0.75 : 0 }}>
+              {pt.label}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function Line({ d, p, chart, fmt, small }: { d: MotionData; p: PartProps; chart: Box; fmt: (v: number) => string; small: number }) {
+  const pts = d.points.map((_, i) => pointAt(d, chart, i));
+  // Çizgi bir sonraki noktaya, o nokta girerken uzanır.
+  let reach = 0;
+  for (let i = 1; i < pts.length; i++) reach += enterK(p.frame, p.enters[1 + i]!, p.fps);
+  const whole = Math.floor(reach);
+  const drawn = pts.slice(0, whole + 1);
+  if (whole < pts.length - 1) {
+    const a = pts[whole]!;
+    const b = pts[whole + 1]!;
+    const f = reach - whole;
+    drawn.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+  }
+  const showFirst = p.frame >= p.enters[1]!;
+  const beat = (60 / p.bpm) * p.fps;
+  return (
+    <>
+      <svg width={p.width} height={p.height} style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}>
+        <line x1={chart.x} x2={chart.x + chart.w} y1={chart.y + chart.h} y2={chart.y + chart.h} stroke={p.colors.fg} strokeOpacity={0.35} strokeWidth={2} />
+        {showFirst && <polyline data-path="" points={drawn.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ")} fill="none" stroke={p.colors.fg} strokeWidth={Math.max(6, small * 0.26)} strokeLinejoin="round" strokeLinecap="round" />}
+        {pts.map((q, i) => {
+          const k = enterK(p.frame, p.enters[1 + i]!, p.fps);
+          if (p.frame < p.enters[1 + i]!) return null;
+          const hot = d.highlight === i;
+          // Vurgulanan nokta vuruşla atan bir halka taşır.
+          const ring = hot ? ((p.frame - p.enters[1 + i]!) % beat) / beat : 0;
+          return (
+            <g key={i} data-dot={i}>
+              {hot && <circle cx={q.x} cy={q.y} r={small * (0.5 + ring * 1.4)} fill="none" stroke={p.colors.accent} strokeOpacity={1 - ring} strokeWidth={3} />}
+              <circle cx={q.x} cy={q.y} r={small * (hot ? 0.42 : 0.28) * k} fill={hot ? p.colors.accent : p.colors.fg} />
+            </g>
+          );
+        })}
+      </svg>
+      {pts.map((q, i) =>
+        p.frame >= p.enters[1 + i]! ? (
+          <div key={i} style={{ position: "absolute", left: q.x - 120, width: 240, top: chart.y + chart.h + small * 0.5, textAlign: "center", fontFamily: p.body.family, fontWeight: p.body.weight, fontSize: small, opacity: 0.75 }}>
+            {d.points[i]!.label}
+            {d.highlight === i && <div style={{ fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: small * 1.2, fontVariantNumeric: "tabular-nums", opacity: 1 }}>{fmt(d.points[i]!.value)}</div>}
+          </div>
+        ) : null,
+      )}
+    </>
+  );
+}
+
+function Count({ d, p, chart, size }: { d: MotionData; p: PartProps; chart: Box; size: number }) {
+  const c = d.count!;
+  const at = p.enters[1]!;
+  const v = countAt(c.from, c.to, p.frame, at, p.fps);
+  // Son 0,15 sn'de hafifçe büyüyüp oturur (count-up).
+  const land = (p.frame - at) / p.fps - FILM.countSec;
+  const pop = land > -0.15 && land < 0.2 ? 1 + 0.06 * Math.sin(clamp01((land + 0.15) / 0.35) * Math.PI) : 1;
+  const text = `${c.prefix}${formatValue(v, c.decimals, p.lang)}${c.suffix}${d.unit ?? ""}`;
+  const big = Math.round(Math.min(chart.h * 0.6, (chart.w / Math.max(4, text.length)) * 1.7, size * 4.2));
+  return (
+    <div data-count="" style={{ position: "absolute", left: chart.x, top: chart.y, width: chart.w, height: chart.h, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: big, fontVariantNumeric: "tabular-nums", color: p.colors.accent, opacity: p.frame >= at ? 1 : 0, transform: `scale(${pop})` }}>
+      {text}
+    </div>
+  );
+}
+
+function Callout({ text, q, at, colors, font, size }: { text: string; q: number; at: { x: number; y: number }; colors: PartProps["colors"]; font: PartProps["body"]; size: number }) {
+  if (q <= 0) return null;
+  return (
+    <div data-callout="" style={{ position: "absolute", left: at.x, top: at.y, transform: `translate(-50%, -100%) translateY(${(1 - q) * 20}px)`, opacity: q, background: colors.accent, color: colors.onAccent, fontFamily: font.family, fontWeight: font.weight, fontSize: size, padding: `${size * 0.35}px ${size * 0.7}px`, borderRadius: size * 0.5, whiteSpace: "nowrap" }}>
+      {text}
+    </div>
+  );
+}

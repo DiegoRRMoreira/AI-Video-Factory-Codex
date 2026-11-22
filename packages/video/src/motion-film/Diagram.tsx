@@ -1,0 +1,155 @@
+import type { MotionDiagram } from "@ys/core";
+import { fitSize, type PartProps } from "./context.ts";
+import { diagramOrder, edgeKey } from "./order.ts";
+import { beatFrames, clamp01, enterK, expoOut, FILM } from "./timing.ts";
+
+/**
+ * Sistem diyagramı (parçalar nasıl bağlı): düğümler sırayla belirir, iki ucu görünen bağ hemen ardından çizilerek açılır
+ * (hw-pipeline'ın sıralı çizimi), çizilen bağın üstünden paket noktaları vuruş ızgarasında akar. Vurgulanan düğüm vurgu
+ * renginde yanar. Dikey videoda ızgara döner (sütunlar satır olur).
+ */
+export function Diagram(p: PartProps) {
+  const g = p.scene.diagram!;
+  const { box, colors, heading, body, frame, fps } = p;
+  const tall = p.height > p.width;
+  const titleSize = Math.round(Math.min(box.h * 0.075, 64));
+  const top = g.title ? titleSize * 1.8 : 0;
+  const area = { x: box.x, y: box.y + top, w: box.w, h: box.h - top };
+  const at = new Map(diagramOrder(g).map((u, i) => [u, p.enters[i]!]));
+  const place = layoutNodes(g, area, tall);
+  const nodeW = Math.min(place.cellW * 0.82, tall ? 440 : 420);
+  const nodeH = Math.min(place.cellH * 0.56, 156);
+  // Etiket iki satıra inebilir: en uzun satır, kelime sınırından ikiye bölünmüş hâlinin uzunu.
+  const label = fitSize(g.nodes.map((n) => halves(n.label)), nodeW * 0.86, nodeH * 0.36, heading.em);
+  const beat = beatFrames(p.bpm, fps);
+  const tq = enterK(frame, 0, fps);
+
+  return (
+    <div style={{ position: "absolute", inset: 0, color: colors.fg }}>
+      {g.title && (
+        <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, opacity: tq }}>
+          {g.title}
+        </div>
+      )}
+      <svg width={p.width} height={p.height} style={{ position: "absolute", left: 0, top: 0 }}>
+        {g.edges.map((e, i) => {
+          const a = place.at.get(e.from);
+          const b = place.at.get(e.to);
+          const t = at.get(edgeKey(i));
+          if (!a || !b || t === undefined || frame < t) return null;
+          const s = trim(a, b, nodeW, nodeH);
+          const k = expoOut((frame - t) / (0.5 * fps));
+          const x2 = s.x1 + (s.x2 - s.x1) * k;
+          const y2 = s.y1 + (s.y2 - s.y1) * k;
+          const ang = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+          const head = 20;
+          const drawnAt = t + 0.5 * fps;
+          const phase = frame >= drawnAt ? (((frame - drawnAt) / (FILM.packetBeats * beat)) % 1) : -1;
+          return (
+            <g key={i} data-edge={i}>
+              <line x1={s.x1} y1={s.y1} x2={x2} y2={y2} stroke={colors.fg} strokeWidth={5} strokeLinecap="round" />
+              {k > 0.98 && (
+                <polygon
+                  points={`${s.x2},${s.y2} ${s.x2 - head * Math.cos(ang - 0.45)},${s.y2 - head * Math.sin(ang - 0.45)} ${s.x2 - head * Math.cos(ang + 0.45)},${s.y2 - head * Math.sin(ang + 0.45)}`}
+                  fill={colors.fg}
+                />
+              )}
+              {g.packets && phase >= 0 && <circle data-packet="" cx={s.x1 + (s.x2 - s.x1) * phase} cy={s.y1 + (s.y2 - s.y1) * phase} r={12} fill={colors.accent} />}
+              {e.label && k > 0.98 && (
+                // Etiket bağın yanında, çizgiye dik yönde (üstüne binmez), zemin renginde bir hale ile.
+                <text
+                  x={(s.x1 + s.x2) / 2 + Math.sin(ang) * label * 0.9}
+                  y={(s.y1 + s.y2) / 2 - Math.abs(Math.cos(ang)) * label * 0.9}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill={colors.fg}
+                  stroke={colors.bg}
+                  strokeWidth={8}
+                  paintOrder="stroke"
+                  style={{ fontFamily: body.family, fontWeight: body.weight, fontSize: Math.round(label * 0.75) }}
+                >
+                  {e.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {g.nodes.map((n) => {
+        const c = place.at.get(n.id)!;
+        const t = at.get(n.id)!;
+        const q = enterK(frame, t, fps);
+        const hot = g.highlight === n.id && q > 0.5;
+        return (
+          <div
+            key={n.id}
+            data-node={n.id}
+            style={{
+              position: "absolute",
+              left: c.x - nodeW / 2,
+              top: c.y - nodeH / 2,
+              width: nodeW,
+              height: nodeH,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              borderRadius: nodeH * 0.22,
+              border: `4px solid ${hot ? colors.accent : colors.fg}`,
+              background: hot ? colors.accent : colors.bg,
+              color: hot ? colors.onAccent : colors.fg,
+              fontFamily: heading.family,
+              fontWeight: heading.weight,
+              fontSize: label,
+              lineHeight: 1.1,
+              opacity: clamp01(q * 2),
+              transform: `scale(${0.82 + 0.18 * q})`,
+            }}
+          >
+            {n.label}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Etiketin iki satıra bölünmüş hâlinin uzun satırı (tek kelimeyse kendisi). */
+export function halves(label: string): string {
+  const words = label.split(/\s+/);
+  let best = label;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(" ");
+    const b = words.slice(i).join(" ");
+    const longer = a.length >= b.length ? a : b;
+    if (longer.length < best.length) best = longer;
+  }
+  return best;
+}
+
+/** Düğümlerin merkezleri: kullanılan sütun/satır aralığı alana yayılır, dikeyde ızgara döner. */
+export function layoutNodes(g: MotionDiagram, area: { x: number; y: number; w: number; h: number }, tall: boolean) {
+  const across = g.nodes.map((n) => (tall ? n.row : n.col));
+  const down = g.nodes.map((n) => (tall ? n.col : n.row));
+  const [a0, a1] = [Math.min(...across), Math.max(...across)];
+  const [d0, d1] = [Math.min(...down), Math.max(...down)];
+  const cols = a1 - a0 + 1;
+  const rows = d1 - d0 + 1;
+  const cellW = area.w / cols;
+  const cellH = area.h / rows;
+  const at = new Map(g.nodes.map((n, i) => [n.id, { x: area.x + (across[i]! - a0 + 0.5) * cellW, y: area.y + (down[i]! - d0 + 0.5) * cellH }]));
+  return { at, cellW, cellH };
+}
+
+/** Bağ, iki düğümün kutularının kenarından kenarına (merkezden çıkan ışının kutuyla kesiştiği yer). */
+function trim(a: { x: number; y: number }, b: { x: number; y: number }, w: number, h: number) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  // Düğümler ayrı hücrelerde (normalizeFilm): uzunluk sıfır olmaz.
+  const len = Math.hypot(dx, dy);
+  // Kutunun yarı ölçüleri boyunca ışının kenara çıktığı uzaklık (+ 6 px boşluk).
+  const out = Math.min(Math.abs(dx) > 0 ? w / 2 / Math.abs(dx / len) : Infinity, Math.abs(dy) > 0 ? h / 2 / Math.abs(dy / len) : Infinity) + 6;
+  const ux = dx / len;
+  const uy = dy / len;
+  return { x1: a.x + ux * out, y1: a.y + uy * out, x2: b.x - ux * out, y2: b.y - uy * out };
+}

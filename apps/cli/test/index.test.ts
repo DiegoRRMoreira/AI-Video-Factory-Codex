@@ -294,6 +294,14 @@ describe("episode ve render-demo", () => {
     expect((episodeMod.episodeCommand.mock.calls[1] as unknown as unknown[])[3]).toMatchObject({ youtube: "dQw4w9WgXcQ", count: "4", min: "25", max: "50", candidates: "c1,c2", review: true, noMusic: true });
   });
 
+  it("film bayrakları: renkler ve görseller birden çok, anlatım isteğe bağlı", async () => {
+    await cli("episode", "new", "--film", "--topic", "Brif", "--color", "#2563eb", "--color", "#f59e0b", "--asset", "logo.png", "--asset", "ekran.jpg", "--narration", "--vertical");
+    const args = (episodeMod.episodeCommand.mock.calls[0] as unknown as unknown[])[3] as Record<string, unknown>;
+    expect(args).toMatchObject({ film: true, topic: "Brif", color: ["#2563eb", "#f59e0b"], asset: ["logo.png", "ekran.jpg"], narration: true, vertical: true });
+    await cli("episode", "new", "--film", "--topic", "Brif");
+    expect((episodeMod.episodeCommand.mock.calls[1] as unknown as unknown[])[3]).toMatchObject({ film: true, narration: false });
+  });
+
   it("render-demo API'siz demo hattını çalıştırır", async () => {
     const r = await cli("render-demo");
     expect(r.code).toBe(0);

@@ -17,7 +17,13 @@ export const CROSSFADE = 8;
  * kayarak üstüne gelir, kenarında gölge), iris (ortadan daire açılır), zoom (gelen biraz yakından yerine oturarak belirir).
  */
 export const SCENE_CUT = { frames: 18, kinds: ["wipe", "slide", "iris", "zoom"] } as const;
-export type CutKind = "dissolve" | (typeof SCENE_CUT.kinds)[number];
+/**
+ * Hareketli grafik filminin geçişleri (motion-film): whip savrulma (gelen yandan çok hızlı gelir, yatay bulanıklığı
+ * HyperFrames whip-pan-cut gibi en çok FILM_CUT.whipBlur px), push içinden geçme (gelen büyükten yerine oturur). Kısa
+ * sürerler: kesme vuruşta kalsın. flash, flood ve flip sahnenin kendi örtüsüdür (Film.tsx), kesme serttir.
+ */
+export const FILM_CUT = { whip: 8, push: 9, iris: 10, whipBlur: 16 } as const;
+export type CutKind = "dissolve" | (typeof SCENE_CUT.kinds)[number] | "whip" | "push";
 export interface Cut {
   kind: CutKind;
   frames: number;
@@ -40,11 +46,16 @@ function seedOf(text: string): number {
  * tür bölüm kimliğinden başlayıp sahne sırasıyla döner (art arda aynısı gelmez), yön her sahnede değişir. Episode ve render
  * önbelleği (chunks.ts) aynı hesabı kullanır.
  */
-export function cutsOf(visuals: readonly { shotId: string; carried?: string[]; stylePack?: string }[], seed: string): (Cut | undefined)[] {
+export function cutsOf(visuals: readonly { shotId: string; carried?: string[]; stylePack?: string; film?: { transition: string } }[], seed: string): (Cut | undefined)[] {
   const start = seedOf(seed) % SCENE_CUT.kinds.length;
   let n = 0;
   return visuals.map((v, i) => {
     if (i === 0 || v.stylePack === "paper-poster") return undefined;
+    // Film sahnesi kendi geçişini taşır; yön her savrulmada değişir.
+    if (v.film) {
+      const t = v.film.transition;
+      return t === "whip" || t === "push" || t === "iris" ? { kind: t, frames: FILM_CUT[t], dir: n++ % 2 ? -1 : 1 } : undefined;
+    }
     if (v.carried?.length || sceneOf(v.shotId) === sceneOf(visuals[i - 1]!.shotId)) return { kind: "dissolve", frames: CROSSFADE, dir: 1 };
     const k = n++;
     return { kind: SCENE_CUT.kinds[(start + k) % SCENE_CUT.kinds.length]!, frames: SCENE_CUT.frames, dir: k % 2 ? -1 : 1 };
@@ -66,6 +77,10 @@ export function cutStyle(cut: Cut, q: number): Record<string, string | number> {
       return { clipPath: `circle(${q * 72}% at 50% 50%)` };
     case "zoom":
       return { opacity: q, transform: `scale(${1 + 0.18 * (1 - q)})` };
+    case "whip":
+      return { transform: `translateX(${cut.dir * (1 - q) * 100}%)` };
+    case "push":
+      return { opacity: Math.min(1, q * 2), transform: `scale(${1 + 0.6 * (1 - q)})` };
   }
 }
 
@@ -86,12 +101,12 @@ export function cutLook(cut: Cut, q: number, dq: number, w: number, h: number): 
   if (q >= 1 || cut.kind === "dissolve") return { style, sigmaX: 0 };
   const smear = (px: number) => MOTION_BLUR.shutter * Math.abs(dq) * px;
   const px = (v: number) => `${v.toFixed(1)}px`;
-  if (cut.kind === "slide") {
-    const sigma = Math.min(MOTION_BLUR.max, smear(w) * MOTION_BLUR.sigma);
+  if (cut.kind === "slide" || cut.kind === "whip") {
+    const sigma = Math.min(cut.kind === "whip" ? FILM_CUT.whipBlur : MOTION_BLUR.max, smear(w) * MOTION_BLUR.sigma);
     return { style, sigmaX: sigma >= MOTION_BLUR.min ? sigma : 0 };
   }
-  if (cut.kind === "zoom") {
-    const r = Math.min(MOTION_BLUR.zoom, smear((0.18 * Math.hypot(w, h)) / 2) * MOTION_BLUR.sigma);
+  if (cut.kind === "zoom" || cut.kind === "push") {
+    const r = Math.min(MOTION_BLUR.zoom, smear(((cut.kind === "push" ? 0.6 : 0.18) * Math.hypot(w, h)) / 2) * MOTION_BLUR.sigma);
     return { style: r >= MOTION_BLUR.min ? { ...style, filter: `blur(${px(r)})` } : style, sigmaX: 0 };
   }
   // Perde ve iris: kenar iz kadar yumuşar.

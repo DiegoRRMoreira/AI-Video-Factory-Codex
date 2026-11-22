@@ -17,6 +17,7 @@ import { Ambience } from "./Ambience.tsx";
 import { captionPages, cutLook, cutsOf, type Cut } from "./cut.ts";
 import { stageFit, VectorScene } from "./Vector.tsx";
 import { Overlays } from "./Overlays.tsx";
+import { FilmScene } from "./motion-film/Film.tsx";
 
 export type EpisodeProps = { timeline: Timeline };
 
@@ -195,7 +196,9 @@ export function Episode({ timeline }: EpisodeProps) {
         return (
           <Sequence key={v.shotId} from={v.fromFrame} durationInFrames={duration} name={v.shotId}>
             <CutIn cut={cuts[i]} id={v.shotId}>
-              {v.kind === "motion_graphic" && v.vector ? (
+              {v.film && timeline.motion ? (
+                <FilmScene scene={v.film} look={timeline.motion} frames={v.durationInFrames} lang={timeline.lang} captions={timeline.captions.length > 0} />
+              ) : v.kind === "motion_graphic" && v.vector ? (
                 <AbsoluteFill>
                   {/* Atmosfer sahnenin içinde çizilir: yazıların, balonun ve formül tahtasının altında kalır. */}
                   <VectorScene

@@ -32,5 +32,7 @@ export const STUDIO_MESSAGES = {
   "api.footage.tooLarge": { tr: "Dosya çok büyük: {name} (en çok {mb} MB; YS_FOOTAGE_MAX_MB ile değişir)", en: "File too large: {name} (up to {mb} MB; set YS_FOOTAGE_MAX_MB to change)" },
   "api.footage.truncated": { tr: "Yükleme eksik geldi: {name} ({got}/{sent} bayt); yeniden yükle", en: "The upload arrived incomplete: {name} ({got}/{sent} bytes); upload it again" },
   "api.footage.uploads": { tr: "1–20 yüklenmiş dosya gerekli (önce dosyaları yükle)", en: "1–20 uploaded files are required (upload the files first)" },
+  "api.motion.uploads": { tr: "Görseller yüklenemedi ya da desteklenmiyor (jpg, png, webp; en çok 12)", en: "The images could not be uploaded or are not supported (jpg, png, webp; up to 12)" },
+  "api.motion.sec": { tr: "Film süresi 10–180 sn olmalı", en: "A film must last 10–180 s" },
   "api.footage.sec": { tr: "Short süresi 15–180 sn olmalı", en: "A Short must last 15–180 s" },
 } as const;

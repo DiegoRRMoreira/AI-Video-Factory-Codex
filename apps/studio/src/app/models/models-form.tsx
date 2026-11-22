@@ -17,6 +17,7 @@ const GROUPS: { title: MessageKey; roles: AgentRole[] }[] = [
   { title: "models.group.publish", roles: ["packager"] },
   { title: "models.group.footage", roles: ["footage-editor", "footage-inspector"] },
   { title: "models.group.youtube", roles: ["youtube-analyst", "youtube-curator"] },
+  { title: "models.group.motion", roles: ["motion-director"] },
   { title: "models.group.image", roles: ["director"] },
 ];
 

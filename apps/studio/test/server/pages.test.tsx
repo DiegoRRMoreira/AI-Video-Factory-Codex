@@ -70,6 +70,7 @@ vi.mock("../../src/lib/server", () => ({
 vi.mock("../../src/lib/update", () => ({ updateInfo: async () => fake.update }));
 vi.mock("../../src/app/footage-form", () => ({ FootageForm: () => <div data-footage-form="" /> }));
 vi.mock("../../src/app/youtube-form", () => ({ YoutubeForm: () => <div data-youtube-form="" /> }));
+vi.mock("../../src/app/motion-form", () => ({ MotionForm: () => <div data-motion-form="" /> }));
 vi.mock("../../src/app/new-episode-form", () => ({
   NewEpisodeForm: ({ series, initialSeries, bank, samples }: { series: { name: string }[]; initialSeries?: string; bank: { name: string }[]; samples: object }) => (
     <div
@@ -512,6 +513,14 @@ describe("Yeni bölüm sayfası", () => {
     expect(youtube).toContain("data-youtube-form");
     expect(youtube).not.toContain("data-footage-form");
     expect(text(youtube)).toContain("YouTube videosundan Short");
+    expect(topic).toContain('href="/episodes/new?kind=motion"');
+    expect(topic).not.toContain("data-motion-form");
+    const motion = await html(NewEpisodePage({ searchParams: Promise.resolve({ kind: "motion" }) }));
+    expect(motion).toContain("data-motion-form");
+    expect(motion).not.toContain("data-form=");
+    expect(motion).not.toContain("data-youtube-form");
+    expect(text(motion)).toContain("Hareketli grafik filmi");
+    expect(text(motion)).toContain("İnsan figürü ve çizim olmadan");
   });
 });
 

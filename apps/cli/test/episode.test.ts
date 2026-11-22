@@ -39,7 +39,7 @@ const base = (over: Partial<EpisodeState> = {}): EpisodeState =>
 /** Sahte pipeline: durumları bellekte tutar, çağrıları kaydeder. */
 function fakePipeline(initial: EpisodeState[] = []) {
   const states = new Map(initial.map((s) => [s.id, structuredClone(s)]));
-  const calls = { footage: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[], create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[], youtube: [] as EpisodeInput[], shorts: [] as [string, string[], unknown][] };
+  const calls = { footage: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[], create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[], youtube: [] as EpisodeInput[], shorts: [] as [string, string[], unknown][], motion: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[] };
   const pipeline = {
     create: async (input: EpisodeInput) => {
       calls.create.push(input);
@@ -58,6 +58,10 @@ function fakePipeline(initial: EpisodeState[] = []) {
         states.set(s.id, s);
         return s;
       });
+    },
+    createMotion: async (input: EpisodeInput, files: { name: string; path: string }[]) => {
+      calls.motion.push({ input, files });
+      return base({ id: "film-1", input });
     },
     createFootage: async (input: EpisodeInput, files: { name: string; path: string }[]) => {
       calls.footage.push({ input, files });
@@ -212,6 +216,69 @@ describe("YouTube analizi ve Short'ları", () => {
     out = [];
     await episodeCommand(pipeline, "show", "bos", {});
     expect(out.some((l) => l.startsWith("  Short üret"))).toBe(false);
+  });
+});
+
+describe("episode new --film", () => {
+  it("yatay film: varsayılan 30 sn, anlatım kapalı; renkler kırpılır, görseller dosya olarak gider", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "new", undefined, { film: true, topic: "  Hızlı derleme ", color: [" #2563eb ", "  "], asset: ["logo.png", "ekran.jpg"] });
+    expect(calls.motion[0]).toEqual({
+      input: {
+        topic: "Hızlı derleme",
+        lang: "tr",
+        targetSec: 30,
+        tier: "economy",
+        budgetUsd: 5,
+        aiClipRatio: 0,
+        voiceId: undefined,
+        autoApprove: true,
+        captions: true,
+        qa: true,
+        motion: { colors: ["#2563eb"], images: [], narration: false },
+        width: 1920,
+        height: 1080,
+        fps: 30,
+      },
+      files: [
+        { name: "logo.png", path: "logo.png" },
+        { name: "ekran.jpg", path: "ekran.jpg" },
+      ],
+    });
+    expect(out).toEqual(["film-1"]);
+  });
+
+  it("dikey, anlatımlı, bütün bayraklar; görselsiz ve renksiz; brif zorunlu", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "new", undefined, { film: true, topic: "Brif", vertical: true, narration: true, sec: "45.4", lang: "en", tier: "premium", budget: "2", voice: "v", manual: true, noCaptions: true, noQa: true });
+    expect(calls.motion[0]).toEqual({
+      input: expect.objectContaining({ targetSec: 45, lang: "en", tier: "premium", budgetUsd: 2, voiceId: "v", autoApprove: false, captions: false, qa: false, width: 1080, height: 1920, motion: { colors: [], images: [], narration: true } }),
+      files: [],
+    });
+    await expect(episodeCommand(pipeline, "new", undefined, { film: true })).rejects.toThrow("--topic gerekli");
+    await expect(episodeCommand(pipeline, "new", undefined, { film: true, topic: "   " })).rejects.toThrow("--topic gerekli");
+    await expect(episodeCommand(pipeline, "new", undefined, { film: true, topic: "x", sec: "0" })).rejects.toThrow("--sec pozitif");
+  });
+
+  it("show film özetini, temsili veri işaretini ve denetim bulgularını yazar; zamanlanmış film önce gelir", async () => {
+    const scene = (id: string, over: object = {}) => ({ id, language: "kinetic", beats: 4, pace: "beat", transition: "cut", camera: "still", ground: "ground", hit: "none", narration: "", kinetic: { lines: ["Hızlı"], mode: "slam" }, ...over });
+    const film = { title: "F", bpm: 120, route: "hybrid", type: "clear", palette: { ground: "#ffffff", ink: "#000000", accent: "#2563eb", alt: "#dbeafe" }, sections: [{ name: "hook", bars: 1, energy: 7 }, { name: "resolve", bars: 1, energy: 3 }], scenes: [scene("m1")] };
+    const timed = { ...film, scenes: [scene("m1", { beats: 8, transition: "whip", camera: "punch" }), scene("m2", { language: "data", illustrative: true, kinetic: undefined, data: { chart: "count", title: "Hız", points: [], count: { to: 9, from: 0, decimals: 0, prefix: "", suffix: "×" } } })] };
+    const lint = [
+      { kind: "gap", sceneId: "m1", atSec: 1.5, detail: "boş" },
+      { kind: "hook", atSec: 0, detail: "kanca yok" },
+    ];
+    const { pipeline } = fakePipeline([base({ id: "film", motionFilm: film, motionTimed: timed, motionLint: lint } as never), base({ id: "taslak", motionFilm: film } as never)]);
+    await episodeCommand(pipeline, "show", "film", {});
+    expect(out).toContain("Film:    2 sahne, 120 BPM, 6.0 sn; ritim: hook 1 · resolve 1");
+    expect(out).toContain("  m1 8 vuruş whip/punch: kinetic: Hızlı");
+    expect(out).toContain("  m2 4 vuruş cut/still [temsili veri]: data: Hız");
+    expect(out).toContain("  ⚠ gap m1 @1.5s: boş");
+    expect(out).toContain("  ⚠ hook @0s: kanca yok");
+    out = [];
+    await episodeCommand(pipeline, "show", "taslak", {});
+    expect(out).toContain("Film:    1 sahne, 120 BPM, 2.0 sn; ritim: hook 1 · resolve 1");
+    expect(out.some((l) => l.includes("⚠"))).toBe(false);
   });
 });
 

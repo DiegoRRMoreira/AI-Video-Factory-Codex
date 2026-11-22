@@ -21,3 +21,5 @@ export * from "./youtube.ts";
 export * from "./youtube-media.ts";
 export * from "./youtube-stages.ts";
 export * from "./youtube-shorts.ts";
+export * from "./motion.ts";
+export * from "./motion-stages.ts";

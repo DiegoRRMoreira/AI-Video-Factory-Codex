@@ -58,6 +58,11 @@ Komutlar:
   episode new --youtube <adres> [--count 6] [--min 20] [--max 60] [--lang tr] [--no-transcribe]
                                     YouTube videosunu indirir (yt-dlp), sahne sahne analiz eder; kesilecek yerler ve
                                     Short adayları (episode run <id> ile çalışır; model: Stüdyo → Modeller, ACP de olur)
+  episode new --film --topic "brif" [--sec 30] [--vertical] [--color "#ff4f1f"]... [--asset logo.png]... [--narration]
+              [--voice id] [--lang tr]
+                                    Hareketli grafik filmi (10–180 sn): insan figürü ve çizim yok; kinetik yazı, veri,
+                                    diyagram, kart montajı, parçacık alanı, 3D nesne; vuruşa oturan müzik ve efekt
+                                    (yönetmen ajanı tek çağrı; anlatım yalnız --narration ile, TTS ücretli)
   episode shorts <id> --candidates c1,c2 [--review: kurguyu Stüdyo'da düzenleyip onayla] [--no-music]
                                     Analizin adaylarından dikey Short bölümleri (incelemesizse hemen üretilir)
   episode run <id> [--until <aşama>] [--from <aşama>] [--only <aşama>]
@@ -174,6 +179,10 @@ async function main(): Promise<void> {
       candidates: { type: "string" },
       review: { type: "boolean", default: false },
       "no-music": { type: "boolean", default: false },
+      film: { type: "boolean", default: false },
+      color: { type: "string", multiple: true },
+      asset: { type: "string", multiple: true },
+      narration: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       // "--version" seçenek olarak tanımlı değilse parseArgs "Unknown option" ile düşüyordu.
       version: { type: "boolean", default: false },

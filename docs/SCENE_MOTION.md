@@ -46,6 +46,35 @@ pnpm.cmd motion:preview out/scene-motion-portrait --portrait
 
 These commands write a timeline and opening/midpoint/ending JPEGs for all six presets to the requested output directory. No AI generation or paid media calls are involved. Output is ignored by Git. Unit tests cover invalid plans, layer budgets, deterministic particles, backwards seeking, camera paths and disposal.
 
+## Motion-graphics films
+
+A second renderer in the same Remotion composition draws films with no people and no SVG drawings
+(`packages/video/src/motion-film/`; spec `MotionFilm` in `packages/core/src/motion-film.ts`). Every element is a pure
+function of the scene's frame; timing comes from the beat grid (`timing.ts`), and sound (`sounds.ts`, `score.ts`) and
+the plan check (`lint.ts`) use the same functions. The fixture renders all six languages:
+
+```powershell
+pnpm.cmd motion:film
+pnpm.cmd motion:film out/motion-film-portrait --portrait
+```
+
+Registry items consulted before building (`npx hyperframes catalog`, words tier, 22 Nov 2026); their techniques were
+ported, nothing was installed into the app:
+
+| Need | Item | What was taken |
+| --- | --- | --- |
+| Hook slam | `headline-slam` | 1.6 → 1 scale with expo ease, a three-frame stage shake on landing |
+| Whip transition | `whip-pan-cut` | directional blur capped at 16 px, the cut at mid-whip |
+| Count-up | `count-up` | tabular figures, a restrained scale as the number lands |
+| Card grid | `grid-card-assemble` | cards slamming into a grid one per step |
+| Bars | `animated-bar-chart`, `data-chart` | bars growing from zero with value labels |
+| Diagram | `hw-pipeline` | nodes and connectors drawing on in sequence |
+| Flash | `flash-through-white` | a white flash decaying over a few frames |
+
+Measured rhythm thresholds (hook within 3 s, a 5-cut burst at 25–60 %, two-bar gap limit, 0.25 s per word + 0.5 s
+hold, 100–125 BPM default) are from huashu-motion's `rhythm.md` and `director.md`, cited in the code; no code or prompt
+text was copied.
+
 ## Style-specific material pilots
 
 See [STYLE_CRAFT.md](STYLE_CRAFT.md) for native paper, risograph and isometric direction, rendering, typography and conservative object continuity.

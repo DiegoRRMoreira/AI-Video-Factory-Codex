@@ -10,6 +10,7 @@ export * from "./geo.ts";
 export * from "./rules.ts";
 export * from "./vector.ts";
 export * from "./effects.ts";
+export * from "./motion-film.ts";
 export * from "./figure.ts";
 export * from "./layout.ts";
 export * from "./models.ts";

@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { BudgetTier, DRAFT_REVIEW } from "@ys/core";
 import {
   approve,
+  describeScene,
   draftBelow,
   EpisodePipeline,
   estimateWordTimings,
@@ -65,6 +66,11 @@ export interface EpisodeArgs {
   candidates?: string;
   review?: boolean;
   noMusic?: boolean;
+  /** Hareketli grafik filmi: marka renkleri ve görsel yolları (logo, ekran görüntüsü); anlatım isteğe bağlı. */
+  film?: boolean;
+  color?: string[];
+  asset?: string[];
+  narration?: boolean;
 }
 
 const parseStage = (s: string | undefined): Stage | undefined => {
@@ -139,6 +145,30 @@ export async function episodeCommand(
           height: 1920,
           fps: 30,
         });
+        console.log(state.id);
+        return;
+      }
+      if (args.film) {
+        if (!args.topic?.trim()) throw new Error("--topic gerekli (filmin brifi)");
+        const state = await pipeline.createMotion(
+          {
+            topic: args.topic.trim(),
+            lang: args.lang ?? "tr",
+            targetSec: Math.round(positive("--sec", args.sec ?? 30)),
+            tier: BudgetTier.parse(args.tier ?? "economy"),
+            budgetUsd: positive("--budget", args.budget ?? 5),
+            aiClipRatio: 0,
+            voiceId: args.voice,
+            autoApprove: !args.manual,
+            captions: !args.noCaptions,
+            qa: !args.noQa,
+            motion: { colors: (args.color ?? []).map((c) => c.trim()).filter(Boolean), images: [], narration: args.narration === true },
+            width: args.vertical ? 1080 : 1920,
+            height: args.vertical ? 1920 : 1080,
+            fps: 30,
+          },
+          (args.asset ?? []).map((path) => ({ name: path, path })),
+        );
         console.log(state.id);
         return;
       }
@@ -287,6 +317,13 @@ function printSummary(s: EpisodeState): void {
       console.log(`  ${c.id} [${c.score}/10] ${c.title} (${Math.round(c.durationMs / 1000)} sn: ${parts})${made ? ` → ${made}` : ""}`);
     }
     if (report.candidates.length) console.log(`  Short üret: pnpm ys episode shorts ${s.id} --candidates ${report.candidates[0]!.id}`);
+  }
+  const film = s.motionTimed ?? s.motionFilm;
+  if (film) {
+    const sec = (film.scenes.reduce((n, x) => n + x.beats, 0) * 60) / film.bpm;
+    console.log(`Film:    ${film.scenes.length} sahne, ${film.bpm} BPM, ${sec.toFixed(1)} sn; ritim: ${film.sections.map((x) => `${x.name} ${x.bars}`).join(" · ")}`);
+    for (const x of film.scenes) console.log(`  ${x.id} ${x.beats} vuruş ${x.transition}/${x.camera}${x.illustrative ? " [temsili veri]" : ""}: ${describeScene(x)}`);
+    for (const i of s.motionLint ?? []) console.log(`  ⚠ ${i.kind}${i.sceneId ? ` ${i.sceneId}` : ""} @${i.atSec}s: ${i.detail}`);
   }
   console.log(`Ajan maliyeti: $${s.agentCostUsd.toFixed(4)}`);
   if (s.render) console.log(`Video:   ${s.render.path}`);

@@ -35,7 +35,7 @@ export type Tab = "overview" | "script" | "concept" | "shots" | "costs" | "activ
 export const TABS: Tab[] = ["overview", "script", "concept", "shots", "costs", "activity"];
 /** Bölümün sekmeleri: footage bölümünde konsept (kadro, karakter seçimi) yok; YouTube analizinde rapor, maliyet ve günlük. */
 export const tabsOf = (state: Pick<EpisodeState, "input">): Tab[] =>
-  state.input.youtube ? ["youtube", "costs", "activity"] : state.input.footage ? TABS.filter((t) => t !== "concept") : TABS;
+  state.input.youtube ? ["youtube", "costs", "activity"] : state.input.footage || state.input.motion ? TABS.filter((t) => t !== "concept") : TABS;
 
 /** Aşama şeridindeki gruplar: senaryo ve konsept onay kapılarıyla ayrılır. */
 export const STAGE_GROUPS: { key: "pre" | "prod" | "post"; stages: Stage[] }[] = [
