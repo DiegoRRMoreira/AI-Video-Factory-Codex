@@ -341,6 +341,19 @@ describe("film kare denetimi", () => {
     expect(h.logs.some((l) => l.includes("m2"))).toBe(true);
   });
 
+  it("kareleri düzelten ama kodun ritim bulgularını artıran düzeltme tutulmaz", async () => {
+    const h = harness();
+    critic((call): Record<string, Record<string, string>> => (call === 0 ? { m2: { overlap: "The bar labels run into the title." } } : {}));
+    let n = 0;
+    onAgent("motionDirector", () => (n++ ? { ...QUIET, title: "Quiet" } : FILM));
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id, { until: "timeline" });
+    expect(callsOf("filmCritic")).toHaveLength(2);
+    expect(state.motionFilm!.title).toBe("Relay");
+    expect(state.motionLint!.map((i) => i.kind)).not.toContain("hook");
+    expect(h.logs.some((l) => l.includes("önceki film kalıyor") && l.includes("%33 → %0"))).toBe(true);
+  });
+
   it("ikinci inceleme yapılamazsa ya da yönetmen düşerse önceki film kalır", async () => {
     const h = harness();
     let call = 0;

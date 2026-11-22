@@ -216,8 +216,8 @@ export function motionStages(ctx: MotionContext): Partial<Record<Stage, StageFn>
 
   /**
    * Kare denetiminin bulgularıyla bir düzeltme turu (22 Kas). Yönetmen geçemeyen sahneleri bulgularla düzeltir, film
-   * yeniden zamanlanır ve denetlenir; daha iyi değilse önceki film, timeline, kareler ve inceleme geri gelir (eski
-   * kareler ve sesler içerik adresli anahtarlarda durur). Döner: geçerli timeline.
+   * yeniden zamanlanır ve denetlenir; daha iyi değilse ya da kodun ritim bulguları arttıysa önceki film, timeline, kareler
+   * ve inceleme geri gelir (eski kareler ve sesler içerik adresli anahtarlarda durur). Döner: geçerli timeline.
    */
   async function revise(state: EpisodeState, review: EpisodeReview): Promise<Timeline> {
     const failing = state.shots!.filter((s) => !shotPasses(review.shots[s.id]) && review.shots[s.id]);
@@ -226,6 +226,8 @@ export function motionStages(ctx: MotionContext): Partial<Record<Stage, StageFn>
     const notes = failing.map((s) => `frame check ${s.id} (${review.shots[s.id]!.score}/10): ${review.shots[s.id]!.issues.map((i) => `${i.type}: ${i.detail}`).join("; ")}`);
     const before = { motionFilm: state.motionFilm, motionTimed: state.motionTimed, motionLint: state.motionLint, script: state.script, story: state.story, shots: state.shots, timeline: state.timeline, draftReview: state.draftReview, stills: state.stills };
     const was = reviewShare(review, before.shots!.map((s) => s.id));
+    // Yönetmene giden ritim bulguları (kanca, boşluk, patlama…) artmamalı: kare denetimi ritme bakmaz.
+    const directable = (issues: FilmIssue[]) => issues.filter((i) => DIRECTABLE.has(i.kind)).length;
     let film: MotionFilm;
     try {
       film = await direct(state, { film: state.motionFilm!, notes });
@@ -242,7 +244,7 @@ export function motionStages(ctx: MotionContext): Partial<Record<Stage, StageFn>
     const timeline = await build(state);
     const again = await ctx.review(state, timeline);
     const now = again ? reviewShare(again, state.shots.map((s) => s.id)) : undefined;
-    if (again && betterFilm(now!, was)) {
+    if (again && betterFilm(now!, was) && directable(state.motionLint) <= directable(before.motionLint!)) {
       state.draftReview = { ...state.draftReview!, revisedScenes: failing.map((s) => s.id) };
       ctx.log(msg("log.motion.criticKept", { before: Math.round(was.share * 100), after: Math.round(now!.share * 100) }));
       return timeline;

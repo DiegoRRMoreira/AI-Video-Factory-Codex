@@ -624,11 +624,13 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
 - **Kare denetimi (23 Kas):** render'dan önce `film-critic` her sahnenin son öğesi oturduktan sonraki karesine film
   kontrol listesiyle bakar (eksik öğe, kesik yazı, çakışma, okunmazlık ağır; tarife uymayan yazı, kalabalık, dengesiz
   kompozisyon hafif); puanı taslak incelemesinin motoru verir, baraj 8. Anlatımsızda barajın altındaki sahneler bulgularla
-  yönetmene bir kez döner, düzeltilmiş film ancak daha iyi denetlenirse kalır; anlatımlıda yalnız render kapısını tutar.
-  Ritim ve geçişler kodun denetiminde kalır, film dersleri ortak deftere yazılmaz. Kalibrasyon (agy/Gemini 3.8 Flash,
-  iki gerçek film, 25 kare): denetçinin bulduğu üç kusur gerçekti ve kodda düzeltildi (dar maske vurgu hapını kesiyordu,
-  büyük puntoda alt uzantılar haptan taşıyordu, eğik bağın etiketi çizgiye biniyordu); düzeltmeden sonra bütün kareler 8
-  ve üstü.
+  yönetmene bir kez döner, düzeltilmiş film ancak daha iyi denetlenirse ve kodun ritim bulguları artmadıysa kalır;
+  anlatımlıda yalnız render kapısını tutar. Ritim ve geçişler kodun denetiminde kalır, film dersleri ortak deftere
+  yazılmaz. Kalibrasyon (agy/Gemini 3.8 Flash; varsayılan ucuz Claude modeli ölçülmedi): onaylı iki filmin özgün
+  planlarında denetçi 11 karenin 2'sini (Lumen) ve 14 karenin 3'ünü (AI Video Factory) geçirmedi; hepsi gerçek kusurdu ve
+  kodda düzeltildi (dar maske vurgu hapını kesiyordu, büyük puntoda alt uzantılar haptan taşıyordu, eğik bağın etiketi
+  çizgiye biniyordu). Sola yaslı bölüm sayacına iki çalıştırmada da gelen hafif "dengesiz" notu için isteme sola yaslı
+  yazının düzen olduğu eklendi. Düzeltmelerle Lumen 11 karede 10, AI Video Factory 9,9 (tek hafif not o "dengesiz" notuydu; istem değişmeden önce ölçüldü).
 
 ## 17. Pazar Haritası (Ekim 2026)
 
