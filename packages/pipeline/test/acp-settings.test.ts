@@ -31,10 +31,17 @@ describe("ACP ayarları", () => {
     const store = tempStore();
     const custom = { id: "claude", label: "Claude ACP", command: "claude-code-acp", args: [] };
     expect((await saveAcpSettings(store, { backends: [custom] })).backends).toEqual([]);
-    process.env.YS_ACP_COMMANDS = " claude-code-acp ; other ,";
+    process.env.YS_ACP_COMMANDS = " claude-code-acp ; other\ngemini   --experimental-acp";
     try {
-      expect((await saveAcpSettings(store, { backends: [custom, { ...custom, id: "bad", args: ["--dangerously-skip-permissions"] }] })).backends.map((b) => b.id)).toEqual(["claude"]);
-      expect((await loadAcpSettings(store)).backends.map((b) => b.id)).toEqual(["claude"]);
+      const raw = [
+        custom,
+        { ...custom, id: "bad", args: ["--dangerously-skip-permissions"] },
+        // İzinli komut, izin listesinde olmayan argümanlarla: reddedilir.
+        { ...custom, id: "args", args: ["--model", "x"] },
+        { ...custom, id: "gem", command: "gemini", args: ["--experimental-acp"] },
+      ];
+      expect((await saveAcpSettings(store, { backends: raw })).backends.map((b) => b.id)).toEqual(["claude", "gem"]);
+      expect((await loadAcpSettings(store)).backends.map((b) => b.id)).toEqual(["claude", "gem"]);
     } finally {
       delete process.env.YS_ACP_COMMANDS;
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acpAllowed, acpChoice, AGY_BACKEND, cleanAcpSettings, cleanModelSettings, modelFor, parseAcpChoice } from "../src/models.ts";
+import { acpAllowed, acpChoice, acpCommandLine, AGY_BACKEND, cleanAcpSettings, cleanModelSettings, modelFor, parseAcpChoice } from "../src/models.ts";
 
 describe("ajan model seçimi", () => {
   it("bilinmeyen ajan ve model atılır", () => {
@@ -34,7 +34,7 @@ describe("ajan model seçimi", () => {
     expect(cleanAcpSettings(undefined)).toEqual({ backends: [] });
     expect(cleanAcpSettings({ backends: "x" })).toEqual({ backends: [] });
     const ok = { id: "agy", label: "A", command: "C:\\tools\\agy.exe", args: ["acp", "--sandbox"] };
-    const allowed = [ok.command, "a|b"];
+    const allowed = [acpCommandLine(ok), "a|b"];
     const out = cleanAcpSettings({ backends: [ok, { ...ok, label: "dup" }, { ...ok, id: "evil", args: ["acp & calc"] }, { ...ok, id: "x2", command: "a|b" }, null] }, allowed);
     expect(out.backends).toEqual([{ ...ok, models: [], efforts: [], images: false }]);
     expect(cleanAcpSettings({ backends: Array.from({ length: 12 }, (_, i) => ({ ...ok, id: `b${i}` })) }, allowed).backends).toHaveLength(10);
@@ -46,6 +46,9 @@ describe("ajan model seçimi", () => {
     expect(acpAllowed({ command: "agy", args: ["chat"] })).toBe(false);
     expect(acpAllowed({ command: "evil.exe", args: [] })).toBe(false);
     expect(acpAllowed({ command: "claude-code-acp", args: [] }, ["claude-code-acp"])).toBe(true);
+    // Yalnız komut adı yetmez: argümanlar da birebir.
+    expect(acpAllowed({ command: "npx", args: ["-y", "evil-pkg"] }, ["npx"])).toBe(false);
+    expect(acpAllowed({ command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] }, ["npx  -y @zed-industries/claude-code-acp "])).toBe(true);
     for (const flag of ["--dangerously-skip-permissions", "--yolo", "--auto-approve", "--allow-all-tools", "--no-sandbox", "--trust"])
       expect(acpAllowed({ command: "claude-code-acp", args: [flag] }, ["claude-code-acp"]), flag).toBe(false);
     expect(cleanAcpSettings({ backends: [AGY_BACKEND, { ...AGY_BACKEND, id: "x", command: "rm" }] }).backends.map((b) => b.id)).toEqual(["agy"]);

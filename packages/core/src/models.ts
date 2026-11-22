@@ -97,14 +97,18 @@ const BYPASS = /danger|skip-?perm|yolo|bypass|allow-?all|auto-?approve|no-?sandb
 
 /**
  * Ajan çalıştırılabilir mi (22 Kas güvenlik incelemesi: Modeller API'si çalıştırılacak komutu kaydediyor): izin atlatan
- * bayrak hiçbir zaman; komut ve argümanlar hazır bir tanımla birebir aynıysa, ya da komut sunucu ortamında
- * (`YS_ACP_COMMANDS`) açıkça izinliyse.
+ * bayrak hiçbir zaman; komut ve argümanları birlikte ya hazır bir tanımla ya da sunucu ortamında (`YS_ACP_COMMANDS`)
+ * izinli bir komut satırıyla birebir aynıysa. Yalnız komut adına izin verilmez: `npx`, `node` gibi bir başlatıcı API'den
+ * gelen argümanlarla her şeyi çalıştırırdı.
  */
 export function acpAllowed(b: Pick<AcpBackend, "command" | "args">, allowed: readonly string[] = []): boolean {
   if (b.args.some((a) => BYPASS.test(a))) return false;
-  const preset = ACP_PRESETS.some((p) => p.command === b.command && p.args.length === b.args.length && p.args.every((a, i) => a === b.args[i]));
-  return preset || allowed.includes(b.command);
+  const line = acpCommandLine(b);
+  return ACP_PRESETS.some((p) => acpCommandLine(p) === line) || allowed.some((a) => acpCommandLine({ command: a, args: [] }) === line);
 }
+
+/** Karşılaştırma için tek boşluklu komut satırı. */
+export const acpCommandLine = (b: Pick<AcpBackend, "command" | "args">) => [b.command, ...b.args].join(" ").trim().replace(/\s+/g, " ");
 
 /** Geçersiz, yinelenen ya da izinsiz komutlu ajanlar sessizce atılır (bozuk dosya çalışmayı bozmaz). */
 export function cleanAcpSettings(raw: unknown, allowed: readonly string[] = []): AcpSettings {

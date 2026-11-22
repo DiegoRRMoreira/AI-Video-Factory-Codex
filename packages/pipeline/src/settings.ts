@@ -4,10 +4,13 @@ import { getJson, putJson, type AssetStore } from "@ys/storage";
 const MODELS_KEY = "settings/models.json";
 const ACP_KEY = "settings/acp.json";
 
-/** Hazır tanımların dışında çalıştırılmasına izin verilen ACP komutları (sunucu ortamı, virgül ya da noktalı virgülle). */
+/**
+ * Hazır tanımların dışında çalıştırılmasına izin verilen ACP komut satırları (sunucu ortamı; argümanlarıyla tam satır,
+ * noktalı virgül ya da satır sonuyla ayrılır; ör. "claude-code-acp; gemini --experimental-acp").
+ */
 export const allowedAcpCommands = (): string[] =>
   (process.env.YS_ACP_COMMANDS ?? "")
-    .split(/[;,]/)
+    .split(/[;\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
 

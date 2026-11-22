@@ -1,7 +1,7 @@
 import { query, type Options, type SDKResultMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { LocalizedError, modelFor, msg, parseAcpChoice, type AcpBackend, type ModelSettings, type Msg, type Text } from "@ys/core";
 import { z } from "zod";
-import { AcpRpcError, AcpSession, extractJson, type AcpBlock, type AcpSpawn } from "./acp.ts";
+import { AcpRpcError, AcpSession, AcpToolError, extractJson, type AcpBlock, type AcpSpawn } from "./acp.ts";
 
 export type QueryFn = typeof query;
 
@@ -310,6 +310,7 @@ async function runAcp<T>(call: AgentCall<T>, model: string, choice: { backend: s
   } catch (e) {
     if (abort.signal.aborted) throw new AgentError(msg("agent.timeout", { agent: call.name, sec: timeoutMs / 1000 }), 0, model, call.name, true);
     if (e instanceof AgentError) throw e;
+    if (e instanceof AcpToolError) throw new AgentError(msg("agent.acpTool", { agent: call.name, title: e.title }), 0, model, call.name);
     if (e instanceof AcpRpcError) throw new AgentError(msg("agent.acpError", { agent: call.name, detail: e.message.slice(0, 300) }), 0, model, call.name, ACP_TRANSIENT.test(e.message));
     if ((e as NodeJS.ErrnoException).code === "ENOENT") throw new AgentError(msg("agent.acpSpawn", { agent: call.name, command: backend.command }), 0, model, call.name);
     throw e;

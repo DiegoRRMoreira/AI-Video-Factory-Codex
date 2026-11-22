@@ -117,8 +117,9 @@ then the episode's **Analysis** tab shows the report and makes Shorts from the c
 
 Every agent normally runs on Claude through the Agent SDK. On the Studio's **Models** page you can also add an
 [Agent Client Protocol](https://agentclientprotocol.com) agent: **Add Antigravity (agy)** sets up `agy acp`, or give
-another ACP agent's command and arguments. A command other than the ready-made ones runs only if it is listed in
-`YS_ACP_COMMANDS` (comma separated) in the environment of the shell that starts the Studio and the CLI, and arguments
+another ACP agent's command and arguments. A command other than the ready-made ones runs only if its full command line,
+arguments included, is listed in `YS_ACP_COMMANDS` (separated by semicolons, e.g.
+`claude-code-acp; gemini --experimental-acp`) in the environment of the shell that starts the Studio and the CLI, and arguments
 that turn off the agent's permission prompts (`--dangerously-skip-permissions`, `--yolo`, `--auto-approve`…) are
 always refused. **Find models** reads its models, thinking levels and image support from the
 agent itself (no prompt is sent). Its models then appear in every agent's list under the agent's name, stored as

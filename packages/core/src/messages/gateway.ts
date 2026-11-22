@@ -86,6 +86,7 @@ export const GATEWAY_MESSAGES = {
   "agent.acpNoImages": { tr: "{agent}: {backend} görsel kabul etmiyor; bu ajan için görsel alan bir model seçin", en: "{agent}: {backend} does not accept images; pick a model that does for this agent" },
   "agent.acpStop": { tr: "{agent}: ACP turu bitmeden durdu ({reason})", en: "{agent}: the ACP turn stopped early ({reason})" },
   "agent.acpError": { tr: "{agent}: ACP hatası: {detail}", en: "{agent}: ACP error: {detail}" },
+  "agent.acpTool": { tr: "{agent}: ACP ajanı araç kullanmaya kalktı ({title}), çağrı kesildi", en: "{agent}: the ACP agent started using a tool ({title}), the call was stopped" },
   "agent.acpSpawn": { tr: "{agent}: ACP ajanı başlatılamadı, komut bulunamadı: {command}", en: "{agent}: could not start the ACP agent, command not found: {command}" },
   "err.ledger.changed": { tr: "Maliyet defteri okuma sırasında değişti; yeniden deneyin", en: "Cost ledger changed during reading; try again" },
 } as const;

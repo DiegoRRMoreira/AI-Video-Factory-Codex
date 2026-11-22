@@ -38,6 +38,16 @@ export class AcpRpcError extends Error {
   }
 }
 
+/**
+ * Ajan araç kullanmaya kalktı, oturum kesildi. Ayrı tür: hiçbir zaman yeniden denenmez (başlık ajandan gelir; "429" gibi
+ * bir başlık geçici hata kalıbına uyup engellenen işi yeniden başlatmasın).
+ */
+export class AcpToolError extends Error {
+  constructor(readonly title: string) {
+    super(`agent tried to use a tool: ${title}`);
+  }
+}
+
 export type AcpBlock = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 
 interface ConfigOption {
@@ -219,7 +229,7 @@ export class AcpSession {
     // Ajan bir araç çağırmaya başladıysa (dosya okuma, komut, ağ) oturum hemen kesilir: istemin bir kısmı güvenilmez veridir
     // ve ajanın kendi izin ayarları bazı araçları sormadan çalıştırabilir. Burada yalnız metin cevabı beklenir.
     if (update?.sessionUpdate === "tool_call" || update?.sessionUpdate === "tool_call_update") {
-      void this.close(new AcpRpcError("session/prompt", -32001, `agent tried to use a tool: ${String(update.title ?? "?").slice(0, 120)}`));
+      void this.close(new AcpToolError(String(update.title ?? "?").slice(0, 120)));
       return;
     }
     if (update?.sessionUpdate === "agent_message_chunk" && update.content?.type === "text") this.text += update.content.text ?? "";

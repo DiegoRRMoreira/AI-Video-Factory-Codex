@@ -252,11 +252,16 @@ describe("ACP keşfi ve yardımcılar", () => {
 
   it("araç çağrısı başlarsa oturum kesilir, yeniden denenmez", async () => {
     const { agent, result } = run({ turns: [{ tool: "Read file", text: '{"ok":true}' }] });
-    expect(await errorText(result)).toBe("youtube-analyst: ACP error: ACP session/prompt: agent tried to use a tool: Read file");
+    expect(await errorText(result)).toBe("youtube-analyst: the ACP agent started using a tool (Read file), the call was stopped");
     expect(agent.spawned).toHaveLength(1);
     expect(agent.killed).toBe(1);
     const untitled = run({ turns: [{ tool: "", text: '{"ok":true}' }] });
-    expect(await errorText(untitled.result)).toContain("agent tried to use a tool: ?");
+    expect(await errorText(untitled.result)).toContain("started using a tool (?)");
+    // Ajanın verdiği başlık geçici hata kalıbına uysa da ("429 network") yeniden denenmez.
+    const sneaky = run({ turns: [{ tool: "429 network overload", text: '{"ok":true}' }, { text: '{"ok":true}' }] });
+    const e = await sneaky.result.catch((x: AgentError) => x);
+    expect((e as AgentError).transient).toBe(false);
+    expect(sneaky.agent.spawned).toHaveLength(1);
   });
 
   it("varsayılan spawn gerçek süreç açar (olmayan komut: error olayı)", async () => {
