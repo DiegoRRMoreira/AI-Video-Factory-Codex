@@ -2,6 +2,16 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.3 (2026-11-22)
+
+- **Shorts from a YouTube video:** paste the address of a video you own or may use. It is downloaded once (yt-dlp, up to 1080p, kept in the library), its captions, chapters and replay graph are read, its scenes, frames and long silences measured, and an analyst goes through it a few minutes at a time with contact sheets and the transcript. You get a scene log, what a tighter edit would cut, and ranked Short candidates fitted to word boundaries. The candidates you pick become vertical footage Shorts with the original speech as captions and the hook on screen; an interrupted analysis resumes where it stopped.
+- Studio: **New episode → From YouTube** (rights confirmation required); the episode's **Analysis** tab shows the report, links every time range to that moment on YouTube and makes Shorts from the ticked candidates, produced right away or opened for editing first.
+- CLI: `pnpm ys episode new --youtube <address> [--count 6] [--min 20] [--max 60]`, then `pnpm ys episode run <id>` and `pnpm ys episode shorts <id> --candidates c1,c3 [--review] [--no-music]`. Needs yt-dlp (`winget install yt-dlp.yt-dlp`, or `YS_YTDLP`).
+- **Agents through ACP:** any agent can run on an Agent Client Protocol agent instead of Claude. On the Models page, **Add Antigravity (agy)** or any ACP command, **Find models** reads its models without sending a prompt, and its models appear in every agent's list. Calls run in an empty temporary folder with tools refused, and the answer is checked against the agent's schema in code.
+- Tried on a real 11.7-minute interview with Gemini 4 Neon through agy: four candidates in 3.5 minutes, one Short to the preview gate in 1.4 minutes.
+
+After updating, rebuild and restart the Studio: `pnpm studio:build && pnpm studio:start`.
+
 ## v0.6.2 (2026-11-22)
 
 - **Shorts from your own footage:** a new episode kind cuts a vertical 1080×1920 Short (15–180 s) from your own videos and images. An AI editor looks at sampled frames and the transcript, picks the best moments, frames each one for 9:16 (cropped around the subject or shown whole over a blurred copy), decides whether its own sound plays, and writes a voice-over and on-screen texts (a hook, labels, a call to action, plus any texts you give verbatim). Captions follow the narration and the kept speech; music and sound effects follow the beats; the cover is the Short's own frame with the hook.
