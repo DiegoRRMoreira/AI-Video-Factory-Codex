@@ -16,7 +16,8 @@ vi.mock("node:child_process", async (orig) => ({
   execFile: (file: string, args: string[], _opts: unknown, cb: (e: Error | null, out?: { stdout: string; stderr: string }) => void) => {
     yt.calls.push({ file, args });
     if (yt.error) return void cb(yt.error);
-    const o = args[args.indexOf("-o") + 1];
+    const at = args.indexOf("-o");
+    const o = at >= 0 ? args[at + 1] : undefined;
     const done = () => cb(null, { stdout: yt.stdout, stderr: "" });
     if (!o || !yt.write) return void done();
     const lang = args.includes("--sub-langs") ? args[args.indexOf("--sub-langs") + 1] : undefined;
