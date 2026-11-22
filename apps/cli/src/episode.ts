@@ -112,6 +112,7 @@ export async function episodeCommand(
             voiceId: args.voice,
             autoApprove: !args.manual,
             captions: !args.noCaptions,
+            qa: !args.noQa,
             footage: { sources: [], narration: !args.noNarration, transcribe: !args.noTranscribe, texts: (args.overlay ?? []).map((t) => t.trim()).filter(Boolean) },
             width: 1080,
             height: 1920,

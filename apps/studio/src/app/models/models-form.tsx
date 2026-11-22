@@ -14,7 +14,7 @@ const GROUPS: { title: MessageKey; roles: AgentRole[] }[] = [
   },
   { title: "models.group.check", roles: ["asset-guess", "asset-gate", "scene-critic", "frame-inspector", "lesson-curator"] },
   { title: "models.group.publish", roles: ["packager"] },
-  { title: "models.group.footage", roles: ["footage-editor"] },
+  { title: "models.group.footage", roles: ["footage-editor", "footage-inspector"] },
   { title: "models.group.image", roles: ["director"] },
 ];
 

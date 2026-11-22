@@ -3,7 +3,7 @@ import type { EpisodeState } from "@ys/pipeline/light";
 import { act as reactAct, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScriptTab, ShotsTab } from "../../src/app/episodes/[id]/steps.tsx";
-import { frameFor } from "../../src/app/episodes/[id]/footage-plan.tsx";
+import { frameFor, freshId, PLAN_LIMIT } from "../../src/app/episodes/[id]/footage-plan.tsx";
 import { tabsOf, TABS } from "../../src/app/episodes/[id]/parts.tsx";
 import { en, makeData, makeState, okAct, renderIn, tr } from "./fixtures.tsx";
 
@@ -55,7 +55,8 @@ describe("footage bölümü", () => {
   });
 
   it("onaylı kurgu salt okunur: vuruşlar, parçalar (kare, aralık, kadraj, ses), yazılar", () => {
-    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: cuts, approvals: { script: "t" } }))} busy={false} act={okAct()} />);
+    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: cuts, approvals: { script: "t" }, footageCheck: { "b1-sh1": { verdict: "ok", evidence: "fine" } } }))} busy={false} act={okAct()} />);
+    expect(container.querySelector("[data-check]")).toBeNull();
     expect(container.querySelector("[data-footage-plan]")).toBeTruthy();
     expect(screen.queryByRole("button", { name: tr("research.title") })).toBeNull();
     const first = container.querySelector('[data-segment="b1-1"]') as HTMLElement;
@@ -125,6 +126,62 @@ describe("footage bölümü", () => {
     fireEvent.click(screen.getByLabelText(tr("footage.edit.textRemove")));
     expect(screen.queryByLabelText(tr("footage.edit.text"))).toBeNull();
     expect(screen.getByText(tr("footage.edit.unsaved"))).toBeTruthy();
+  });
+
+  it("parça, vuruş ve yazı eklenir; kaynak değişir (resimde aralık ve ses sıfırlanır); anlatımsız vuruşa anlatım yazılır", async () => {
+    const act = okAct();
+    const { container } = renderIn(<ScriptTab data={makeData(footageState())} busy={false} act={act} />);
+    const label = (key: Parameters<typeof tr>[0]) => screen.getAllByLabelText(tr(key)) as HTMLButtonElement[];
+    fireEvent.click(screen.getAllByRole("button", { name: new RegExp(tr("footage.edit.addPart")) })[0]!);
+    expect(container.querySelectorAll('[data-beat="b1"] [data-segment]')).toHaveLength(3);
+    fireEvent.change(label("footage.edit.source")[2]!, { target: { value: "f2" } });
+    fireEvent.change(label("footage.edit.source")[0]!, { target: { value: "f1" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(tr("footage.edit.addBeat")) }));
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(tr("footage.edit.addText")) }));
+    const drafts = label("footage.edit.narration") as unknown as HTMLTextAreaElement[];
+    expect(drafts).toHaveLength(2);
+    fireEvent.change(drafts[0]!, { target: { value: "Konuşmanın üstüne" } });
+    await reactAct(async () => void fireEvent.click(screen.getByRole("button", { name: new RegExp(tr("footage.edit.save")) })));
+    const sent = act.mock.calls.at(-1)![0] as { plan: { beats: { id: string; narration: string; segments: { source: string; fromMs: number; toMs: number; audio: string }[] }[]; overlays: { text: string; beat: string }[] } };
+    expect(sent.plan.beats.map((b) => b.id)).toEqual(["b1", "b2", "new3"]);
+    expect(sent.plan.beats[0]!.segments[2]).toMatchObject({ source: "f2", fromMs: 0, toMs: 3000, audio: "mute" });
+    expect(sent.plan.beats[1]!.narration).toBe("Konuşmanın üstüne");
+    expect(sent.plan.beats[2]!.segments).toEqual([{ source: "f1", fromMs: 0, toMs: 3000, focusX: 0.5, fit: "cover", audio: "mute", why: "" }]);
+    expect(sent.plan.overlays.at(-1)).toEqual({ text: "", style: "label", beat: "b1", position: "top" });
+  });
+
+  it("taslak kimliği çakışmaz; resim kaynaklı ilk parça 3 sn; sınırda ekleme kilitli; anlatım kapalıysa anlatım yazılmaz", () => {
+    expect(freshId({ beats: [{ id: "new2" }] })).toBe("new3");
+    expect(freshId({ beats: [] })).toBe("new1");
+    const imageFirst = { ...footage, sources: [footage.sources[1]!, footage.sources[0]!], narration: false };
+    const full = { ...plan, beats: Array.from({ length: PLAN_LIMIT.beats }, (_, i) => ({ ...plan.beats[0]!, id: "b" + (i + 1), segments: Array.from({ length: PLAN_LIMIT.segments }, () => plan.beats[0]!.segments[0]!) })), overlays: Array.from({ length: PLAN_LIMIT.overlays }, () => plan.overlays[0]!) };
+    renderIn(<ScriptTab data={makeData(makeState({ script, footagePlan: full, footageScan: scan } as Partial<EpisodeState>, { footage: imageFirst }))} busy={false} act={okAct()} />);
+    for (const key of ["footage.edit.addBeat", "footage.edit.addText"] as const) expect((screen.getByRole("button", { name: new RegExp(tr(key)) }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: new RegExp(tr("footage.edit.addPart")) })[0] as HTMLButtonElement).disabled).toBe(true);
+    cleanup();
+    const { container } = renderIn(<ScriptTab data={makeData(makeState({ script, footagePlan: plan, footageScan: scan } as Partial<EpisodeState>, { footage: imageFirst }))} busy={false} act={okAct()} />);
+    expect(screen.queryByLabelText(tr("footage.edit.narration"))).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: new RegExp(tr("footage.edit.addPart")) })[0]!);
+    expect(container.querySelectorAll('[data-beat="b1"] [data-segment]')).toHaveLength(3);
+  });
+
+  it("kadraj denetimi parça kartında: düzeltildi, boş kare, özne kesik", () => {
+    const more = [
+      cuts[0]!,
+      { ...cuts[0]!, id: "b1-sh2", source: "f2", kind: "image" as const, speed: 1, holdMs: 0, startMs: 5200, durMs: 2000, audio: "mute" as const },
+      { ...cuts[0]!, id: "b2-sh1", beat: "b2", source: "f9", speed: 1, holdMs: 0, startMs: 7200, audio: "original" as const },
+    ];
+    const footageCheck = {
+      "b1-sh1": { verdict: "subject_cut" as const, evidence: "face cut", fixed: { focusX: 0.9, fit: "cover" as const } },
+      "b1-sh2": { verdict: "empty" as const, evidence: "black" },
+      "b2-sh1": { verdict: "subject_cut" as const, evidence: "edge" },
+    };
+    const { container } = renderIn(<ScriptTab data={makeData(footageState({ footageCuts: more, footageCheck, approvals: { script: "t" } }))} busy={false} act={okAct()} />);
+    const badge = (id: string) => container.querySelector(`[data-segment="${id}"] [data-check]`) as HTMLElement;
+    expect(badge("b1-1").textContent).toBe(tr("footage.check.fixed"));
+    expect(badge("b1-1").title).toBe("face cut");
+    expect(badge("b1-2").textContent).toBe(tr("footage.check.empty"));
+    expect(badge("b2-1").textContent).toBe(tr("footage.check.cut"));
   });
 
   it("vuruş silinince yazıları da gider; son vuruş ve tek parça silinemez", () => {

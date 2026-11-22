@@ -292,7 +292,8 @@ export function readPlanEdit(raw: unknown, narrations: Record<string, string>): 
       if (!beat || typeof beat.id !== "string" || !mood || !segments?.length || segments.length > PLAN_EDIT.segments) throw bad();
       ids.push(beat.id);
       return {
-        narration: narrations[beat.id] ?? (typeof beat.narration === "string" ? beat.narration : ""),
+        // Senaryodaki dolu anlatım önceliklidir (ayrı düzenlenir); anlatımsız ya da yeni vuruşa taslaktaki metin girer.
+        narration: narrations[beat.id] || (typeof beat.narration === "string" ? beat.narration.slice(0, 2000) : ""),
         mood,
         segments: segments.map((s) => {
           const seg = obj(s);

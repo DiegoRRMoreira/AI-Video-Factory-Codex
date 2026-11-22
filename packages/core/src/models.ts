@@ -44,6 +44,7 @@ export const AGENT_ROLES = {
   pronouncer: "cheap",
   "set-dresser": "fast",
   "footage-editor": "fast",
+  "footage-inspector": "cheap",
 } as const satisfies Record<string, ModelTier>;
 export type AgentRole = keyof typeof AGENT_ROLES;
 

@@ -572,7 +572,10 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
 - Kurgu onaydan önce Stüdyo'da elle düzeltilir: vuruş ve parça sırası, silme, aralık, resim süresi, kırpma odağı,
   kadraj, ses, hava, yazılar. Taslak "Kurguyu kaydet" ile gönderilir, kurallar sunucuda yine uygulanır; kaydedilmemiş
   değişiklik varken onay kilitlidir.
-- Açık işler: footage kareleri için görsel denetim; elle yeni parça ya da vuruş ekleme.
+- Elle parça, vuruş ve yazı eklenir; parçanın kaynağı değiştirilir; anlatımsız vuruşa anlatım yazılır.
+- Kadraj denetimi (kesimden sonra, denetim açıksa): her parçanın dikey karesi kaynağın aynı anıyla ucuz görsel ajana
+  (`footage-inspector`) gösterilir; kırpma özneyi keserse odak ve kadraj düzeltilip parça bir kez yeniden kesilir, sonuç
+  kurguya ve parça kartına yazılır.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

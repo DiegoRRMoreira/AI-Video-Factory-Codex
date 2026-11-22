@@ -386,6 +386,8 @@ export const PIPELINE_MESSAGES = {
   "log.footage.sttSkipped": { tr: "⚠ konuşma dökümü atlandı ({id}): {error}", en: "⚠ transcript skipped ({id}): {error}" },
   "log.footage.plan": { tr: "✂ kurgu: {beats} vuruş, {segments} parça, {overlays} ekran yazısı", en: "✂ edit: {beats} beats, {segments} parts, {overlays} on-screen texts" },
   "log.footage.fit": { tr: "⏱ Short {sec} sn (hedef {target} sn)", en: "⏱ Short {sec} s (target {target} s)" },
+  "log.footage.check": { tr: "🔎 kadraj denetimi: {parts} parça, {fixed} düzeltildi, {flagged} işaretli", en: "🔎 framing check: {parts} parts, {fixed} fixed, {flagged} flagged" },
+  "log.footage.checkSkipped": { tr: "⚠ kadraj denetimi atlandı: {error}", en: "⚠ framing check skipped: {error}" },
   "log.footage.cut": { tr: "✂ {id}: {source} {from}–{to} sn{slow}", en: "✂ {id}: {source} {from}–{to} s{slow}" },
   "err.math.unavailable": { tr: "Manim bulunamadı ({path}); kurulum: README → Manim tahtaları", en: "Manim not found ({path}); setup: README → Manim boards" },
   "err.math.failed": { tr: "Manim render hatası (çıkış {code}): {detail}", en: "Manim render failed (exit {code}): {detail}" },

@@ -132,3 +132,46 @@ export function footageEditor(input: FootageEditInput, deps?: AgentDeps): Promis
     deps,
   );
 }
+
+export const FootageCheckOut = z.object({
+  parts: z.array(
+    z.object({
+      id: z.string().describe("Part id as given"),
+      evidence: z.string().describe("English, one sentence: what the vertical frame shows of the main subject compared with the source frame"),
+      verdict: z
+        .enum(["ok", "subject_cut", "empty"])
+        .describe("ok: the main subject is whole and readable in the vertical frame; subject_cut: the crop cuts off or loses the main subject (a face, a person, the key object, on-screen text) that the source frame shows; empty: the frame is black, blurred or shows nothing"),
+      focusX: z.number().min(0).max(1).describe("Horizontal position of the main subject in the SOURCE frame, 0 = left edge, 1 = right edge"),
+      fit: z.enum(["cover", "contain"]).describe("cover if the subject fits in a 9:16 crop around focusX; contain if it is wider (several people far apart, a wide scene, a screen or text) and needs the whole frame"),
+    }),
+  ),
+});
+export type FootageCheckOut = z.infer<typeof FootageCheckOut>;
+
+export interface FootageCheckPart {
+  id: string;
+  why: string;
+  /** Kesilmiş dikey parçanın ortasından kare. */
+  cut: AgentImage;
+  /** Aynı anın kaynak karesi (yatay olabilir). */
+  source: AgentImage;
+}
+
+/**
+ * Footage kare denetçisi (ucuz katman): her parçanın dikey karesini kaynağın aynı anıyla karşılaştırır; kırpma özneyi
+ * keserse öznenin kaynaktaki yerini ve uygun kadrajı söyler (düzeltmeyi kod uygular, parça yeniden kesilir).
+ */
+export function footageInspector(parts: FootageCheckPart[], deps?: AgentDeps): Promise<AgentResult<FootageCheckOut>> {
+  return runStructured(
+    {
+      name: "footage-inspector",
+      model: models().cheap,
+      effort: "low",
+      schema: FootageCheckOut,
+      images: parts.flatMap((p) => [p.source, p.cut]),
+      system: `You check the vertical 9:16 crops of a Short cut from the user's own footage. For each part you get two images: first the SOURCE frame, then the VERTICAL frame made from it. Judge only framing: is the main subject (what the part is about) whole and readable in the vertical frame? Write the evidence first, then the verdict; the verdict must follow the evidence. Always give where the main subject sits horizontally in the source frame and whether it fits a 9:16 crop.`,
+      prompt: `Parts (images come in pairs in this order: source, vertical):\n${parts.map((p, i) => `${i + 1}. ${p.id}: ${p.why || "no description"} (images ${2 * i + 1}–${2 * i + 2})`).join("\n")}`,
+    },
+    deps,
+  );
+}

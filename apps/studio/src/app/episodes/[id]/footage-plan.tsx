@@ -1,7 +1,7 @@
 "use client";
 
 import type { EpisodeState } from "@ys/pipeline/light";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Film, Image as ImageIcon, Mic, RotateCcw, Save, Trash2, Type } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Film, Image as ImageIcon, Mic, Plus, RotateCcw, Save, Trash2, Type } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MessageKey } from "../../../lib/i18n";
 import { useI18n } from "../../locale-provider";
@@ -18,6 +18,14 @@ const FITS = ["cover", "contain"] as const;
 const AUDIOS = ["original", "ambient", "mute"] as const;
 const STYLES = ["hook", "title", "label", "cta"] as const;
 const POSITIONS = ["top", "center", "bottom"] as const;
+/** Elle düzenlemenin sınırları (sunucudaki PLAN_EDIT ile aynı: istemci pipeline kodunu alamaz). */
+export const PLAN_LIMIT = { beats: 20, segments: 8, overlays: 12 };
+/** Yeni vuruşun taslak kimliği: var olanlarla çakışmaz (sunucu kaydederken vuruşları yeniden numaralar). */
+export const freshId = (p: { beats: { id: string }[] }) => {
+  let n = p.beats.length + 1;
+  while (p.beats.some((b) => b.id === `new${n}`)) n++;
+  return `new${n}`;
+};
 /** Elle düzenlemede kaydedilmemiş kurgu: ScriptTab onay düğmesini bu anahtarla kilitler. */
 export const PLAN_DIRTY = "__plan";
 
@@ -57,6 +65,11 @@ export function FootagePlanView({ state, plan, busy, approved, act, onDirtyChang
     setDraft(next);
   };
   const beatIds = draft.beats.map((b) => b.id);
+  const saved = new Map(plan.beats.map((b) => [b.id, b.narration]));
+  const sources = state.input.footage!.sources;
+  const narrationOn = state.input.footage!.narration;
+  /** Yeni parça: ilk kaynaktan 3 sn (resimde süre), kırpılmış, sessiz; kullanıcı kaynağı ve aralığı seçer. */
+  const newSegment = (): Segment => ({ source: sources[0]!.id, fromMs: 0, toMs: Math.min(3000, sources[0]!.kind === "video" ? sources[0]!.durationMs : 3000), focusX: 0.5, fit: "cover", audio: "mute", why: "" });
 
   return (
     <div className="grid gap-4" data-footage-plan="">
@@ -95,8 +108,10 @@ export function FootagePlanView({ state, plan, busy, approved, act, onDirtyChang
                   </span>
                 )}
               </div>
-              {beat.narration ? (
+              {saved.get(beat.id) ? (
                 <NarrationEditor key={`${state.id}-${beat.id}`} id={state.id} sceneId={beat.id} narration={state.script?.scenes.find((s) => s.id === beat.id)?.narration ?? beat.narration} disabled={approved || busy || dirty} act={act} onDirtyChange={onDirtyChange} />
+              ) : editable && narrationOn ? (
+                <textarea aria-label={t("footage.edit.narration")} rows={2} className="field" placeholder={t("footage.edit.narrationHint")} value={beat.narration} onChange={(e) => update((p) => void (p.beats[i]!.narration = e.target.value))} />
               ) : (
                 <p className="flex items-center gap-1 text-sm text-muted"><Mic size={12} /> {t("footage.plan.noNarration")}</p>
               )}
@@ -109,20 +124,37 @@ export function FootagePlanView({ state, plan, busy, approved, act, onDirtyChang
                     source={names.get(seg.source)}
                     frame={frameFor(state.footageScan, seg.source, seg.fromMs, seg.toMs)}
                     cut={timed[j]}
+                    check={timed[j] && state.footageCheck?.[timed[j]!.id]}
                     editable={editable}
                     first={j === 0}
                     last={j === beat.segments.length - 1}
                     only={beat.segments.length === 1}
+                    sources={sources}
                     onChange={(fn) => update((p) => fn(p.beats[i]!.segments[j]!))}
                     onMove={(by) => update((p) => move(p.beats[i]!.segments, j, by))}
                     onRemove={() => update((p) => void p.beats[i]!.segments.splice(j, 1))}
                   />
                 ))}
               </ul>
+              {editable && (
+                <button type="button" className="btn-ghost w-fit py-1 text-xs" disabled={beat.segments.length >= PLAN_LIMIT.segments} onClick={() => update((p) => void p.beats[i]!.segments.push(newSegment()))}>
+                  <Plus size={14} /> {t("footage.edit.addPart")}
+                </button>
+              )}
             </li>
           );
         })}
       </ol>
+      {editable && (
+        <span className="flex flex-wrap gap-2">
+          <button type="button" className="btn-ghost py-1 text-xs" disabled={draft.beats.length >= PLAN_LIMIT.beats} onClick={() => update((p) => void p.beats.push({ id: freshId(p), narration: "", mood: "neutral", segments: [newSegment()] }))}>
+            <Plus size={14} /> {t("footage.edit.addBeat")}
+          </button>
+          <button type="button" className="btn-ghost py-1 text-xs" disabled={draft.overlays.length >= PLAN_LIMIT.overlays} onClick={() => update((p) => void p.overlays.push({ text: "", style: "label", beat: p.beats[0]!.id, position: "top" }))}>
+            <Plus size={14} /> {t("footage.edit.addText")}
+          </button>
+        </span>
+      )}
       {draft.overlays.length > 0 && (
         <div className="grid gap-2 rounded-xl border border-line bg-panel-2/30 p-3 text-sm">
           <div className="label flex items-center gap-1"><Type size={12} /> {t("footage.plan.overlays")}</div>
@@ -159,12 +191,15 @@ type Source = NonNullable<EpisodeState["input"]["footage"]>["sources"][number];
 type Cut = NonNullable<EpisodeState["footageCuts"]>[number];
 
 /** Tek parça: kare, kaynak, aralık; düzenlenebilirken aralık, odak, kadraj, ses ve sıra denetimleri. */
-function SegmentCard({ id, seg, source, frame, cut, editable, first, last, only, onChange, onMove, onRemove }: {
+function SegmentCard({ id, seg, source, sources, frame, cut, check, editable, first, last, only, onChange, onMove, onRemove }: {
   id: string;
   seg: Segment;
   source?: Source;
+  sources: Source[];
   frame?: string;
   cut?: Cut;
+  /** Kadraj denetimi (clips aşaması): özne kesildiyse düzeltildi mi. */
+  check?: NonNullable<EpisodeState["footageCheck"]>[string];
   editable: boolean;
   first: boolean;
   last: boolean;
@@ -185,6 +220,13 @@ function SegmentCard({ id, seg, source, frame, cut, editable, first, last, only,
       </span>
       {editable ? (
         <div className="grid gap-1">
+          <select aria-label={t("footage.edit.source")} className="field w-auto py-0.5 text-xs" value={seg.source} onChange={(e) => onChange((s) => {
+            s.source = e.target.value;
+            // Resimde aralık yok; ses yok.
+            if (sources.find((x) => x.id === s.source)!.kind === "image") Object.assign(s, { fromMs: 0, audio: "mute" });
+          })}>
+            {sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
           {image ? (
             <label className="flex items-center gap-1">{t("footage.edit.seconds")}
               <input aria-label={t("footage.edit.seconds")} type="number" min={0.8} step={0.1} className="field w-20 py-0.5" value={seg.toMs / 1000} onChange={(e) => onChange((s) => void (s.toMs = ms(e.target.value)))} />
@@ -225,6 +267,11 @@ function SegmentCard({ id, seg, source, frame, cut, editable, first, last, only,
             <span className="chip">{t(`footage.audio.${cut?.audio ?? seg.audio}`)}</span>
           </span>
         </>
+      )}
+      {check && check.verdict !== "ok" && (
+        <span data-check={check.verdict} title={check.evidence} className={check.fixed ? "text-ok" : "text-bad"}>
+          {t(check.fixed ? "footage.check.fixed" : check.verdict === "empty" ? "footage.check.empty" : "footage.check.cut")}
+        </span>
       )}
       <span className="text-muted italic">{seg.why}</span>
     </li>

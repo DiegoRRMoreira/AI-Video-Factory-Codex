@@ -156,6 +156,7 @@ describe("episode new --footage", () => {
         voiceId: undefined,
         autoApprove: true,
         captions: true,
+        qa: true,
         footage: { sources: [], narration: true, transcribe: true, texts: ["Bir"] },
         width: 1080,
         height: 1920,
@@ -171,8 +172,8 @@ describe("episode new --footage", () => {
 
   it("bütün footage bayrakları", async () => {
     const { pipeline, calls } = fakePipeline();
-    await episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4"], sec: "45.4", topic: " Tatil ", lang: "en", tier: "premium", budget: "2", voice: "v", manual: true, noCaptions: true, noNarration: true, noTranscribe: true });
-    expect(calls.footage[0]!.input).toMatchObject({ topic: "Tatil", lang: "en", targetSec: 45, tier: "premium", budgetUsd: 2, voiceId: "v", autoApprove: false, captions: false, footage: { narration: false, transcribe: false, texts: [] } });
+    await episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4"], sec: "45.4", topic: " Tatil ", lang: "en", tier: "premium", budget: "2", voice: "v", manual: true, noCaptions: true, noNarration: true, noTranscribe: true, noQa: true });
+    expect(calls.footage[0]!.input).toMatchObject({ qa: false, topic: "Tatil", lang: "en", targetSec: 45, tier: "premium", budgetUsd: 2, voiceId: "v", autoApprove: false, captions: false, footage: { narration: false, transcribe: false, texts: [] } });
     await expect(episodeCommand(pipeline, "new", undefined, { footage: ["a.mp4"], sec: "0" })).rejects.toThrow("--sec pozitif");
   });
 });

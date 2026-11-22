@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentError, FootageEditOut, footageEditor, toOutputSchema, transcriptLines, type FootageEditInput, type QueryFn } from "../src/index.ts";
+import { AgentError, FootageCheckOut, FootageEditOut, footageEditor, footageInspector, toOutputSchema, transcriptLines, type FootageEditInput, type QueryFn } from "../src/index.ts";
 
 type Params = { prompt: string | AsyncIterable<{ message: { content: { type: string; text?: string }[] } }>; options: Record<string, unknown> };
 
@@ -74,5 +74,20 @@ describe("kurgu ajanı", () => {
     expect(FootageEditOut.safeParse({ title: "t", beats: [beat], overlays: [] }).success).toBe(true);
     expect(FootageEditOut.safeParse({ title: "t", beats: [{ ...beat, segments: [] }], overlays: [] }).success).toBe(false);
     expect(FootageEditOut.safeParse({ title: "t", beats: [{ ...beat, segments: [{ ...segment, focusX: 2 }] }], overlays: [] }).success).toBe(false);
+  });
+});
+
+describe("kadraj denetçisi", () => {
+  it("kaynak ve dikey kareleri çiftler hâlinde gönderir; parçaları sırayla anlatır", async () => {
+    const { queryFn, seen, parts } = capture();
+    const one = { data: new Uint8Array([1]), mimeType: "image/jpeg" }, two = { data: new Uint8Array([2]), mimeType: "image/jpeg" };
+    await expect(footageInspector([{ id: "b1-sh1", why: "road", cut: two, source: one }, { id: "b1-sh2", why: "", cut: two, source: one }], { queryFn })).rejects.toThrow(AgentError);
+    const content = await parts();
+    expect(content.filter((c) => c.type === "image")).toHaveLength(4);
+    const text = content.find((c) => c.type === "text")!.text!;
+    expect(text).toContain("1. b1-sh1: road (images 1–2)");
+    expect(text).toContain("2. b1-sh2: no description (images 3–4)");
+    expect(String(seen.params!.options.systemPrompt)).toContain("first the SOURCE frame, then the VERTICAL frame");
+    expect(FootageCheckOut.safeParse({ parts: [{ id: "a", evidence: "e", verdict: "cut", focusX: 0.5, fit: "cover" }] }).success).toBe(false);
   });
 });

@@ -323,6 +323,62 @@ describe("footage hattı", () => {
     expect(state.timeline!.captions).toEqual([]);
   });
 
+  it("kadraj denetimi: özneyi kesen parçanın odağı ve kadrajı düzeltilip yeniden kesilir; kurguya da yazılır", async () => {
+    const h = harness();
+    withStt(h);
+    onAgent("footageInspector", (parts: { id: string; cut: { data: Uint8Array }; source: { data: Uint8Array } }[]) => ({
+      parts: [
+        { id: parts[0]!.id, evidence: "face cut at the right edge", verdict: "subject_cut", focusX: 0.9, fit: "cover" },
+        { id: parts[1]!.id, evidence: "black frame", verdict: "empty", focusX: 0.5, fit: "contain" },
+        { id: parts[2]!.id, evidence: "slightly cut", verdict: "subject_cut", focusX: 0.52, fit: "cover" },
+        { id: "yok", evidence: "", verdict: "ok", focusX: 0.5, fit: "cover" },
+      ],
+    }));
+    const { id } = await h.pipeline.createFootage(input(), FILES);
+    const state = await h.pipeline.run(id, { until: "clips" });
+    const parts = callsOf("footageInspector")[0]!.args[0] as { id: string }[];
+    expect(parts.map((p) => p.id)).toEqual(["b1-sh1", "b1-sh2", "b2-sh1", "b3-sh1"]);
+    expect(state.footageCheck!["b1-sh1"]).toEqual({ verdict: "subject_cut", evidence: "face cut at the right edge", fixed: { focusX: 0.9, fit: "cover" } });
+    expect(state.footageCheck!["b1-sh2"]).toMatchObject({ verdict: "empty" });
+    expect(state.footageCheck!["b2-sh1"]!.fixed).toBeUndefined();
+    expect(state.footageCuts![0]!.focusX).toBe(0.9);
+    expect(state.footagePlan!.beats[0]!.segments[0]!.focusX).toBe(0.9);
+    // 3 parça + düzeltilen 1 parça yeniden kesilir; denetim bir kez.
+    expect(ff.cuts).toHaveLength(4);
+    expect(callsOf("footageInspector")).toHaveLength(1);
+    expect(h.logs.some((l) => l.includes("kadraj denetimi: 4 parça, 1 düzeltildi, 2 işaretli"))).toBe(true);
+    // Yeni zamanlama eski denetimi siler.
+    expect((await h.pipeline.run(id, { only: "shots" })).footageCheck).toBeUndefined();
+  });
+
+  it("kadraj denetimi düşerse kesim kalır; denetim kapalıysa sorulmaz; kurgusu olmayan parça kurguya yazılmaz", async () => {
+    const h = harness();
+    withStt(h);
+    onAgent("footageInspector", () => {
+      throw new Error("kota");
+    });
+    const { id } = await h.pipeline.createFootage(input(), FILES);
+    let state = await h.pipeline.run(id, { until: "clips" });
+    expect(state.footageCheck).toBeUndefined();
+    expect(h.logs.some((l) => l.includes("kadraj denetimi atlandı"))).toBe(true);
+
+    const off = harness();
+    withStt(off);
+    const created = await off.pipeline.createFootage(input({ qa: false }), FILES);
+    await off.pipeline.run(created.id, { until: "clips" });
+    expect(callsOf("footageInspector")).toHaveLength(1);
+
+    const loose = harness();
+    withStt(loose);
+    onAgent("footageInspector", (parts: { id: string }[]) => ({ parts: [{ id: parts[0]!.id, evidence: "cut", verdict: "subject_cut", focusX: 0.1, fit: "contain" }] }));
+    const third = await loose.pipeline.createFootage(input(), FILES);
+    state = await loose.pipeline.run(third.id, { until: "shots" });
+    delete state.footagePlan;
+    await loose.pipeline.save(state);
+    state = await loose.pipeline.run(third.id, { only: "clips" });
+    expect(state.footageCuts![0]).toMatchObject({ focusX: 0.1, fit: "contain" });
+  });
+
   it("anlatımsız sahne seslendirilmez (vektör olmayan bölümde de)", async () => {
     const h = harness();
     const state = makeState({}, { script: { scenes: [{ id: "s1", beatId: "b", narration: "  ", visualIntent: "", emotion: "", location: "" }] } as never });

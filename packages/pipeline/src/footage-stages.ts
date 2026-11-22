@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
-import { footageEditor, type AgentResult } from "@ys/agents";
+import { footageEditor, footageInspector, type AgentResult, type FootageCheckOut, type FootageCheckPart } from "@ys/agents";
 import { errorText, LocalizedError, msg, type Text, type Timeline, type WordTiming } from "@ys/core";
 import type { MediaGateway, RunOptions } from "@ys/media-gateway";
 import type { AssetStore } from "@ys/storage";
@@ -86,6 +86,91 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
   };
 
   const sourcesOf = (state: EpisodeState) => state.input.footage!.sources;
+
+  /** Parmak izi değişen parçaları keser (görüntü + ayrı ses); kesilenlerin kimlikleri. */
+  const cutAll = async (state: EpisodeState, cuts: FootageCut[]): Promise<string[]> => {
+    const { width, height, fps } = state.input;
+    const assets = (state.footageAssets ??= { visual: {}, audio: {}, sig: {} });
+    const byId = new Map(sourcesOf(state).map((s) => [s.id, s]));
+    const fresh: string[] = [];
+    for (const c of cuts) {
+      const src = byId.get(c.source)!;
+      const sig = hash(JSON.stringify([src.key, c.kind, c.fromMs, c.toMs, c.speed, c.holdMs, c.focusX, c.fit, c.audio, width, height, fps])).slice(0, 24);
+      if (assets.sig[c.id] === sig) continue;
+      const file = await local(state, src);
+      const dir = `${prefix(state.id)}/cuts`;
+      if (c.kind === "video") {
+        // Geçiş payı (FOOTAGE.tailMs): parça sonrakinin geçişi boyunca oynamaya devam eder.
+        const toMs = Math.min(src.durationMs, c.toMs + FOOTAGE.tailMs * c.speed);
+        // Kaynak bitince: donmuş son kare parçanın eksiğini ve geçiş payının kalanını doldurur.
+        const padMs = Math.round(c.holdMs + FOOTAGE.tailMs - (toMs - c.toMs) / c.speed);
+        const video = await cutVideo(file, { fromMs: c.fromMs, toMs, focusX: c.focusX, fit: c.fit, width, height, fps, speed: c.speed, padMs });
+        assets.visual[c.id] = `${dir}/${sig}.mp4`;
+        await ctx.store.put(assets.visual[c.id]!, video, "video/mp4");
+      } else {
+        const still = await frameImage(file, { focusX: c.focusX, fit: c.fit, width, height });
+        assets.visual[c.id] = `${dir}/${sig}.jpg`;
+        await ctx.store.put(assets.visual[c.id]!, still, "image/jpeg");
+      }
+      if (c.audio !== "mute") {
+        const audio = await extractAudio(file, { fromMs: c.fromMs, toMs: c.toMs, speed: c.speed });
+        assets.audio[c.id] = `${dir}/${sig}.wav`;
+        await ctx.store.put(assets.audio[c.id]!, audio, "audio/wav");
+      } else delete assets.audio[c.id];
+      assets.sig[c.id] = sig;
+      fresh.push(c.id);
+      await ctx.save(state);
+      ctx.log(cutLog(c));
+    }
+    return fresh;
+  };
+
+  /**
+   * Kadraj denetimi (22 Kas): her parçanın dikey karesi kaynağın aynı anıyla ucuz görsel ajana gösterilir; kırpma özneyi
+   * keserse öznenin yeri ve kadraj parçaya ve kurguya yazılır (true: yeniden kesilecek parça var). Ajan düşerse kesim
+   * olduğu gibi kalır.
+   */
+  const inspect = async (state: EpisodeState, cuts: FootageCut[]): Promise<boolean> => {
+    const byId = new Map(sourcesOf(state).map((s) => [s.id, s]));
+    const dir = resolve(ctx.workDir, state.id, "footage", "check");
+    await mkdir(dir, { recursive: true });
+    const parts: FootageCheckPart[] = [];
+    for (const c of cuts) {
+      const src = byId.get(c.source)!;
+      const key = state.footageAssets!.visual[c.id]!;
+      const file = join(dir, basename(key));
+      await writeFile(file, (await ctx.store.get(key))!);
+      const cut = await sampleFrame(file, Math.round(c.durMs / 2), c.kind);
+      const source = await sampleFrame(await local(state, src), Math.round((c.fromMs + c.toMs) / 2), src.kind);
+      parts.push({ id: c.id, why: c.why, cut: { data: cut, mimeType: "image/jpeg" }, source: { data: source, mimeType: "image/jpeg" } });
+    }
+    let out: FootageCheckOut;
+    try {
+      out = await ctx.agent(state, "clips", footageInspector(parts, ctx.agentDeps()));
+    } catch (e) {
+      ctx.log(msg("log.footage.checkSkipped", { error: errorText(e) }));
+      return false;
+    }
+    const check = (state.footageCheck ??= {});
+    let fixed = 0, flagged = 0;
+    for (const r of out.parts) {
+      const c = cuts.find((x) => x.id === r.id);
+      if (!c) continue;
+      const fix = r.verdict === "subject_cut" && (Math.abs(r.focusX - c.focusX) > 0.05 || r.fit !== c.fit);
+      check[c.id] = { verdict: r.verdict, evidence: r.evidence, ...(fix ? { fixed: { focusX: r.focusX, fit: r.fit } } : {}) };
+      if (r.verdict !== "ok" && !fix) flagged++;
+      if (!fix) continue;
+      fixed++;
+      c.focusX = r.focusX;
+      c.fit = r.fit;
+      // Kurguya da yazılır: zamanlama yeniden yapılsa da düzeltme kalır.
+      const seg = state.footagePlan?.beats.find((b) => b.id === c.beat)?.segments[Number(c.id.split("-sh")[1]) - 1];
+      if (seg) Object.assign(seg, { focusX: r.focusX, fit: r.fit });
+    }
+    await ctx.save(state);
+    ctx.log(msg("log.footage.check", { parts: cuts.length, fixed, flagged }));
+    return fixed > 0;
+  };
 
   return {
     style: noop,
@@ -201,6 +286,8 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
       const voiceMs = Object.fromEntries(Object.entries(state.voice ?? {}).map(([id, v]) => [id, v.durationMs]));
       const cuts = fitCuts(plan, sourcesOf(state), voiceMs, state.input.targetSec * 1000);
       state.footageCuts = cuts;
+      // Yeni zamanlama: önceki kadraj denetimi başka parçalara aitti (düzeltmeleri kurguya yazılmıştı).
+      delete state.footageCheck;
       state.shots = cuts.map((c) => ({
         id: c.id,
         sceneId: c.beat,
@@ -220,37 +307,10 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
     clips: async (state) => {
       const cuts = state.footageCuts;
       if (!cuts) throw new LocalizedError(msg("err.missing", { what: "footageCuts" }));
-      const { width, height, fps } = state.input;
-      const assets = (state.footageAssets ??= { visual: {}, audio: {}, sig: {} });
-      const byId = new Map(sourcesOf(state).map((s) => [s.id, s]));
-      for (const c of cuts) {
-        const src = byId.get(c.source)!;
-        const sig = hash(JSON.stringify([src.key, c.kind, c.fromMs, c.toMs, c.speed, c.holdMs, c.focusX, c.fit, c.audio, width, height, fps])).slice(0, 24);
-        if (assets.sig[c.id] === sig) continue;
-        const file = await local(state, src);
-        const dir = `${prefix(state.id)}/cuts`;
-        if (c.kind === "video") {
-          // Geçiş payı (FOOTAGE.tailMs): parça sonrakinin geçişi boyunca oynamaya devam eder.
-          const toMs = Math.min(src.durationMs, c.toMs + FOOTAGE.tailMs * c.speed);
-          // Kaynak bitince: donmuş son kare parçanın eksiğini ve geçiş payının kalanını doldurur.
-          const padMs = Math.round(c.holdMs + FOOTAGE.tailMs - (toMs - c.toMs) / c.speed);
-          const video = await cutVideo(file, { fromMs: c.fromMs, toMs, focusX: c.focusX, fit: c.fit, width, height, fps, speed: c.speed, padMs });
-          assets.visual[c.id] = `${dir}/${sig}.mp4`;
-          await ctx.store.put(assets.visual[c.id]!, video, "video/mp4");
-        } else {
-          const still = await frameImage(file, { focusX: c.focusX, fit: c.fit, width, height });
-          assets.visual[c.id] = `${dir}/${sig}.jpg`;
-          await ctx.store.put(assets.visual[c.id]!, still, "image/jpeg");
-        }
-        if (c.audio !== "mute") {
-          const audio = await extractAudio(file, { fromMs: c.fromMs, toMs: c.toMs, speed: c.speed });
-          assets.audio[c.id] = `${dir}/${sig}.wav`;
-          await ctx.store.put(assets.audio[c.id]!, audio, "audio/wav");
-        } else delete assets.audio[c.id];
-        assets.sig[c.id] = sig;
-        await ctx.save(state);
-        ctx.log(cutLog(c));
-      }
+      const fresh = await cutAll(state, cuts);
+      // Yeni kesilen parçaların kadrajı bir kez denetlenir; düzeltilen parçalar yeniden kesilir (tek tur).
+      if (state.input.qa === false || !fresh.length) return;
+      if (await inspect(state, cuts.filter((c) => fresh.includes(c.id)))) await cutAll(state, cuts);
     },
 
     /** Timeline: parçalar, anlatım, kaynak ses, altyazı ve ekran yazıları; sonra müzik ve efekt. */

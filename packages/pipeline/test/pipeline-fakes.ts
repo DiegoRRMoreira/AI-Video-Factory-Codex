@@ -40,6 +40,7 @@ export const AGENT_NAMES = [
   "pronouncer",
   "setDresser",
   "footageEditor",
+  "footageInspector",
 ] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 
@@ -159,6 +160,8 @@ export function resetFakes(): void {
   handlers.set("pronouncer", () => ({ terms: [] }));
   // Set düzenleyici her kare aşamasında döşenmemiş mekânlara sorulur: varsayılan olarak eşya yok.
   handlers.set("setDresser", () => ({ locations: [] }));
+  // Footage kadraj denetçisi her kesimden sonra sorulur: varsayılan olarak her parça yerinde.
+  handlers.set("footageInspector", (parts: { id: string }[]) => ({ parts: parts.map((p) => ({ id: p.id, evidence: "subject whole", verdict: "ok", focusX: 0.5, fit: "cover" })) }));
   agentCalls.length = 0;
   for (const group of [render, media, refs, geo]) for (const fn of Object.values(group)) fn.mockReset();
 }

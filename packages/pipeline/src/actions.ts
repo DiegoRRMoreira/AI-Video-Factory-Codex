@@ -210,6 +210,7 @@ export function editFootagePlan(state: EpisodeState, raw: unknown): void {
   // Onaydan önce ses yoktur; yine de kurgu değişince eski sesler ve zamanlama kullanılmaz.
   delete state.voice;
   delete state.footageCuts;
+  delete state.footageCheck;
   delete state.timeline;
   delete state.lastError;
   invalidateFrom(state, "cast");

@@ -291,6 +291,8 @@ export interface EpisodeState {
   footageCuts?: FootageCut[];
   /** Footage modu: kesilmiş parçaların depo anahtarları; parmak izi değişmeyen parça yeniden kesilmez (clips aşaması). */
   footageAssets?: FootageAssets & { sig: Record<string, string> };
+  /** Footage modu: parça başına kadraj denetimi (clips aşaması); özne kesildiyse düzeltilen odak ve kadraj. */
+  footageCheck?: Record<string, { verdict: "ok" | "subject_cut" | "empty"; evidence: string; fixed?: { focusX: number; fit: "cover" | "contain" } }>;
   keyframes?: Record<string, AssetRef>;
   /** Human-selected real archive inserts; original generated shots stay available for restoration. */
   archives?: Record<string, ArchiveImage>;

@@ -34,6 +34,8 @@ describe("elle kurgu düzenlemesi", () => {
     expect(out.beats[1]!.segments[0]).toEqual({ source: "f1", fromSec: 0, toSec: 4, focusX: 1, fit: "cover", audio: "ambient", why: "" });
     expect(out.overlays).toEqual([{ text: "Kanca", style: "hook", beat: 2, position: "top" }]);
     expect(readPlanEdit({ ...plan, title: 5 }, {}).title).toBe("");
+    // Senaryoda anlatımı boş vuruşa taslaktaki metin girer.
+    expect(readPlanEdit({ ...plan, beats: [{ ...plan.beats[1], narration: "Taslak" }], overlays: [] }, { b2: "" }).beats[0]!.narration).toBe("Taslak");
     expect(readPlanEdit({ ...plan, beats: [{ ...plan.beats[0], narration: 5 }] }, {}).beats[0]!.narration).toBe("");
   });
 

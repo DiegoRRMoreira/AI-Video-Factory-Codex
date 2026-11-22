@@ -52,7 +52,7 @@ Komutlar:
   episode new --topic "..." [--lang tr] [--minutes 3] [--tier economy] [--budget 10]
               [--clips 0.2] [--style "..."] [--voice id] [--vertical]
   episode new --footage a.mp4 --footage b.jpg [--sec 30] [--topic "kısa bilgi"] [--overlay "yazı"]...
-              [--no-narration] [--no-transcribe] [--voice id] [--lang tr]
+              [--no-narration] [--no-transcribe] [--no-qa: kadraj denetimi kapalı] [--voice id] [--lang tr]
                                     Kendi videonla resimlerinden dikey Short (15–180 sn): AI kurgu, anlatım,
                                     konuşma dökümü (ElevenLabs Scribe), altyazı, ekran yazıları, müzik, efekt
   episode run <id> [--until <aşama>] [--from <aşama>] [--only <aşama>]
