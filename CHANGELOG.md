@@ -2,6 +2,17 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.2 (2026-11-22)
+
+- **Shorts from your own footage:** a new episode kind cuts a vertical 1080×1920 Short (15–180 s) from your own videos and images. An AI editor looks at sampled frames and the transcript, picks the best moments, frames each one for 9:16 (cropped around the subject or shown whole over a blurred copy), decides whether its own sound plays, and writes a voice-over and on-screen texts (a hook, labels, a call to action, plus any texts you give verbatim). Captions follow the narration and the kept speech; music and sound effects follow the beats; the cover is the Short's own frame with the hook.
+- Studio: **New episode → Short from your footage** uploads the files as you pick them (up to 1 GB each, `YS_FOOTAGE_MAX_MB`). The Script tab shows the edit with a frame for every part; before approving you can reorder, add or remove beats, parts and texts and change each part's source, range, crop focus, framing and sound. After cutting, a cheap vision check fixes crops that cut the subject.
+- CLI: `pnpm ys episode new --footage a.mp4 --footage b.jpg --sec 30 [--overlay "text"] [--no-narration] [--no-transcribe]`.
+- Speech in your videos is transcribed with a local whisper.cpp when `YS_WHISPER` and `YS_WHISPER_MODEL` are set (free), otherwise with ElevenLabs Scribe (about $0.40 per hour of audio). Both are unverified until their first real call.
+- Studio uploads larger than 10 MB are no longer cut short by Next.js.
+- Add immutable benchmark review packets, label history and a frozen TR and EN benchmark supplement.
+
+After updating, rebuild and restart the Studio: `pnpm studio:build && pnpm studio:start`.
+
 ## v0.6.1 (2026-11-17)
 
 - Finalize 0.6.1 release notes
