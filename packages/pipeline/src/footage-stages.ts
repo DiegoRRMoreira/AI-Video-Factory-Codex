@@ -107,7 +107,10 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
         await mkdir(dir, { recursive: true });
         const file = join(dir, basename(p.key));
         await writeFile(file, bytes);
-        await addFootageSources(ctx.store, state, [{ name: p.name, path: file }], async () => bytes);
+        // Tür, Stüdyo'nun denetlediği anahtardan gelir (adın uzantısı ondan farklıysa ad ona uydurulur).
+        const ext = extname(p.key);
+        const name = extname(p.name).toLowerCase() === ext ? p.name : `${p.name}${ext}`;
+        await addFootageSources(ctx.store, state, [{ name, path: file }], async () => bytes);
         footage.pending.shift();
         if (!footage.pending.length) delete footage.pending;
         await ctx.store.delete(p.key);
@@ -224,14 +227,16 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
       const byId = new Map(sourcesOf(state).map((s) => [s.id, s]));
       for (const c of cuts) {
         const src = byId.get(c.source)!;
-        const sig = hash(JSON.stringify([src.key, c.kind, c.fromMs, c.toMs, c.speed, c.focusX, c.fit, c.audio, width, height, fps])).slice(0, 24);
+        const sig = hash(JSON.stringify([src.key, c.kind, c.fromMs, c.toMs, c.speed, c.holdMs, c.focusX, c.fit, c.audio, width, height, fps])).slice(0, 24);
         if (assets.sig[c.id] === sig) continue;
         const file = await local(state, src);
         const dir = `${prefix(state.id)}/cuts`;
         if (c.kind === "video") {
           // Geçiş payı (FOOTAGE.tailMs): parça sonrakinin geçişi boyunca oynamaya devam eder.
           const toMs = Math.min(src.durationMs, c.toMs + FOOTAGE.tailMs * c.speed);
-          const video = await cutVideo(file, { fromMs: c.fromMs, toMs, focusX: c.focusX, fit: c.fit, width, height, fps, speed: c.speed });
+          // Kaynak bitince: donmuş son kare parçanın eksiğini ve geçiş payının kalanını doldurur.
+          const padMs = Math.round(c.holdMs + FOOTAGE.tailMs - (toMs - c.toMs) / c.speed);
+          const video = await cutVideo(file, { fromMs: c.fromMs, toMs, focusX: c.focusX, fit: c.fit, width, height, fps, speed: c.speed, padMs });
           assets.visual[c.id] = `${dir}/${sig}.mp4`;
           await ctx.store.put(assets.visual[c.id]!, video, "video/mp4");
         } else {

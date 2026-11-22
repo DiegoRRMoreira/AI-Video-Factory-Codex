@@ -33,7 +33,7 @@ describe("ElevenLabs STT", () => {
     });
     const stt = new ElevenLabsSttAdapter("anahtar", "scribe_v2");
     const res = await stt.generate(
-      { capability: "stt", quality: "standard", language: "tr", refs: [{ role: "source_audio", bytes: new Uint8Array([1, 2]), mimeType: "audio/wav" }] },
+      { capability: "stt", quality: "standard", language: "tr-TR", refs: [{ role: "source_audio", bytes: new Uint8Array([1, 2]), mimeType: "audio/wav" }] },
       { fetch },
     );
     expect(calls[0]!.url).toBe(`${EL}/speech-to-text`);

@@ -549,7 +549,8 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
   kaynağa sığdırma, çok kısa parçayı atma, sessiz kaynağı susturma, anlatımlı vuruşta konuşmayı ortam sesine indirme
   (iki ses üst üste anlaşılmaz), kullanıcının yazılarını eksiksiz koyma. Senaryo kapısı burada durur.
 - **voice:** yalnız anlatımlı vuruşlar seslendirilir. **shots = zamanlama:** vuruş payı hedefe ölçeklenir; anlatım ya
-  da korunan konuşma uzunsa o kazanır; video önce kaynakta uzar, yetmezse 0,6 hıza kadar yavaşlar.
+  da korunan konuşma uzunsa o kazanır; video önce kaynakta uzar, yetmezse 0,6 hıza kadar yavaşlar, o da yetmezse son
+  karesi donar (parça kısalmaz, anlatımlar üst üste binmez).
 - **clips = kesim:** ffmpeg ile 1080×1920, sabit fps, sessiz H.264 (render yeniden kodlamaz, çekim türü `footage`);
   cover odaktan kırpar, contain bulanık dolgunun üstüne ortalar; ses ayrı WAV izi (`source` rolü). Parmak izi aynı
   parça yeniden kesilmez.
@@ -560,7 +561,9 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
   render'dan önce durur. Dosyalar `assets/footage/<bölüm>/` altında, bölüm silinince gider.
 - Stüdyo: Yeni bölüm → "Kendi görüntünden Short"; dosyalar seçilince `/api/footage`'a ham gövdeyle yüklenir (uzantı
   ve dosya imzası denetlenir, en çok 1 GB), `uploads/footage/` bekleme alanına yazılır; Stüdyo ffprobe çalıştırmaz,
-  ölçüm ve bölüme alma işin ilk aşamasında yapılır. CLI: `episode new --footage a.mp4 --footage b.jpg --sec 30`.
+  ölçüm ve bölüme alma işin ilk aşamasında yapılır. Next proxy'den geçen gövdeyi 10 MB'ta sessizce kesiyordu:
+  `next.config.ts` sınırı yükleme sınırına çeker, uç nokta `content-length`'ten kısa gövdeyi reddeder (72 MB'lık
+  yükleme bayt bayt doğrulandı). CLI: `episode new --footage a.mp4 --footage b.jpg --sec 30`.
 - Açık işler: yerel STT (whisper.cpp) seçeneği, kurgunun Stüdyo'da elle düzeltilmesi (parça sırası, kırpma),
   footage kareleri için görsel denetim, yalnız video içeren timeline'da küçük resim.
 

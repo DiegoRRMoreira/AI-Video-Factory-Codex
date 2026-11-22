@@ -68,6 +68,14 @@ describe("footage yüklemesi", () => {
     expect(streamed.status).toBe(413);
   });
 
+  it("bildirilen boydan kısa gelen gövde (kesik yükleme) saklanmaz", async () => {
+    const put = vi.spyOn(server.store(), "put");
+    const res = await send(JPEG, { "content-type": "image/jpeg", "x-file-name": "a.jpg", "content-length": "100" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain(`Yükleme eksik geldi: a.jpg (${JPEG.length}/100 bayt)`);
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it("proxy yalnız bu uç noktada izinli video/resim türüne açar; köken denetimi sürer", () => {
     const call = (path: string, type: string, extra: Record<string, string> = {}) =>
       proxy(new NextRequest(`http://localhost:3100${path}`, { method: "POST", headers: { host: "localhost:3100", "content-type": type, ...extra } }));

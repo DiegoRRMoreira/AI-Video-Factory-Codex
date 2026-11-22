@@ -135,6 +135,8 @@ export interface FootageCut {
   toMs: number;
   /** Oynatma hızı (≤ 1): kaynak, ayrılan süreye yetmeyince yavaşlatılır. */
   speed: number;
+  /** Yavaşlatma da yetmezse son karenin donduğu süre (ms); parça yine `durMs` sürer. */
+  holdMs: number;
   /** Bölüm içindeki başlangıç ve süre. */
   startMs: number;
   durMs: number;
@@ -257,22 +259,25 @@ const lengthOf = (s: FootageSegment) => s.toMs - s.fromMs;
  * (yalnız konuşmadan oluşan vuruşlar kendi uzunluğunda, hedeften düşülür);
  * anlatımı (+ nefes) ve tam sesle çalan kaynak konuşması bundan uzunsa o kazanır (söz kesilmez). Vuruş içinde konuşan
  * parça kendi uzunluğunu korur, kalan süre diğer parçalara uzunluklarıyla orantılı dağılır. Video parçası uzaması
- * gerekince önce kaynakta ileri (sonra geri) uzar, yetmezse `minSpeed`e kadar yavaşlar; resim istenen kadar kalır.
+ * gerekince önce kaynakta ileri (sonra geri) uzar, yetmezse `minSpeed`e kadar yavaşlar, o da yetmezse son karesi
+ * donar (`holdMs`): parça hiç kısalmaz, vuruşlar kaymaz, bir anlatım ötekinin üstüne binmez. Resim istenen kadar kalır.
+ * Anlatımı olan vuruşta kaynağın konuşması ortam sesine iner (kurgu sonradan değişse de iki ses üst üste çalmaz).
  */
 export function fitCuts(plan: FootagePlan, sources: FootageSource[], voiceMs: Record<string, number>, targetMs: number): FootageCut[] {
   const byId = new Map(sources.map((s) => [s.id, s]));
   const natural = plan.beats.map((b) => b.segments.reduce((a, s) => a + lengthOf(s), 0));
+  const audioOf = (beat: FootageBeat, s: FootageSegment): SegmentAudio => (voiceMs[beat.id] && s.audio === "original" ? "ambient" : s.audio);
   // Yalnız konuşan parçalardan oluşan vuruş esnemez: hedeften düşülür, kalan esneyen vuruşlara oranla dağılır.
-  const rigid = plan.beats.map((b) => b.segments.every((s) => s.audio === "original"));
+  const rigid = plan.beats.map((b) => b.segments.every((s) => audioOf(b, s) === "original"));
   const rigidMs = natural.reduce((a, n, i) => a + (rigid[i] ? n : 0), 0);
   const total = natural.reduce((a, n, i) => a + (rigid[i] ? 0 : n), 0);
   const room = Math.max(0, targetMs - rigidMs);
   const cuts: FootageCut[] = [];
   let cursor = 0;
   plan.beats.forEach((beat, bi) => {
-    const fixed = beat.segments.filter((s) => s.audio === "original");
+    const fixed = beat.segments.filter((s) => audioOf(beat, s) === "original");
     const fixedMs = fixed.reduce((a, s) => a + lengthOf(s), 0);
-    const flex = beat.segments.filter((s) => s.audio !== "original");
+    const flex = beat.segments.filter((s) => audioOf(beat, s) !== "original");
     const voice = voiceMs[beat.id] ? voiceMs[beat.id]! + FOOTAGE.voicePadMs : 0;
     const share = Math.round((natural[bi]! / total) * room);
     // Esnek parça yoksa vuruş, konuşan parçaların toplamıdır.
@@ -282,8 +287,9 @@ export function fitCuts(plan: FootagePlan, sources: FootageSource[], voiceMs: Re
     let flexLeft = flexNatural;
     for (const seg of beat.segments) {
       const src = byId.get(seg.source)!;
+      const audio = audioOf(beat, seg);
       let dur: number;
-      if (seg.audio === "original") dur = lengthOf(seg);
+      if (audio === "original") dur = lengthOf(seg);
       else {
         dur = Math.max(FOOTAGE.minSegMs, Math.round((lengthOf(seg) / flexLeft) * left));
         left -= dur;
@@ -291,6 +297,7 @@ export function fitCuts(plan: FootagePlan, sources: FootageSource[], voiceMs: Re
       }
       let { fromMs, toMs } = seg;
       let speed = 1;
+      let holdMs = 0;
       if (src.kind === "video") {
         if (dur <= toMs - fromMs) toMs = fromMs + dur;
         else {
@@ -298,11 +305,11 @@ export function fitCuts(plan: FootagePlan, sources: FootageSource[], voiceMs: Re
           fromMs = Math.max(0, toMs - dur);
           const have = toMs - fromMs;
           if (have < dur) speed = Math.max(FOOTAGE.minSpeed, have / dur);
-          // Yavaşlatma da yetmezse parça kısalır (kaynak bitti); sonraki parça erken başlar.
-          dur = Math.min(dur, Math.round(have / speed));
+          // Yavaşlatma da yetmezse (kaynak bitti) son kare kalan süre boyunca durur.
+          holdMs = Math.max(0, dur - Math.round(have / speed));
         }
       } else toMs = dur;
-      cuts.push({ id: `${beat.id}-sh${cuts.filter((c) => c.beat === beat.id).length + 1}`, beat: beat.id, source: seg.source, kind: src.kind, fromMs, toMs, speed, startMs: cursor, durMs: dur, focusX: seg.focusX, fit: seg.fit, audio: seg.audio, why: seg.why });
+      cuts.push({ id: `${beat.id}-sh${cuts.filter((c) => c.beat === beat.id).length + 1}`, beat: beat.id, source: seg.source, kind: src.kind, fromMs, toMs, speed, holdMs, startMs: cursor, durMs: dur, focusX: seg.focusX, fit: seg.fit, audio, why: seg.why });
       cursor += dur;
     }
   });

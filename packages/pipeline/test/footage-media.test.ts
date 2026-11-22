@@ -104,13 +104,13 @@ describe("ffmpeg adımları", () => {
   });
 
   it("parça: sessiz, dikey, sabit fps; yavaşlatma pts ile; yedek ffmpeg kullanılmaz", async () => {
-    await cutVideo("a.mp4", { fromMs: 0, toMs: 2000, focusX: 0.5, fit: "cover", width: 1080, height: 1920, fps: 30, speed: 0.75 });
-    await cutVideo("a.mp4", { fromMs: 0, toMs: 2000, focusX: 0.5, fit: "cover", width: 1080, height: 1920, fps: 30 });
+    await cutVideo("a.mp4", { fromMs: 0, toMs: 2000, focusX: 0.5, fit: "cover", width: 1080, height: 1920, fps: 30, speed: 0.75, padMs: 1500 });
+    await cutVideo("a.mp4", { fromMs: 0, toMs: 2000, focusX: 0.5, fit: "cover", width: 1080, height: 1920, fps: 30, padMs: 0 });
     const [slow, normal] = calls.list;
     expect(slow!.bundled).toBe(false);
     expect(slow!.args).toContain("-an");
-    expect(slow!.args.find((a) => a.includes("setpts"))).toMatch(/,setpts=PTS\/0\.75,fps=30$/);
-    expect(normal!.args.find((a) => a.includes("fps="))).not.toContain("setpts");
+    expect(slow!.args.find((a) => a.includes("setpts"))).toMatch(/,setpts=PTS\/0\.75,tpad=stop_mode=clone:stop_duration=1\.500,fps=30$/);
+    expect(normal!.args.find((a) => a.includes("fps="))).not.toMatch(/setpts|tpad/);
   });
 
   it("resim dikey kareye oturur", async () => {

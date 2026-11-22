@@ -2,12 +2,6 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
-## Unreleased
-
-- **Shorts from your own footage:** a new episode kind cuts a vertical 1080×1920 Short (15–180 s) from your own videos and images. An AI editor looks at sampled frames and the transcript, picks the best moments, frames each one for 9:16 (cropped around the subject or shown whole over a blurred copy), decides whether its own sound plays, and writes a voice-over and on-screen texts (a hook, labels, a call to action, plus any texts you give verbatim). Captions follow the narration and the kept speech; music and sound effects follow the beats.
-- Speech in your videos can be transcribed with ElevenLabs Scribe (a new `stt` capability in the media gateway, about $0.40 per hour of audio, unverified until the first real call).
-- Studio: **New episode → Short from your footage** uploads the files as you pick them (up to 1 GB each, `YS_FOOTAGE_MAX_MB`); the episode stops for your approval of the edit and of the preview. CLI: `pnpm ys episode new --footage a.mp4 --footage b.jpg --sec 30 [--overlay "text"] [--no-narration] [--no-transcribe]`.
-
 ## v0.6.1 (2026-11-17)
 
 - Finalize 0.6.1 release notes

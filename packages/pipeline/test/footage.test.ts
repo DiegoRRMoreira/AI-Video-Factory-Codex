@@ -121,16 +121,16 @@ describe("fitCuts", () => {
     expect(beatStarts(cuts)).toEqual({ b1: 0, b2: 6000 });
   });
 
-  it("anlatım uzunsa vuruş uzar: video önce ileri, sonra geri uzar, yetmezse yavaşlar; konuşan parça kendi uzunluğunda", () => {
+  it("vuruş uzayınca video önce ileri, sonra geri uzar, yetmezse yavaşlar; konuşan parça kendi uzunluğunda", () => {
     const cuts = fitCuts(
       plan([
-        { id: "b1", narration: "uzun", mood: "day", segments: [s("f1", 25000, 28000), s("f2", 1000, 3000), s("f1", 0, 2000, "original")] },
+        { id: "b1", narration: "", mood: "day", segments: [s("f1", 25000, 28000), s("f2", 1000, 3000), s("f1", 0, 2000, "original")] },
       ]),
       sources,
-      { b1: 13700 },
-      5000,
+      {},
+      14000,
     );
-    // Vuruş: anlatım 13.7 + 0.3 = 14 sn; konuşan parça 2 sn, kalan 12 sn iki esnek parçaya 3:2.
+    // Vuruş 14 sn; konuşan parça 2 sn, kalan 12 sn iki esnek parçaya 3:2.
     expect(cuts.map((c) => [c.durMs, c.fromMs, c.toMs, Number(c.speed.toFixed(3))])).toEqual([
       [7200, 22800, 30000, 1],
       [4800, 0, 4000, 0.833],
@@ -138,23 +138,38 @@ describe("fitCuts", () => {
     ]);
   });
 
-  it("yavaşlatma da yetmezse parça kısalır (kaynak bitti)", () => {
-    const cuts = fitCuts(plan([{ id: "b1", narration: "x", mood: "day", segments: [s("f2", 0, 4000)] }]), sources, { b1: 20000 }, 5000);
-    expect(cuts[0]).toMatchObject({ speed: FOOTAGE.minSpeed, durMs: Math.round(4000 / FOOTAGE.minSpeed), fromMs: 0, toMs: 4000 });
+  it("yavaşlatma da yetmezse son kare donar: parça kısalmaz, sonraki anlatımlı vuruş öncekinin sesinden sonra başlar", () => {
+    const cuts = fitCuts(
+      plan([
+        { id: "b1", narration: "uzun", mood: "day", segments: [s("f2", 0, 4000)] },
+        { id: "b2", narration: "sonra", mood: "day", segments: [s("f1", 0, 2000)] },
+      ]),
+      sources,
+      { b1: 10000, b2: 1000 },
+      5000,
+    );
+    expect(cuts[0]).toMatchObject({ speed: FOOTAGE.minSpeed, durMs: 10300, holdMs: 10300 - Math.round(4000 / FOOTAGE.minSpeed), fromMs: 0, toMs: 4000 });
+    expect(cuts[1]!.startMs).toBeGreaterThanOrEqual(10000);
+  });
+
+  it("anlatımı olan vuruşta kaynak konuşması ortam sesine iner ve esner", () => {
+    const cuts = fitCuts(plan([{ id: "b1", narration: "x", mood: "day", segments: [s("f1", 0, 2000, "original")] }]), sources, { b1: 5700 }, 1000);
+    expect(cuts[0]).toMatchObject({ audio: "ambient", durMs: 6000, fromMs: 0, toMs: 6000 });
   });
 
   it("yalnız konuşan parçalardan oluşan vuruş, parçaların toplamı kadar sürer", () => {
     const cuts = fitCuts(plan([{ id: "b1", narration: "", mood: "day", segments: [s("f1", 0, 3000, "original")] }, { id: "b2", narration: "", mood: "day", segments: [s("f1", 3000, 6000)] }]), sources, {}, 60000);
     expect(cuts.map((c) => [c.startMs, c.durMs])).toEqual([
       [0, 3000],
-      // Kalan 57 sn'ye 30 sn'lik kaynak en çok 0.6 hızla yeter: 50 sn.
-      [3000, 50000],
+      // Kalan 57 sn'ye 30 sn'lik kaynak 0.6 hızla 50 sn yeter, son 7 sn son kare durur.
+      [3000, 57000],
     ]);
+    expect(cuts[1]).toMatchObject({ speed: FOOTAGE.minSpeed, holdMs: 7000 });
   });
 });
 
 describe("sourceWords ve overlayTimes", () => {
-  const cut = (over: Partial<FootageCut>): FootageCut => ({ id: "b1-sh1", beat: "b1", source: "f1", kind: "video", fromMs: 1000, toMs: 3000, speed: 1, startMs: 5000, durMs: 2000, focusX: 0.5, fit: "cover", audio: "original", why: "", ...over });
+  const cut = (over: Partial<FootageCut>): FootageCut => ({ id: "b1-sh1", beat: "b1", source: "f1", kind: "video", fromMs: 1000, toMs: 3000, speed: 1, holdMs: 0, startMs: 5000, durMs: 2000, focusX: 0.5, fit: "cover", audio: "original", why: "", ...over });
 
   it("yalnız tam sesle çalan parçanın içindeki kelimeler, bölüm zamanına taşınır (yavaşlatma ölçeklenir)", () => {
     const words = [
@@ -194,10 +209,10 @@ describe("footageTimeline", () => {
       [{ text: "Kanca", style: "hook", beat: "b1", position: "top" }],
     );
     const cuts: FootageCut[] = [
-      { id: "b1-sh1", beat: "b1", source: "f1", kind: "video", fromMs: 0, toMs: 2000, speed: 1, startMs: 0, durMs: 2000, focusX: 0.5, fit: "cover", audio: "ambient", why: "" },
-      { id: "b1-sh2", beat: "b1", source: "f3", kind: "image", fromMs: 0, toMs: 1000, speed: 1, startMs: 2000, durMs: 1000, focusX: 0.5, fit: "contain", audio: "mute", why: "" },
-      { id: "b2-sh1", beat: "b2", source: "f1", kind: "video", fromMs: 5000, toMs: 7000, speed: 1, startMs: 3000, durMs: 2000, focusX: 0.5, fit: "cover", audio: "original", why: "" },
-      { id: "b2-sh2", beat: "b2", source: "f2", kind: "image", fromMs: 0, toMs: 500, speed: 1, startMs: 5000, durMs: 500, focusX: 0.5, fit: "cover", audio: "ambient", why: "" },
+      { id: "b1-sh1", beat: "b1", source: "f1", kind: "video", fromMs: 0, toMs: 2000, speed: 1, holdMs: 0, startMs: 0, durMs: 2000, focusX: 0.5, fit: "cover", audio: "ambient", why: "" },
+      { id: "b1-sh2", beat: "b1", source: "f3", kind: "image", fromMs: 0, toMs: 1000, speed: 1, holdMs: 0, startMs: 2000, durMs: 1000, focusX: 0.5, fit: "contain", audio: "mute", why: "" },
+      { id: "b2-sh1", beat: "b2", source: "f1", kind: "video", fromMs: 5000, toMs: 7000, speed: 1, holdMs: 0, startMs: 3000, durMs: 2000, focusX: 0.5, fit: "cover", audio: "original", why: "" },
+      { id: "b2-sh2", beat: "b2", source: "f2", kind: "image", fromMs: 0, toMs: 500, speed: 1, holdMs: 0, startMs: 5000, durMs: 500, focusX: 0.5, fit: "cover", audio: "ambient", why: "" },
     ];
     const t = footageTimeline({
       episodeId: "e1",
@@ -236,7 +251,7 @@ describe("footageTimeline", () => {
   it("boş kesimde en az bir kare; ilk sıradaki resim sağa kayar", () => {
     const t = footageTimeline({ episodeId: "e", lang: "tr", fps: 30, width: 1080, height: 1920, plan: plan([]), cuts: [], assets: { visual: {}, audio: {} }, voice: {}, scans: {} });
     expect(t.durationInFrames).toBe(1);
-    const still: FootageCut = { id: "b1-sh1", beat: "b1", source: "f3", kind: "image", fromMs: 0, toMs: 2000, speed: 1, startMs: 0, durMs: 2000, focusX: 0.5, fit: "cover", audio: "mute", why: "" };
+    const still: FootageCut = { id: "b1-sh1", beat: "b1", source: "f3", kind: "image", fromMs: 0, toMs: 2000, speed: 1, holdMs: 0, startMs: 0, durMs: 2000, focusX: 0.5, fit: "cover", audio: "mute", why: "" };
     const one = footageTimeline({ episodeId: "e", lang: "tr", fps: 30, width: 1080, height: 1920, plan: plan([]), cuts: [still], assets: { visual: { "b1-sh1": "s.jpg" }, audio: {} }, voice: {}, scans: {} });
     expect(one.visuals[0]!.motion?.panX).toBe(0.3);
   });

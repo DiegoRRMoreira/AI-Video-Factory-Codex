@@ -147,7 +147,8 @@ export class ElevenLabsSttAdapter implements ProviderAdapter {
     form.append("model_id", this.model);
     form.append("timestamps_granularity", "word");
     form.append("tag_audio_events", "false");
-    if (req.language) form.append("language_code", req.language);
+    // Scribe ISO 639 dil kodu bekler: bölge eki atılır (pt-BR → pt).
+    if (req.language) form.append("language_code", req.language.split("-")[0]!);
     form.append("file", new Blob([new Uint8Array(audio.bytes)], { type: audio.mimeType }), "audio");
     const res = await requestJson<{ text?: string; words?: ScribeWord[] }>(ctx.fetch, `${BASE}/speech-to-text`, {
       method: "POST",

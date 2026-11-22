@@ -23,7 +23,7 @@ async function readLimited(req: Request, limit: number): Promise<Uint8Array | un
     }
     parts.push(value);
   }
-  return new Uint8Array(Buffer.concat(parts));
+  return Buffer.concat(parts);
 }
 
 /**
@@ -46,6 +46,9 @@ export async function POST(req: Request) {
   if (Number(req.headers.get("content-length")) > limit) return tooLarge();
   const bytes = await readLimited(req, limit);
   if (!bytes) return tooLarge();
+  // Bildirilen boydan kısa gövde kesilmiştir (yarıda kopan yükleme, proxy'nin gövde sınırı): kesik video saklanmaz.
+  const declared = req.headers.get("content-length");
+  if (declared !== null && Number(declared) !== bytes.length) return apiError(req, msg("api.footage.truncated", { name, got: bytes.length, sent: declared }));
   if (!sniffFootage(bytes.subarray(0, 16), ext)) return apiError(req, msg("api.footage.type", { name }));
   const key = `uploads/footage/${createHash("sha256").update(bytes).digest("hex").slice(0, 24)}.${ext}`;
   await store().put(key, bytes, FOOTAGE_TYPES[ext]);

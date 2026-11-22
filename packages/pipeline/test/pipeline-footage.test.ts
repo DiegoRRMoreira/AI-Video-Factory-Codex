@@ -123,14 +123,15 @@ describe("Stüdyo'dan yüklenenler", () => {
     h.store.map.set("uploads/footage/aaaaaaaaaaaaaaaaaaaaaaaa.mp4", new Uint8Array([1, 2]));
     h.store.map.set("uploads/footage/bbbbbbbbbbbbbbbbbbbbbbbb.jpg", new Uint8Array([3]));
     const state = makeState(
-      { ...input(), footage: { sources: [], narration: true, transcribe: false, texts: [], pending: [{ key: "uploads/footage/aaaaaaaaaaaaaaaaaaaaaaaa.mp4", name: "yol.mp4" }, { key: "uploads/footage/bbbbbbbbbbbbbbbbbbbbbbbb.jpg", name: "foto.jpg" }] } },
+      { ...input(), footage: { sources: [], narration: true, transcribe: false, texts: [], pending: [{ key: "uploads/footage/aaaaaaaaaaaaaaaaaaaaaaaa.mp4", name: "yol.mp4" }, { key: "uploads/footage/bbbbbbbbbbbbbbbbbbbbbbbb.jpg", name: "foto.png" }] } },
     );
     const id = await h.seed(state);
     const done = await h.pipeline.run(id, { only: "story" });
     expect(done.input.footage!.pending).toBeUndefined();
     expect(done.input.footage!.sources.map((s) => [s.id, s.name, s.kind])).toEqual([
       ["f1", "yol.mp4", "video"],
-      ["f2", "foto.jpg", "image"],
+      // Adın uzantısı anahtarınkine uymuyorsa tür anahtardan gelir.
+      ["f2", "foto.png.jpg", "image"],
     ]);
     expect(await h.store.list("uploads/")).toEqual([]);
     expect(Object.keys(done.footageScan!)).toEqual(["f1", "f2"]);

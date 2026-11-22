@@ -163,6 +163,8 @@ export interface CutOptions {
   fps: number;
   /** Kaynak süreye yetmezse yavaşlatma (0.5–1): 0.8 → parça 1/0.8 kat uzun oynar. */
   speed?: number;
+  /** Sonuna eklenecek donmuş son kare (ms): kaynak bitince parça ve geçiş payı yine dolsun. */
+  padMs?: number;
 }
 
 /**
@@ -171,6 +173,7 @@ export interface CutOptions {
  */
 export function cutVideo(file: string, o: CutOptions): Promise<Uint8Array> {
   const speed = o.speed && o.speed < 1 ? `,setpts=PTS/${o.speed}` : "";
+  const pad = o.padMs && o.padMs > 0 ? `,tpad=stop_mode=clone:stop_duration=${sec(o.padMs)}` : "";
   // Remotion'un ffmpeg'inde fps filtresi yok: yedeğe düşmez (normalizeClip gibi).
   return withOutput("cut.mp4", (out) =>
     runMediaTool(
@@ -187,7 +190,7 @@ export function cutVideo(file: string, o: CutOptions): Promise<Uint8Array> {
         file,
         "-an",
         "-vf",
-        `${frameFilter(o.fit, o.focusX, o.width, o.height)}${speed},fps=${o.fps}`,
+        `${frameFilter(o.fit, o.focusX, o.width, o.height)}${speed}${pad},fps=${o.fps}`,
         "-c:v",
         "libx264",
         "-preset",

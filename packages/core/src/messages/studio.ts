@@ -28,6 +28,7 @@ export const STUDIO_MESSAGES = {
   "api.notFound": { tr: "Yok", en: "Not found" },
   "api.footage.type": { tr: "Desteklenmeyen ya da bozuk dosya: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)", en: "Unsupported or damaged file: {name} (mp4, mov, webm, mkv, m4v, jpg, png, webp)" },
   "api.footage.tooLarge": { tr: "Dosya çok büyük: {name} (en çok {mb} MB; YS_FOOTAGE_MAX_MB ile değişir)", en: "File too large: {name} (up to {mb} MB; set YS_FOOTAGE_MAX_MB to change)" },
+  "api.footage.truncated": { tr: "Yükleme eksik geldi: {name} ({got}/{sent} bayt); yeniden yükle", en: "The upload arrived incomplete: {name} ({got}/{sent} bytes); upload it again" },
   "api.footage.uploads": { tr: "1–20 yüklenmiş dosya gerekli (önce dosyaları yükle)", en: "1–20 uploaded files are required (upload the files first)" },
   "api.footage.sec": { tr: "Short süresi 15–180 sn olmalı", en: "A Short must last 15–180 s" },
 } as const;
