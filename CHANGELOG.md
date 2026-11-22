@@ -2,6 +2,11 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.5 (2026-11-22)
+
+- **ACP security:** `YS_ACP_COMMANDS` now lists full command lines, arguments included (semicolon separated, e.g. `claude-code-acp; gemini --experimental-acp`), and an agent runs only on an exact match. Allowing a bare command name let the Models page add any arguments, so an allowed launcher such as `npx` could run anything. If you set `YS_ACP_COMMANDS` for v0.6.4, write each entry with its arguments.
+- An agent call stopped because the agent started using a tool is never retried, whatever the tool is called.
+
 ## v0.6.4 (2026-11-22)
 
 - **ACP security:** the Models page can no longer store an arbitrary program to run. Only the ready-made Antigravity (`agy acp`) definition, or a command listed in `YS_ACP_COMMANDS` in the shell that starts the Studio and the CLI, is accepted; arguments that turn off an agent's permission prompts (`--dangerously-skip-permissions`, `--yolo`, `--auto-approve`…) are always refused. An agent that starts using a tool during a call is stopped, and the prompt marks video titles, transcripts and captions as untrusted data.
