@@ -564,8 +564,12 @@ Ayrı bir bölüm modu (`input.footage`); aşamalar aynı listede kalır, footag
   ölçüm ve bölüme alma işin ilk aşamasında yapılır. Next proxy'den geçen gövdeyi 10 MB'ta sessizce kesiyordu:
   `next.config.ts` sınırı yükleme sınırına çeker, uç nokta `content-length`'ten kısa gövdeyi reddeder (72 MB'lık
   yükleme bayt bayt doğrulandı). CLI: `episode new --footage a.mp4 --footage b.jpg --sec 30`.
-- Açık işler: yerel STT (whisper.cpp) seçeneği, kurgunun Stüdyo'da elle düzeltilmesi (parça sırası, kırpma),
-  footage kareleri için görsel denetim, yalnız video içeren timeline'da küçük resim.
+- Stüdyo'da kurgu onayı senaryo sekmesindedir: vuruşlar, her parçanın taranmış karesi, aralığı, kadrajı, ses kararı,
+  yazılar; anlatım orada düzenlenir. Onay işi önizleme kapısına kadar sürdürür; konsept sekmesi, yeniden çizim ve notla
+  yeniden oluşturma footage'da yoktur. Kapak, render edilmiş Short'un kanca anındaki karesidir (dikey).
+- Yerel STT: `YS_WHISPER` (whisper-cli) ve `YS_WHISPER_MODEL` (ggml modeli) verilirse whisper.cpp ücretsiz olduğu için
+  Scribe'dan önce seçilir (doğrulanmadı).
+- Açık işler: kurgunun Stüdyo'da elle düzeltilmesi (parça sırası, aralık, kırpma), footage kareleri için görsel denetim.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

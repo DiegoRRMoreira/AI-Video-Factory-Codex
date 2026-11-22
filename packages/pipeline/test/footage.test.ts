@@ -8,6 +8,7 @@ import {
   frameTimes,
   normalizePlan,
   overlayTimes,
+  posterMs,
   sourceWords,
   type FootageCut,
   type FootageInput,
@@ -165,6 +166,26 @@ describe("fitCuts", () => {
       [3000, 57000],
     ]);
     expect(cuts[1]).toMatchObject({ speed: FOOTAGE.minSpeed, holdMs: 7000 });
+  });
+});
+
+describe("posterMs", () => {
+  const hook = { text: "K", style: "hook" as const, fromFrame: 0, durationInFrames: 105, position: "top" as const, anim: "kinetic" as const };
+  const v = (fromFrame: number, durationInFrames: number) => ({ shotId: `v${fromFrame}`, assetUrl: "x", kind: "footage" as const, fromFrame, durationInFrames, ambience: "none" as const, playbackRate: 1 });
+
+  it("kanca tam açıkken (bitişinden 0,4 sn önce); kanca yoksa üçte bir", () => {
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [v(0, 450)], overlays: [{ ...hook, style: "label" }, hook] })).toBe(3100);
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [], overlays: [{ ...hook, durationInFrames: 6 }] })).toBe(0);
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [] })).toBe(5000);
+  });
+
+  it("geçişe düşen an: geçiş bitince, kancaya sığmıyorsa geçişten hemen önce", () => {
+    // 3,1 sn ikinci çekimin 0,1 sn'sine düşer; 3,7 kancanın (3,2'ye kadar) dışında: geçişten önce 2,9.
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [v(0, 90), v(90, 360)], overlays: [hook] })).toBe(2900);
+    // Geçiş bitişi kancaya sığıyor: 2,5 + 0,7 = 3,2 sn.
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [v(0, 75), v(75, 375)], overlays: [hook] })).toBe(3200);
+    // Kancasız: üçte birdeki geçiş.
+    expect(posterMs({ fps: 30, durationInFrames: 450, visuals: [v(0, 150), v(150, 300)] })).toBe(5700);
   });
 });
 

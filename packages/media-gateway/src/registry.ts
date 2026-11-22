@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ComfyUiAdapter, type ComfyWorkflowSpec } from "./providers/comfyui.ts";
+import { WhisperCppSttAdapter } from "./providers/whisper.ts";
 import { ElevenLabsMusicAdapter, ElevenLabsSfxAdapter, ElevenLabsSttAdapter, ElevenLabsTtsAdapter } from "./providers/elevenlabs.ts";
 import { FalAdapter } from "./providers/fal.ts";
 import { FAL_MODELS } from "./providers/fal-models.ts";
@@ -181,6 +182,10 @@ export function createProvidersFromEnv(
   } else {
     skipped.push(msg("gw.skip.noKey", { scope: "elevenlabs:*", key: "ELEVENLABS_API_KEY" }));
   }
+
+  // --- Yerel konuşmadan metin (whisper.cpp): ücretsiz, yönlendirici kuruluysa Scribe'dan önce seçer ---
+  if (env.YS_WHISPER && env.YS_WHISPER_MODEL) providers.push(new WhisperCppSttAdapter(env.YS_WHISPER, env.YS_WHISPER_MODEL));
+  else skipped.push(msg("gw.skip.whisper"));
 
   return { providers, skipped };
 }

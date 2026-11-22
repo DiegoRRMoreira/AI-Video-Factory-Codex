@@ -11,7 +11,7 @@ vi.mock("@ys/video/tools", () => ({
   },
 }));
 
-const { cutVideo, extractAudio, FOOTAGE_MEDIA, frameFilter, frameImage, parseProbe, probeMedia, sampleFrame } = await import("../src/footage-media.ts");
+const { cutVideo, extractAudio, FOOTAGE_MEDIA, frameFilter, frameImage, parseProbe, posterFrame, probeMedia, sampleFrame } = await import("../src/footage-media.ts");
 const { footageKindOf, isFootageExt, sniffFootage } = await import("../src/footage.ts");
 
 beforeEach(() => {
@@ -111,6 +111,11 @@ describe("ffmpeg adımları", () => {
     expect(slow!.args).toContain("-an");
     expect(slow!.args.find((a) => a.includes("setpts"))).toMatch(/,setpts=PTS\/0\.75,tpad=stop_mode=clone:stop_duration=1\.500,fps=30$/);
     expect(normal!.args.find((a) => a.includes("fps="))).not.toMatch(/setpts|tpad/);
+  });
+
+  it("kapak karesi tam çözünürlükte, istenen anda", async () => {
+    expect(await posterFrame("v.mp4", 3100)).toEqual(new Uint8Array([7, 7]));
+    expect(calls.list[0]!.args.slice(2, 6)).toEqual(["error", "-ss", "3.100", "-i"]);
   });
 
   it("resim dikey kareye oturur", async () => {

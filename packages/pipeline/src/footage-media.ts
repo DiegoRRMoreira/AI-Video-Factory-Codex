@@ -210,6 +210,11 @@ export function cutVideo(file: string, o: CutOptions): Promise<Uint8Array> {
   );
 }
 
+/** Videodan tam çözünürlüklü tek kare (JPEG): footage Short'unun kapağı. */
+export function posterFrame(file: string, atMs: number): Promise<Uint8Array> {
+  return withOutput("poster.jpg", (out) => runMediaTool("ffmpeg", ["-y", "-v", "error", "-ss", sec(atMs), "-i", file, "-frames:v", "1", "-q:v", "2", out]).then(() => undefined));
+}
+
 /** Resmi dikey kareye oturtur (JPEG); üstüne render'da Ken Burns hareketi gelir. */
 export function frameImage(file: string, o: { focusX: number; fit: Fit; width: number; height: number }): Promise<Uint8Array> {
   return withOutput("still.jpg", (out) =>

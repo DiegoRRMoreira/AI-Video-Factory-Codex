@@ -355,6 +355,26 @@ export function overlayTimes(plan: FootagePlan, cuts: FootageCut[], fps: number)
   });
 }
 
+/** Çekim geçişinin (cutsOf; sahne geçişi 0,6 sn) payı: kapak bu süre içinde alınmaz, iki görüntü karışık görünür. */
+const CUT_CLEAR_MS = 700;
+
+/**
+ * Kapak karesinin anı (ms): kanca yazısı tamamen açık ve henüz kararmamışken (bitişinden 0,4 sn önce); kanca yoksa
+ * Short'un üçte biri. O an bir çekim geçişine düşerse (22 Kas, gerçek render: iki çekim üst üste karışık göründü) geçiş
+ * bittikten sonraki an alınır, kancanın içinde kalmıyorsa geçiş başlamadan hemen önceki an. Shorts kapağı videodan bir
+ * karedir: dikey kalır, başlık zaten kancadadır.
+ */
+export function posterMs(timeline: Pick<Timeline, "fps" | "durationInFrames" | "overlays" | "visuals">): number {
+  const hook = timeline.overlays?.find((o) => o.style === "hook");
+  const total = (timeline.durationInFrames / timeline.fps) * 1000;
+  const until = hook ? ((hook.fromFrame + hook.durationInFrames) / timeline.fps) * 1000 - 300 : total;
+  let t = hook ? until - 100 : total / 3;
+  const v = timeline.visuals.slice(1).find((x) => (x.fromFrame / timeline.fps) * 1000 <= t && t < ((x.fromFrame + x.durationInFrames) / timeline.fps) * 1000);
+  const start = v ? (v.fromFrame / timeline.fps) * 1000 : 0;
+  if (v && t - start < CUT_CLEAR_MS) t = start + CUT_CLEAR_MS <= until ? start + CUT_CLEAR_MS : start - 100;
+  return Math.max(0, Math.round(t));
+}
+
 export interface FootageAssets {
   /** Çekim → kesilmiş görüntünün anahtarı (video parçası ya da dikey resim). */
   visual: Record<string, string>;

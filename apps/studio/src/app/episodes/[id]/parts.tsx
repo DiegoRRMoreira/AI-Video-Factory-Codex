@@ -33,6 +33,8 @@ export const modeOf = (input: { motionMode?: "animated" | "mixed" | "still" | "v
 
 export type Tab = "overview" | "script" | "concept" | "shots" | "costs" | "activity";
 export const TABS: Tab[] = ["overview", "script", "concept", "shots", "costs", "activity"];
+/** Bölümün sekmeleri: footage bölümünde konsept (kadro, karakter seçimi) yok. */
+export const tabsOf = (state: Pick<EpisodeState, "input">): Tab[] => (state.input.footage ? TABS.filter((t) => t !== "concept") : TABS);
 
 /** Aşama şeridindeki gruplar: senaryo ve konsept onay kapılarıyla ayrılır. */
 export const STAGE_GROUPS: { key: "pre" | "prod" | "post"; stages: Stage[] }[] = [

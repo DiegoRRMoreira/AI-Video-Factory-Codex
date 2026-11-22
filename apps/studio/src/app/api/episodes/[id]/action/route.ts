@@ -90,10 +90,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       case "undo-narration-edit":
         await undoNarrationEdit({ id, store: store(), repo: episodes, editId: action.editId, fingerprint: action.fingerprint });
         break;
-      case "approve-script":
-        await episodes.update(id, (s) => approve(s, "script"));
-        startJob(id, "job.concept", ["episode", "run", id, "--until", "concept"]);
+      case "approve-script": {
+        const state = await episodes.update(id, (s) => approve(s, "script"));
+        // Footage bölümünde konsept yok: onaydan sonra ses, kesim ve timeline önizleme onayına kadar sürer.
+        if (state.input.footage) startJob(id, "job.produce", ["episode", "run", id]);
+        else startJob(id, "job.concept", ["episode", "run", id, "--until", "concept"]);
         break;
+      }
       case "revoke-script":
         await episodes.update(id, (s) => revokeApproval(s, "script"));
         break;

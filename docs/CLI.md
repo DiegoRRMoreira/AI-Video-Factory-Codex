@@ -66,7 +66,7 @@ pnpm ys episode new --footage trip.mp4 --footage beach.mov --footage sunrise.jpg
 - `--topic`: optional brief for the editor (default "Short").
 - `--overlay "text"` (repeatable): your on-screen texts, used verbatim; the editor adds a hook and a call to action itself.
 - `--no-narration`: no AI voice-over; the footage, its own sound and the texts carry the Short.
-- `--no-transcribe`: do not transcribe the speech in your videos (ElevenLabs Scribe, about $0.40 per hour of audio, needs `ELEVENLABS_API_KEY`); without it the editor only sees frames and kept speech gets no captions.
+- `--no-transcribe`: do not transcribe the speech in your videos; without it the editor only sees frames and kept speech gets no captions. Transcription uses a local whisper.cpp when `YS_WHISPER` (the `whisper-cli` path) and `YS_WHISPER_MODEL` (a ggml model) are set, free, otherwise ElevenLabs Scribe (about $0.40 per hour of audio, needs `ELEVENLABS_API_KEY`).
 - `--no-captions`, `--voice`, `--lang`, `--budget` (default 5) and `--manual` work as for other episodes.
 
 The stages are: scan (frames and transcript), edit (the `footage-editor` agent picks the parts, the crop and whether
@@ -75,7 +75,9 @@ voice, timing (each beat fits its narration and the target), cut (FFmpeg, 9:16, 
 whole over a blurred copy), timeline (captions, texts, the original sound, music and sound effects), preview gate and
 render. Where narration plays over a part, its own speech drops to a quiet ambience so the two never talk over each
 other. In the Studio, choose **New episode → Short from your footage**; files upload as you pick them (up to 1 GB each,
-`YS_FOOTAGE_MAX_MB` changes it).
+`YS_FOOTAGE_MAX_MB` changes it). The Script tab then shows the edit (each beat's parts with a frame, range, framing and
+sound, the narration to edit, the on-screen texts); approving it cuts and builds the preview, and the Shots tab plays it
+before you approve the render. The cover image is the rendered Short's frame where the hook is fully on screen.
 
 ## Character bank
 

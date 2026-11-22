@@ -122,6 +122,12 @@ describe("changeVoice", () => {
   });
 });
 describe("redrawShots", () => {
+  it("footage çekimleri yeniden çizilmez", () => {
+    const s = baseState();
+    s.input.footage = { sources: [], narration: true, transcribe: true, texts: [] };
+    expect(() => redrawShots(s, ["a"])).toThrow("Footage bölümünde çekim yeniden çizilmez");
+  });
+
   it("kareyi ve klibi siler, seed sayacını artırır, kareden sonrasını geçersiz kılar", () => {
     const s = baseState();
     const shot = { id: "a", sceneId: "s1", kind: "still_motion" as const, startMs: 0, endMs: 1000, description: "", imagePrompt: "", motionPrompt: "", camera: "static" as const };

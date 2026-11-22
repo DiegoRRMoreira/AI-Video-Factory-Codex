@@ -162,6 +162,13 @@ describe("EpisodeView: sekmeler", () => {
     expect(screen.getByRole("tab", { name: tr("tab.script") }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("footage bölümünde konsept sekmesi yok; adresteki konsept sekmesi genel bakışa düşer", async () => {
+    window.location.hash = "#concept";
+    await show(makeData(makeState({}, { footage: { sources: [], narration: true, transcribe: true, texts: [] } })));
+    expect(screen.queryByRole("tab", { name: tr("tab.concept") })).toBeNull();
+    expect(screen.getByRole("tab", { name: tr("tab.overview") }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("aşama şeridinden aşamaya tıklanınca günlük o aşamaya süzülür", async () => {
     await show(makeData(makeState({ activity })));
     const disclosure = screen.getByText(new RegExp(tr("next.details"))).closest("details")!;

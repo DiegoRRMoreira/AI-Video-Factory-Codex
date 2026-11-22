@@ -403,6 +403,10 @@ export const PIPELINE_MESSAGES = {
   "err.action.conceptApproved": { tr: "Konsept onaylandı; hareket modu değiştirilemez", en: "The concept is approved; the motion mode cannot be changed" },
   "err.action.noShots": { tr: "Yeniden çizilecek çekim yok", en: "No shots to redraw" },
   "err.action.noNote": { tr: "Ne değişsin? Bir not yazın", en: "What should change? Write a note" },
+  "err.action.footage": {
+    tr: "Footage bölümünde çekim yeniden çizilmez: kurguyu değiştirmek için senaryo onayını geri al",
+    en: "Footage shots are not redrawn: revoke the script approval to change the edit",
+  },
   "err.action.replanVector": {
     tr: "Notla yeniden oluşturma yalnız vektör bölümlerde; görsel modda yeniden çizimi kullanın",
     en: "Re-creating with a note works only for vector episodes; use redraw in image mode",

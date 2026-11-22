@@ -46,6 +46,7 @@ describe("createProvidersFromEnv", () => {
         "fal:* (FAL_KEY yok)",
         "gemini:* (GEMINI_API_KEY yok)",
         "elevenlabs:* (ELEVENLABS_API_KEY yok)",
+        "local:whisper (YS_WHISPER veya YS_WHISPER_MODEL yok)",
       ],
     });
   });
@@ -57,6 +58,7 @@ describe("createProvidersFromEnv", () => {
       "fal:* (no FAL_KEY)",
       "gemini:* (no GEMINI_API_KEY)",
       "elevenlabs:* (no ELEVENLABS_API_KEY)",
+      "local:whisper (no YS_WHISPER or YS_WHISPER_MODEL)",
     ]);
     const veo = rawEnv({ GEMINI_API_KEY: "g", GEMINI_VEO_MODEL: "veo-x" }, empty).providers.find((p) => p.id === "gemini:veo")!;
     expect(formatText("en", veo.priceSource!.note)).toBe("Unverified: Veo is no longer on the pricing page (preview shut down)");

@@ -151,6 +151,8 @@ import {
 import { existingSamples, loadStyleSamples, SAMPLE_BRIEF, STYLE_SAMPLES_ID, STYLE_SAMPLES_KEY, type StyleSample, type StyleSamples } from "./samples.ts";
 import { shortRange, shortTimeline } from "./short.ts";
 import { addFootageSources, checkFootageInput, footageStages } from "./footage-stages.ts";
+import { posterMs } from "./footage.ts";
+import { posterFrame } from "./footage-media.ts";
 import { buildTimeline, clipSeconds, resolveShotTimes, sceneOffsets, toSrt } from "./timing.ts";
 import { assignReverseViews, reverseCandidates, varyShotSizes } from "./variety.ts";
 import { withKey } from "./key-prop.ts";
@@ -3250,6 +3252,18 @@ export class EpisodePipeline {
         this.log(msg("log.package.done", { path: file }));
       } catch (e) {
         this.log(msg("log.package.failed", { error: errorText(e) }));
+      }
+      // Footage Short'unun kapağı videonun kendi karesidir (dikey, kanca yazısıyla); yatay küçük resim çizilmez.
+      if (state.input.footage) {
+        try {
+          const output = join(dir, `${state.id}.jpg`);
+          await writeFile(output, await posterFrame(render.path, posterMs(timeline)));
+          render.thumbnail = output;
+          this.log(msg("log.thumbnail.done", { path: output }));
+        } catch (e) {
+          this.log(msg("log.thumbnail.failed", { error: errorText(e) }));
+        }
+        return;
       }
       // Küçük resim (yerel, ücretsiz): çıkarılamazsa video yine hazırdır.
       const pick = thumbnailShot(timeline);

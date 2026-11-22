@@ -20,7 +20,7 @@ vi.mock("../src/media.ts", async (orig) => {
 });
 
 /** ffmpeg adımları sahte: ölçüler dosya adından, çıktılar küçük baytlar. */
-const ff = vi.hoisted(() => ({ cuts: [] as { file: string; o: Record<string, unknown> }[], audio: [] as Record<string, unknown>[], stills: 0 }));
+const ff = vi.hoisted(() => ({ cuts: [] as { file: string; o: Record<string, unknown> }[], audio: [] as Record<string, unknown>[], stills: 0, posters: [] as number[], posterFail: false }));
 vi.mock("../src/footage-media.ts", async (orig) => ({
   ...(await orig<object>()),
   probeMedia: async (file: string, kind: "video" | "image") =>
@@ -37,6 +37,11 @@ vi.mock("../src/footage-media.ts", async (orig) => ({
   frameImage: async () => {
     ff.stills++;
     return new Uint8Array([4]);
+  },
+  posterFrame: async (_file: string, atMs: number) => {
+    if (ff.posterFail) throw new Error("kare yok");
+    ff.posters.push(atMs);
+    return new Uint8Array([5]);
   },
 }));
 
@@ -90,6 +95,8 @@ beforeEach(() => {
   ff.cuts = [];
   ff.audio = [];
   ff.stills = 0;
+  ff.posters = [];
+  ff.posterFail = false;
   onAgent("footageEditor", () => EDIT);
 });
 
@@ -205,8 +212,14 @@ describe("footage hattı", () => {
     expect(media.normalize).not.toHaveBeenCalled();
     expect(render.episode).toHaveBeenCalledTimes(1);
     expect(state.done.review).toBeTruthy();
-    // Dikey bölümde ayrı Short yok.
+    // Dikey bölümde ayrı Short yok; kapak videonun kanca anındaki karesi.
     expect(state.short).toBeUndefined();
+    expect(ff.posters).toHaveLength(1);
+    expect(state.render!.thumbnail).toMatch(/\.jpg$/);
+    expect(render.thumbnail).not.toHaveBeenCalled();
+    ff.posterFail = true;
+    await h.pipeline.run(id, { only: "package" });
+    expect(h.logs.some((l) => l.includes("kare yok"))).toBe(true);
   });
 
   it("onaylı akış: kurgu onayında durur, konsept kapısı yok, önizleme onayında durur", async () => {

@@ -14,7 +14,7 @@ import { useI18n } from "../../locale-provider";
 import { ActivityLine, ActivityTab } from "./activity";
 import { CostsTab } from "./costs-panel";
 import { OverviewTab } from "./overview";
-import { Badge, Bar, gateTab, modeOf, nextWork, STAGE_GROUPS, STATUS_TONE, StatusIcon, stageKey, TABS, type Act, type Tab } from "./parts";
+import { Badge, Bar, gateTab, modeOf, nextWork, STAGE_GROUPS, STATUS_TONE, StatusIcon, stageKey, TABS, tabsOf, type Act, type Tab } from "./parts";
 import { ConceptTab, ScriptTab, ShotsTab } from "./steps";
 
 export function EpisodeView({ id }: { id: string }) {
@@ -154,9 +154,10 @@ export function EpisodeView({ id }: { id: string }) {
   if (!data) return connection ?? <p className="text-muted">{t("common.loading")}</p>;
   const { state, status } = data;
   const busy = pending || status.status === "running" || data.job?.status === "running";
-  // Sekme seçilmediyse bölümün durumuna göre en anlamlı olanı aç.
+  const tabs = tabsOf(state);
+  // Sekme seçilmediyse (ya da bu bölümde yoksa: footage'da konsept) bölümün durumuna göre en anlamlı olanı aç.
   const active: Tab =
-    tab ??
+    (tab && tabs.includes(tab) ? tab : undefined) ??
     (status.status === "waiting"
       ? gateTab(status.stage)
       : status.status === "running"
@@ -180,7 +181,7 @@ export function EpisodeView({ id }: { id: string }) {
 
       <section className="card min-w-0 p-0">
         <nav className="flex gap-1 overflow-x-auto border-b border-line px-3" role="tablist">
-          {TABS.map((k) => (
+          {tabs.map((k) => (
             <button
               key={k}
               role="tab"
@@ -190,9 +191,9 @@ export function EpisodeView({ id }: { id: string }) {
               aria-selected={active === k}
               onClick={() => setTab(k)}
               onKeyDown={e => {
-                const next = e.key === "ArrowRight" ? (TABS.indexOf(k) + 1) % TABS.length : e.key === "ArrowLeft" ? (TABS.indexOf(k) + TABS.length - 1) % TABS.length : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : undefined;
+                const next = e.key === "ArrowRight" ? (tabs.indexOf(k) + 1) % tabs.length : e.key === "ArrowLeft" ? (tabs.indexOf(k) + tabs.length - 1) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : undefined;
                 if (next === undefined) return;
-                e.preventDefault(); setTab(TABS[next]!); e.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]!.focus();
+                e.preventDefault(); setTab(tabs[next]!); e.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]!.focus();
               }}
               className={`relative shrink-0 cursor-pointer px-3 py-3 text-sm transition ${active === k ? "text-white" : "text-muted hover:text-white"}`}
             >

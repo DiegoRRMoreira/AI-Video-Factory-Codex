@@ -53,6 +53,7 @@ export const GATEWAY_MESSAGES = {
   // Kurulmayan sağlayıcılar (Fiyatlar sayfası, CLI).
   "gw.skip.comfyFile": { tr: "comfy:{id} (workflow dosyası yok: {file})", en: "comfy:{id} (workflow file missing: {file})" },
   "gw.skip.comfy": { tr: "comfy:* (COMFYUI_URL veya manifest.json yok)", en: "comfy:* (no COMFYUI_URL or manifest.json)" },
+  "gw.skip.whisper": { tr: "local:whisper (YS_WHISPER veya YS_WHISPER_MODEL yok)", en: "local:whisper (no YS_WHISPER or YS_WHISPER_MODEL)" },
   "gw.skip.unverified": {
     tr: "{id} (doğrulanmadı; FAL_ENABLE_UNVERIFIED=1 ile aç)",
     en: "{id} (unverified; enable with FAL_ENABLE_UNVERIFIED=1)",

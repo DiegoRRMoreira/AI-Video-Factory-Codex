@@ -208,6 +208,8 @@ export function setMotion(state: EpisodeState, motionMode: MotionMode, aiClipRat
  * Her yeniden çizim yeni bir seed alır, yoksa aynı istek önbellekten aynı kareyi döndürürdü.
  */
 export function redrawShots(state: EpisodeState, shotIds: string[]): void {
+  // Footage çekimleri kullanıcının görüntüsüdür: yeniden çizilecek kare yok (kurgu, senaryo onayı geri alınarak değişir).
+  if (state.input.footage) throw new LocalizedError(msg("err.action.footage"));
   const known = new Set(state.shots?.map((s) => s.id));
   const ids = shotIds.filter((id) => known.has(id));
   if (ids.length === 0) throw new LocalizedError(msg("err.action.noShots"));
