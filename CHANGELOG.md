@@ -2,6 +2,17 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.6 (2026-11-22)
+
+- **Motion-graphics films:** a new episode kind with no people and no drawings. A director agent writes a rhythm sheet (hook, build, stop, peak, resolve) and scenes measured in beats: kinetic type (slams, mask rises, word by word, chapter counters, a highlight pill), data (bars from zero, a line drawn to its point, a counter), system diagrams (edges drawing on, packets on the beat), card grids and full-frame montages cut on the beat, particle fields and 3D objects with your logo. Code draws every frame; transitions (cut, flash, colour flip, flood, iris, whip, push-through), the camera, a synthesized score that follows the rhythm sheet and the sound effects all share the film's tempo.
+- The plan is checked in code: a hook within 3 s, a burst of cuts near the middle, no more than two bars without something new, readable text. Scenes are lengthened until their text reads; other findings go back to the director once. Chart values, counters and card figures come only from your brief; any other number is shown with an "illustrative data" badge.
+- Studio: **New episode → Motion-graphics film** (brief, length, 16:9 or 9:16, brand colours, logo and screenshots, optional narration). The Script tab shows the rhythm sheet and scenes, with **Remake with a note**.
+- CLI: `pnpm ys episode new --film --topic "…" [--sec 30] [--vertical] [--color "#2563eb"] [--asset logo.png] [--narration]`. Without narration no paid API is used. Preview fixture: `pnpm motion:film`.
+- Tried on a real brief with Gemini 4 Neon through agy: a 14-scene, 32-second film at 120 BPM with no check findings, rendered with its package and a vertical Short.
+- Fixed: the Script tab of a footage Short showed the plain scene list instead of the edit (its data was not sent with the tab), and footage Shorts and YouTube analyses were labelled "Living stills + effects"; they are now named by kind.
+
+After updating, rebuild and restart the Studio: `pnpm studio:build && pnpm studio:start`.
+
 ## v0.6.5 (2026-11-22)
 
 - **ACP security:** `YS_ACP_COMMANDS` now lists full command lines, arguments included (semicolon separated, e.g. `claude-code-acp; gemini --experimental-acp`), and an agent runs only on an exact match. Allowing a bare command name let the Models page add any arguments, so an allowed launcher such as `npx` could run anything. If you set `YS_ACP_COMMANDS` for v0.6.4, write each entry with its arguments.
