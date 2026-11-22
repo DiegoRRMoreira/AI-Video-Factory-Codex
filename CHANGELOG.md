@@ -2,6 +2,12 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.4 (2026-11-22)
+
+- **ACP security:** the Models page can no longer store an arbitrary program to run. Only the ready-made Antigravity (`agy acp`) definition, or a command listed in `YS_ACP_COMMANDS` in the shell that starts the Studio and the CLI, is accepted; arguments that turn off an agent's permission prompts (`--dangerously-skip-permissions`, `--yolo`, `--auto-approve`…) are always refused. An agent that starts using a tool during a call is stopped, and the prompt marks video titles, transcripts and captions as untrusted data.
+- A YouTube download that fails with HTTP 403 is retried once.
+- CI: a platform-dependent branch in the ACP spawn kept branch coverage at 99.99% on Linux; it is now tested on every platform.
+
 ## v0.6.3 (2026-11-22)
 
 - **Shorts from a YouTube video:** paste the address of a video you own or may use. It is downloaded once (yt-dlp, up to 1080p, kept in the library), its captions, chapters and replay graph are read, its scenes, frames and long silences measured, and an analyst goes through it a few minutes at a time with contact sheets and the transcript. You get a scene log, what a tighter edit would cut, and ranked Short candidates fitted to word boundaries. The candidates you pick become vertical footage Shorts with the original speech as captions and the hook on screen; an interrupted analysis resumes where it stopped.
