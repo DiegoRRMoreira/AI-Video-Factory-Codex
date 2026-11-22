@@ -14,6 +14,7 @@ import type { MessageKey } from "../../../lib/i18n";
 import type { EpisodeResponse } from "../../../lib/types";
 import { VOICES } from "../../../lib/voices";
 import { useI18n } from "../../locale-provider";
+import { kindLabel } from "../../../lib/episode-kind";
 import { asset, Bar, Stat, modeOf, type Act } from "./parts";
 
 export function OverviewTab({ data, busy = false, act, onInspectIssue, onScene }: { data: EpisodeResponse; busy?: boolean; act?: Act; onInspectIssue?: (issue: QualityIssue) => void; onScene?: (id: string) => void }) {
@@ -292,11 +293,12 @@ function Facts({ data }: { data: EpisodeResponse }) {
     [t("fact.topic"), input.topic],
     [t("fact.lang"), input.lang.toUpperCase()],
     [t("fact.target"), fmt.duration(input.targetSec)],
-    [t("fact.motion"), t(`motion.${mode}` as MessageKey)],
+    [t("fact.motion"), t(kindLabel(input))],
     ...(pack ? [[t("fact.pack"), pack.name[locale]] as [string, ReactNode]] : []),
     ...(mode === "vector" ? [[t("fact.line"), t(`line.${input.lineStyle ?? pack?.lineStyle ?? "outline"}` as MessageKey)] as [string, ReactNode]] : []),
     [t("fact.tier"), t(`form.tier.${input.tier}` as MessageKey)],
-    [t("fact.voice"), voice ? t(voice.label) : (state.voiceProviderId ?? "—")],
+    // Anlatımsız film ve footage Short'unda ses yok.
+    [t("fact.voice"), (input.motion && !input.motion.narration) || (input.footage && !input.footage.narration) ? "—" : voice ? t(voice.label) : (state.voiceProviderId ?? "—")],
     ...(typography ? [[t("fact.typography"), `${typography.heading.family} / ${typography.body.family}`] as [string, ReactNode]] : []),
     [t("fact.created"), fmt.date(state.createdAt)],
     [

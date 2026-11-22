@@ -35,6 +35,33 @@ export function emOf(face: { id: string; generic: string }): number {
   return face.generic === "serif" ? 0.57 : 0.58;
 }
 
+/**
+ * Dikey karede satırlar kelime sınırından kayar: tek satıra sığdırmak yatay için yazılmış uzun satırı çok küçültüyordu
+ * (gerçek filmin Short'unda "27 dakika beklemek mi?" ~60 px kaldı). En büyük boydan başlayıp %4 küçülterek, en uzun
+ * kelime genişliğe ve kaymış satırların toplam yüksekliği kutuya sığana kadar iner (en az 24 px).
+ */
+export function fitWrapped(lines: readonly string[], width: number, height: number, max: number, perChar: number, lineHeight = 1.12): number {
+  for (let size = max; size > 24; size *= 0.96) {
+    const char = size * perChar;
+    let rows = 0;
+    let fits = true;
+    for (const line of lines) {
+      let used = 0;
+      rows++;
+      for (const word of line.split(/\s+/).filter(Boolean)) {
+        const w = word.length * char;
+        if (w > width) fits = false;
+        if (used && used + char + w > width) {
+          rows++;
+          used = w;
+        } else used += (used ? char : 0) + w;
+      }
+    }
+    if (fits && rows * size * lineHeight <= height) return Math.round(size);
+  }
+  return 24;
+}
+
 /** Uzun dikey metinde satır başına sığan yazı boyu (px): en uzun satır kutunun genişliğine sığar. */
 export function fitSize(lines: readonly string[], width: number, max: number, perChar: number): number {
   const longest = Math.max(1, ...lines.map((l) => l.length));

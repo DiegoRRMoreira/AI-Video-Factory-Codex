@@ -1,4 +1,5 @@
 import type { Timeline } from "@ys/core";
+import { clipSections } from "./motion.ts";
 
 /**
  * Bölümden dikey Short: ardışık sahnelerden oluşan bir aralık 9:16 olarak yeniden render edilir (API yok). Aralığı
@@ -68,5 +69,7 @@ export function shortTimeline(timeline: Timeline, fromMs: number, toMs: number):
     audio: timeline.audio.filter((a) => a.role === "voice").flatMap(clip),
     captions: words(timeline.captions),
     speech: words(timeline.speech),
+    // Film: müzik aralığın kendi ritim çizelgesiyle yeniden üretilir.
+    ...(timeline.motion ? { motion: { ...timeline.motion, sections: clipSections(timeline.motion.sections, timeline.motion.bpm, fromMs, toMs) } } : {}),
   };
 }

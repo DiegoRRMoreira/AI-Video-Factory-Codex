@@ -21,9 +21,10 @@ export function panelPayload(data: EpisodeResponse, panel: EpisodePanel): Episod
   };
   const fields: Record<EpisodePanel, (keyof typeof s)[]> = {
     overview: ["render", "short", "package", "review", "draftReview", "voice", "style", "shots", "keyframes", "stills", "voiceAudit", "styleReference", "scriptNotes", "voiceProviderId"],
-    script: ["script", "scriptNotes", "voice", "pronunciations", "pronunciationOverrides", "pronunciationPlan", "narrationEdit", "voiceAudit"],
+    // Footage kurgusu ve hareketli grafik filmi senaryo sekmesinde çizilir (22 Kas: bu alanlar gitmiyordu, sekme düz sahne listesine düşüyordu).
+    script: ["script", "scriptNotes", "voice", "pronunciations", "pronunciationOverrides", "pronunciationPlan", "narrationEdit", "voiceAudit", "footagePlan", "footageCuts", "footageScan", "footageCheck", "motionFilm", "motionLint"],
     concept: ["cast", "concept", "style", "assetChecks", "figurePreviews", "sideViews", "backgroundViews"],
-    shots: ["shots", "keyframes", "stills", "clips", "draftReview", "review", "style", "qa", "archives", "replans", "render", "short", "voiceAudit", "script", "cast", "vectorProps"],
+    shots: ["shots", "keyframes", "stills", "clips", "draftReview", "review", "style", "qa", "archives", "replans", "render", "short", "voiceAudit", "script", "cast", "vectorProps", "footageCuts", "footageScan"],
     costs: [], activity: ["activity"], youtube: ["youtube"],
   };
   for (const key of fields[panel]) if (key in s) Object.assign(base, { [key]: s[key] });

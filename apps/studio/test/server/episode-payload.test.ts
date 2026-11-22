@@ -46,6 +46,15 @@ it("projects panels without mutating the source or transmitting unrelated shots/
   expect(overview.state.shots).toHaveLength(1); expect(overview.state.voice!.s1!.words).toEqual([]);
   expect(overview.state.voice!.s1!.durationMs).toBe(1000); expect(overview.state.scriptNotes).toEqual(["Doctor note"]);
 });
+it("sends the footage edit and the motion film with the script panel, footage frames with the shots panel", () => {
+  const original = data();
+  Object.assign(original.state, { footagePlan: { beats: [] }, footageCuts: [{ id: "b1-sh1" }], footageScan: { f1: { frames: [] } }, footageCheck: {}, motionFilm: { scenes: [] }, motionLint: [] });
+  const script = panelPayload(original, "script").state;
+  expect([script.footagePlan, script.footageCuts, script.footageScan, script.footageCheck, script.motionFilm, script.motionLint]).not.toContain(undefined);
+  const shots = panelPayload(original, "shots").state;
+  expect([shots.footageCuts, shots.footageScan]).not.toContain(undefined);
+  expect(shots.motionFilm).toBeUndefined();
+});
 it("handles an unproduced episode with no optional data or job", () => {
   const original = data(); original.state = { id: "empty", createdAt: "now", input: original.state.input, done: {}, agentCostUsd: 0 }; original.job = null;
   for (const panel of ["overview", "activity", "script"] as EpisodePanel[]) {

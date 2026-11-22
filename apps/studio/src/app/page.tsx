@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { statusLabel } from "../lib/status";
-import { motionModeOf, sameSeries, seriesOf, STAGES, summarizeSeries, summaryStatus, type EpisodeSummary, type RunStatus } from "@ys/pipeline/light";
+import { sameSeries, seriesOf, STAGES, summarizeSeries, summaryStatus, type EpisodeSummary, type RunStatus } from "@ys/pipeline/light";
 import { stylePackOf } from "@ys/core/styles";
 import { episodeStyle, filterLibrary, libraryCosts, libraryFilters, libraryHref, libraryQueue, LIBRARY_QUEUES, LIBRARY_STATUSES, type LibraryParams } from "../lib/library";
 import { Film, Plus } from "lucide-react";
 import type { MessageKey } from "../lib/i18n";
+import { kindLabel } from "../lib/episode-kind";
 import { getI18n } from "../lib/locale";
 import { ledgerEntries, repo } from "../lib/server";
 import { Badge } from "./episodes/[id]/parts";
@@ -131,7 +132,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Lib
                         {seriesOf(e) && filter === undefined && <div className="text-[11px] font-medium text-accent">{seriesOf(e)}</div>}
                         <div className="break-words font-medium">{e.title ?? e.input.topic}</div>
                         <div className="mt-1 text-xs text-muted">
-                          {e.input.lang.toUpperCase()} · {fmt.duration(e.input.targetSec)} · {t(`motion.${motionModeOf(e.input)}` as MessageKey)} ·{" "}
+                          {e.input.lang.toUpperCase()} · {fmt.duration(e.input.targetSec)} · {t(kindLabel(e.input))} ·{" "}
                           {fmt.date(e.createdAt)}
                         </div>
                         {queue && <p className="mt-1 text-xs text-accent">{t(`library.queue.${queue}`)}</p>}

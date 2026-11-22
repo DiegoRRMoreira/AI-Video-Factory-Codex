@@ -191,6 +191,41 @@ export function describeScene(s: MotionScene): string {
   return `${s.language}: ${head}`;
 }
 
+/**
+ * Filmin kapak karesi (ms): ilk kinetik yazı sahnesinin sonuna doğru, yazılar oturmuşken (yoksa ilk sahnenin); kapak
+ * render edilmiş videonun kendi karesidir (vektör küçük resmi film sahnesi çizemez).
+ */
+export function filmPosterMs(timeline: Pick<Timeline, "fps" | "visuals">): number {
+  const v = timeline.visuals.find((x) => x.film?.language === "kinetic") ?? timeline.visuals[0]!;
+  return Math.round(((v.fromFrame + v.durationInFrames * 0.85) / timeline.fps) * 1000);
+}
+
+/**
+ * Film sahnelerinin başlangıçları (ms), timeline'dan: sahne uzunluğu vuruştan gelir, seslendirmeden değil (anlatımsız
+ * filmde sceneOffsets bütün sahneleri 0'a koyuyordu; Short "m12–m14" diye filmin ilk 28 sn'sini kesti, bölüm zamanları
+ * da yanlıştı).
+ */
+export function filmOffsets(timeline: Pick<Timeline, "fps" | "visuals">): Record<string, number> {
+  return Object.fromEntries(timeline.visuals.map((v) => [v.shotId, Math.round((v.fromFrame / timeline.fps) * 1000)]));
+}
+
+/**
+ * Short aralığının ritim çizelgesi: yalnız aralıkla örtüşen bölümler, aralığın başından ölçülür (ilk ve son bölüm
+ * örtüştüğü kadar). Bütün filmin çizelgesi Short'ta baştan çalınca duruşun sessizliği yanlış yere düşüyordu.
+ */
+export function clipSections(sections: MotionFilm["sections"], bpm: number, fromMs: number, toMs: number): MotionFilm["sections"] {
+  const barMs = (MOTION_FILM.beatsPerBar * 60000) / bpm;
+  const [start, end] = [fromMs / barMs, toMs / barMs];
+  const out: MotionFilm["sections"] = [];
+  let at = 0;
+  for (const s of sections) {
+    const overlap = Math.min(end, at + s.bars) - Math.max(start, at);
+    if (overlap > 1e-6) out.push({ ...s, bars: Math.max(1, Math.round(overlap)) });
+    at += s.bars;
+  }
+  return out;
+}
+
 export interface FilmTimelineInput {
   episodeId: string;
   lang: LanguageCode;

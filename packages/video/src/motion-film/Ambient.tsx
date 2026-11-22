@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Img } from "remotion";
 import { PixiParticles } from "../PixiParticles.tsx";
 import { Scene3D } from "../Scene3D.tsx";
-import { fileSrc, fitSize, type PartProps } from "./context.ts";
+import { fileSrc, fitSize, fitWrapped, type PartProps } from "./context.ts";
 import { enterK } from "./timing.ts";
 
 /** Hex → Pixi renk sayısı. */
@@ -56,7 +56,7 @@ export function Object3D(p: PartProps) {
 function Titles({ p, title, sub, y, skipFirst }: { p: PartProps; title?: string; sub?: string; y: number; skipFirst?: boolean }) {
   const lines = [title, sub].filter((x): x is string => !!x);
   if (!lines.length) return null;
-  const size = fitSize([title ?? sub!], p.box.w, p.height > p.width ? 96 : 112, p.heading.em);
+  const size = p.height > p.width ? fitWrapped([title ?? sub!], p.box.w, p.box.h * 0.3, 96, p.heading.em) : fitSize([title ?? sub!], p.box.w, 112, p.heading.em);
   let n = skipFirst ? 1 : 0;
   return (
     <div style={{ position: "absolute", left: p.box.x, width: p.box.w, top: p.box.y + p.box.h * y, transform: "translateY(-50%)", textAlign: "center", color: p.colors.fg }}>

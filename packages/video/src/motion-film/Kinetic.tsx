@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fitSize, type PartProps } from "./context.ts";
+import { fitSize, fitWrapped, type PartProps } from "./context.ts";
 import { enterK, expoOut, FILM, wordsOf } from "./timing.ts";
 
 /**
@@ -11,7 +11,8 @@ export function Kinetic(p: PartProps) {
   const k = p.scene.kinetic!;
   const { box, colors, heading, frame, fps, enters } = p;
   const tall = p.height > p.width;
-  const size = fitSize(k.lines, box.w, tall ? 170 : 220, heading.em);
+  // Dikeyde satırlar kayar (fitWrapped), yatayda her satır tek satıra sığar.
+  const size = tall ? fitWrapped(k.lines, box.w, box.h * 0.8, 170, heading.em) : fitSize(k.lines, box.w, 220, heading.em);
   const font = { fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.08, letterSpacing: "-0.02em" };
 
   if (k.mode === "chapter") {
@@ -19,7 +20,7 @@ export function Kinetic(p: PartProps) {
     const total = String(k.chapter?.total ?? k.chapter?.index ?? 1).padStart(2, "0");
     const q = enterK(frame, enters[0]!, fps);
     // Bölüm kartı: etiket satırları kutuya sığar, sayaç onun 2,6 katı (kutuyu aşmadan).
-    const lineSize = fitSize(k.lines, box.w, tall ? 110 : 130, heading.em);
+    const lineSize = tall ? fitWrapped(k.lines, box.w, box.h * 0.45, 110, heading.em) : fitSize(k.lines, box.w, 130, heading.em);
     const counter = Math.min(lineSize * 2.6, box.w * 0.42);
     return (
       <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, display: "flex", flexDirection: "column", justifyContent: "center", color: colors.fg }}>

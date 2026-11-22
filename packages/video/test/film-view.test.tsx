@@ -280,6 +280,7 @@ describe("kalan dallar", () => {
     expect(draw(kinetic("chapter"), 100).querySelector("[data-chapter]")).not.toBeNull();
     expect(draw(grid("montage"), 0).querySelector("[data-montage]")).not.toBeNull();
     expect(draw(field(), 100).querySelectorAll("[data-rise]").length).toBe(2);
+    expect(draw(field({ field: { kind: "sparks", subtitle: "Only" } }), 100).querySelectorAll("[data-rise]").length).toBe(1);
     clock.width = 1920;
     clock.height = 1080;
     expect(draw(kinetic("words"), 200).querySelectorAll("[data-word]").length).toBe(5);

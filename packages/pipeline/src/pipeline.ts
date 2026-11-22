@@ -154,7 +154,7 @@ import { shortRange, shortTimeline } from "./short.ts";
 import { addFootageSources, checkFootageInput, footageStages } from "./footage-stages.ts";
 import { youtubeStages } from "./youtube-stages.ts";
 import { addMotionImage, checkMotionInput, motionStages } from "./motion-stages.ts";
-import type { MotionInput } from "./motion.ts";
+import { filmOffsets, filmPosterMs, type MotionInput } from "./motion.ts";
 import { createYoutubeShorts } from "./youtube-shorts.ts";
 import type { YoutubeInput } from "./youtube.ts";
 import { posterMs } from "./footage.ts";
@@ -3291,7 +3291,7 @@ export class EpisodePipeline {
       const durationSec = timeline.durationInFrames / timeline.fps;
       let thumbnailText = thumbnailTitle(story.title);
       const ids = script.scenes.map((s) => s.id);
-      const starts = Object.entries(sceneOffsets(ids, voice)).map(([id, ms]) => [id, ms / 1000] as const);
+      const starts = Object.entries(state.input.motion ? filmOffsets(timeline) : sceneOffsets(ids, voice)).map(([id, ms]) => [id, ms / 1000] as const);
       // Sahne süresi: sonraki sahnenin başına (sonuncusu videonun sonuna) kadar; ajan Short aralığını buna göre seçer.
       const sceneSec = Object.fromEntries(starts.map(([id, at], i) => [id, (starts[i + 1]?.[1] ?? durationSec) - at]));
       try {
@@ -3306,11 +3306,12 @@ export class EpisodePipeline {
       } catch (e) {
         this.log(msg("log.package.failed", { error: errorText(e) }));
       }
-      // Footage Short'unun kapağı videonun kendi karesidir (dikey, kanca yazısıyla); yatay küçük resim çizilmez.
-      if (state.input.footage) {
+      // Footage Short'unun kapağı videonun kendi karesidir (dikey, kanca yazısıyla); yatay küçük resim çizilmez. Filmin
+      // kapağı da kendi karesidir: küçük resim kompozisyonu film sahnesini çizemez.
+      if (state.input.footage || state.input.motion) {
         try {
           const output = join(dir, `${state.id}.jpg`);
-          await writeFile(output, await posterFrame(render.path, posterMs(timeline)));
+          await writeFile(output, await posterFrame(render.path, state.input.motion ? filmPosterMs(timeline) : posterMs(timeline)));
           render.thumbnail = output;
           this.log(msg("log.thumbnail.done", { path: output }));
         } catch (e) {
@@ -3340,7 +3341,7 @@ export class EpisodePipeline {
       const dir = resolve(this.deps.workDir, state.id);
       const publicDir = join(dir, "public");
       const ids = script.scenes.map((s) => s.id);
-      const range = shortRange(ids, sceneOffsets(ids, voice), (timeline.durationInFrames / timeline.fps) * 1000, state.package?.short);
+      const range = shortRange(ids, state.input.motion ? filmOffsets(timeline) : sceneOffsets(ids, voice), (timeline.durationInFrames / timeline.fps) * 1000, state.package?.short);
       const short = shortTimeline(timeline, range.fromMs, range.toMs);
       // Short ek çıktıdır: üretilemezse bölüm yine hazırdır.
       try {

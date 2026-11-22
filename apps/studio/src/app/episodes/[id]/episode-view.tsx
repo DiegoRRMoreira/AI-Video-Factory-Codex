@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorKey } from "../../../lib/errors";
 import type { MessageKey } from "../../../lib/i18n";
+import { kindLabel } from "../../../lib/episode-kind";
 import type { EpisodeResponse, EpisodeStatusResponse } from "../../../lib/types";
 import { useI18n } from "../../locale-provider";
 import { ActivityLine, ActivityTab } from "./activity";
@@ -267,7 +268,6 @@ function SeriesTag({ series, act }: { series?: string; act: Act }) {
 function Header({ data, act }: { data: EpisodeResponse; act: Act }) {
   const { t, fmt } = useI18n();
   const { state, spentUsd, claudeUsd, status } = data;
-  const mode = modeOf(state.input);
   const pct = Math.min(100, (spentUsd / state.input.budgetUsd) * 100);
   return (
     <div className="grid gap-3">
@@ -283,7 +283,7 @@ function Header({ data, act }: { data: EpisodeResponse; act: Act }) {
           </div>
           <p className="mt-1.5 flex flex-wrap gap-x-2 text-sm text-muted">
             <span>{state.input.lang.toUpperCase()}</span>·<span>{fmt.duration(state.input.targetSec)}</span>·
-            <span>{t(`motion.${mode}` as MessageKey)}</span>·<span>{t(`form.tier.${state.input.tier}` as MessageKey)}</span>
+            <span>{t(kindLabel(state.input))}</span>·<span>{t(`form.tier.${state.input.tier}` as MessageKey)}</span>
           </p>
         </div>
         <div className="w-full text-sm sm:w-60 sm:text-right">

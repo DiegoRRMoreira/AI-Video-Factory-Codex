@@ -288,6 +288,22 @@ describe("OverviewTab", () => {
     expect(act).toHaveBeenLastCalledWith({ type: "resume" });
   });
 
+  it("film, footage ve YouTube bölümü kendi türüyle anılır; anlatımsız filmde ve footage'da ses yok", () => {
+    const film = makeState({ voiceProviderId: "gemini-tts" }, { voiceId: "x", motion: { colors: [], images: [], narration: false } } as never);
+    const { rerender } = renderIn(<OverviewTab data={makeData(film)} />);
+    expect(screen.getByText(tr("film.tab"))).toBeTruthy();
+    expect(screen.queryByText("gemini-tts")).toBeNull();
+    rerender(<OverviewTab data={makeData(makeState({ voiceProviderId: "gemini-tts" }, { voiceId: "x", motion: { colors: [], images: [], narration: true } } as never))} />);
+    expect(screen.getByText("gemini-tts")).toBeTruthy();
+    rerender(<OverviewTab data={makeData(makeState({ voiceProviderId: "gemini-tts" }, { voiceId: "x", footage: { sources: [], narration: false, transcribe: false, texts: [] } } as never))} />);
+    expect(screen.getByText(tr("footage.tab.footage"))).toBeTruthy();
+    expect(screen.queryByText("gemini-tts")).toBeNull();
+    rerender(<OverviewTab data={makeData(makeState({ voiceProviderId: "gemini-tts" }, { voiceId: "x", footage: { sources: [], narration: true, transcribe: false, texts: [] } } as never))} />);
+    expect(screen.getByText("gemini-tts")).toBeTruthy();
+    rerender(<OverviewTab data={makeData(makeState({}, { youtube: { url: "u" } } as never))} />);
+    expect(screen.getByText(tr("youtube.tab"))).toBeTruthy();
+  });
+
   it("video yoksa yer tutucu; inceleme yoksa bilgi; zayıf ve orta puan renkleri", () => {
     const state = makeState({ voiceProviderId: "gemini-tts" }, { voiceId: "bilinmeyen" });
     const { rerender } = renderIn(<OverviewTab data={makeData(state)} />);

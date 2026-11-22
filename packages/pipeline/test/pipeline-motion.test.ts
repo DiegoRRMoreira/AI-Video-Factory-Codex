@@ -19,6 +19,16 @@ vi.mock("../src/media.ts", async (orig) => {
   };
 });
 
+const poster = vi.hoisted(() => ({ at: [] as number[], fail: false }));
+vi.mock("../src/footage-media.ts", async (orig) => ({
+  ...(await orig<object>()),
+  posterFrame: async (_file: string, atMs: number) => {
+    if (poster.fail) throw new Error("kare yok");
+    poster.at.push(atMs);
+    return new Uint8Array([5]);
+  },
+}));
+
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
 const JPG = [0xff, 0xd8, 0xff, 0xe0, 0, 16];
 const dir = mkdtempSync(join(tmpdir(), "ys-motion-test-"));
@@ -62,6 +72,8 @@ const QUIET: MotionFilmOut = { ...FILM, scenes: [{ id: "m1", language: "field", 
 
 beforeEach(() => {
   resetFakes();
+  poster.at = [];
+  poster.fail = false;
   media.probe.mockImplementation(async () => 2000);
   media.silences.mockImplementation(async () => []);
   onAgent("motionDirector", () => FILM);
@@ -126,6 +138,13 @@ describe("film hattı", () => {
     const staged = render.episode.mock.calls[0]![0] as { publicDir: string };
     expect(await import("node:fs").then((fs) => fs.existsSync(join(staged.publicDir, ...state.input.motion!.images[0]!.key.split("/"))))).toBe(true);
     expect(state.done.render).toBeTruthy();
+    // Kapak videonun kendi karesi: ilk kinetik sahnenin sonuna doğru.
+    expect(poster.at).toEqual([Math.round(((t.visuals[0]!.durationInFrames * 0.85) / 30) * 1000)]);
+    expect(state.render!.thumbnail).toMatch(/\.jpg$/);
+    // Paket ve Short sahne zamanlarını timeline'dan alır (anlatımsız filmde ses süresi yok).
+    const sceneSec = (callsOf("packager")[0]!.args[0] as { sceneSec: Record<string, number> }).sceneSec;
+    expect(sceneSec.m1).toBeCloseTo(t.visuals[0]!.durationInFrames / 30);
+    expect(state.short).toBeDefined();
   });
 
   it("denetim notu varsa yönetmen bir kez düzeltir; düzeltme düşerse ilk film kalır", async () => {

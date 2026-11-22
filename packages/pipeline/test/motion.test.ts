@@ -1,6 +1,7 @@
 import { MotionFilm, MotionScene } from "@ys/core";
 import { describe, expect, it } from "vitest";
-import { describeScene, filmScript, filmShots, filmTimeline, fitSections, fitToVoice, fixPalette, illustrative, MOTION, normalizeFilm, numbersIn } from "../src/motion.ts";
+import { shortTimeline } from "../src/short.ts";
+import { clipSections, describeScene, filmOffsets, filmPosterMs, filmScript, filmShots, filmTimeline, fitSections, fitToVoice, fixPalette, illustrative, MOTION, normalizeFilm, numbersIn } from "../src/motion.ts";
 
 const PALETTE = { ground: "#f3efe6", ink: "#141414", accent: "#ff4f1f", alt: "#1e2a3a" };
 const sc = (over: Record<string, unknown>) => MotionScene.parse({ id: "m9", beats: 8, ...over });
@@ -147,6 +148,33 @@ describe("filmin kuralları", () => {
     ]);
     expect(fitSections([{ name: "hook", bars: 1, energy: 7 }], [{ beats: 10 }])).toEqual([{ name: "hook", bars: 3, energy: 7 }]);
     expect(fitSections([], [{ beats: 0 }])).toEqual([{ name: "build", bars: 1, energy: 6 }]);
+  });
+});
+
+describe("kapak ve Short'un ritim çizelgesi", () => {
+  it("kapak ilk kinetik sahnenin sonuna doğru; kinetik yoksa ilk sahne", () => {
+    const v = (id: string, language: string, fromFrame: number) => ({ shotId: id, fromFrame, durationInFrames: 100, film: { language } });
+    expect(filmPosterMs({ fps: 30, visuals: [v("m1", "data", 0), v("m2", "kinetic", 100)] as never })).toBe(Math.round((185 / 30) * 1000));
+    expect(filmPosterMs({ fps: 30, visuals: [v("m1", "data", 0)] as never })).toBe(Math.round((85 / 30) * 1000));
+  });
+
+  it("sahne başlangıçları timeline'dan (seslendirmeden değil)", () => {
+    expect(filmOffsets({ fps: 30, visuals: [{ shotId: "m1", fromFrame: 0 }, { shotId: "m2", fromFrame: 45 }] as never })).toEqual({ m1: 0, m2: 1500 });
+  });
+
+  it("yalnız aralıkla örtüşen bölümler, aralığın başından", () => {
+    // 120 BPM: ölçü 2 sn. kanca 0–4, duruş 4–6, zirve 6–14, çözülme 14–18 sn.
+    const sections = [{ name: "hook", bars: 2, energy: 7 }, { name: "stop", bars: 1, energy: 0 }, { name: "peak", bars: 4, energy: 9 }, { name: "resolve", bars: 2, energy: 3 }] as const;
+    expect(clipSections([...sections], 120, 6000, 16000)).toEqual([{ name: "peak", bars: 4, energy: 9 }, { name: "resolve", bars: 1, energy: 3 }]);
+    expect(clipSections([...sections], 120, 3000, 5000)).toEqual([{ name: "hook", bars: 1, energy: 7 }, { name: "stop", bars: 1, energy: 0 }]);
+  });
+
+  it("filmin Short'u kendi çizelgesini taşır; filmsiz timeline'a dokunmaz", () => {
+    const f = normalizeFilm(film([kin({ beats: 16 }), kin({ beats: 16 })]), { ...opts, targetSec: 180 });
+    const t = filmTimeline({ episodeId: "e", lang: "en", fps: 30, width: 1920, height: 1080, film: f, images: [], voice: {}, captions: false });
+    const short = shortTimeline(t, 8000, 16000);
+    expect(short.motion!.sections.reduce((n, s) => n + s.bars, 0)).toBe(4);
+    expect(shortTimeline({ ...t, motion: undefined }, 8000, 16000).motion).toBeUndefined();
   });
 });
 
