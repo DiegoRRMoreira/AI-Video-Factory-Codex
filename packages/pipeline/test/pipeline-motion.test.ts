@@ -134,6 +134,8 @@ describe("film hattı", () => {
     expect(t.visuals.map((v) => v.film!.id)).toEqual(["m1", "m2", "m3"]);
     expect(t.audio.map((a) => a.role).sort()).toEqual(["music", "sfx"]);
     expect(h.logs.some((l) => l.includes("hook → build"))).toBe(true);
+    // Render'dan önce sahne önizlemeleri (Çekimler sekmesi).
+    expect(Object.keys(state.stills!)).toEqual(["m1", "m2", "m3"]);
     // Render görselleri render klasörüne indirir.
     const staged = render.episode.mock.calls[0]![0] as { publicDir: string };
     expect(await import("node:fs").then((fs) => fs.existsSync(join(staged.publicDir, ...state.input.motion!.images[0]!.key.split("/"))))).toBe(true);
@@ -226,6 +228,16 @@ describe("film hattı", () => {
     const id4 = await noFilm.seed(makeState(input()));
     await expect(noFilm.pipeline.run(id4, { only: "shots" })).rejects.toThrow("motionFilm");
     await expect(noFilm.pipeline.run(id4, { only: "timeline" })).rejects.toThrow("motionFilm");
+  });
+
+  it("önizleme kareleri çıkarılamazsa günlüğe yazılır, timeline yine kurulur", async () => {
+    const h = harness();
+    render.stills.mockRejectedValueOnce(new Error("chrome yok"));
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id, { until: "timeline" });
+    expect(state.timeline!.visuals).toHaveLength(3);
+    expect(state.stills).toBeUndefined();
+    expect(h.logs.some((l) => l.includes("chrome yok"))).toBe(true);
   });
 
   it("zamanlanmamış film de timeline olur; efekt ve müzik kapatılabilir", async () => {

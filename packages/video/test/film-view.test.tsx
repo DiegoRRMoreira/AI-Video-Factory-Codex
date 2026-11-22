@@ -99,6 +99,10 @@ describe("kinetik yazı", () => {
     expect(c.querySelectorAll("[data-word]").length).toBe(5);
     expect([...c.querySelectorAll("[data-pill]")].map((e) => e.textContent)).toEqual(["40", "minutes"]);
     expect(markedWords("a b c", "b c")).toEqual([false, true, true]);
+    // Hapın ardındaki noktalama hapla aynı satırda kalır.
+    const dot = draw(kinetic("rise", { kinetic: { lines: ["Open source. Now"], mode: "rise", highlight: "Open source" } }), 60);
+    expect(dot.querySelector("[data-pill]")!.textContent).toBe("Open source.");
+    expect(dot.querySelector("[data-line]")!.textContent).toBe("Open source. Now");
     expect(markedWords("a b", "zz")).toEqual([false, false]);
     expect(markedWords("a b")).toEqual([false, false]);
   });

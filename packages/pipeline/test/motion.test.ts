@@ -111,6 +111,27 @@ describe("filmin kuralları", () => {
     expect(g[1]!.diagram!.highlight).toBe("b");
   });
 
+  it("sayaçta birim son ekte varsa bir kez; montajda okunmayan gövde atılır, okunmayan başlık tempoyu yavaşlatır", () => {
+    const [dup, keep, fast, slow, long, roomy] = normalizeFilm(
+      film([
+        sc({ language: "data", data: { chart: "count", title: "t", unit: "ms", count: { to: 50, suffix: " ms" } } }),
+        sc({ language: "data", data: { chart: "count", title: "t", unit: "x", count: { to: 50, suffix: "%" } } }),
+        sc({ language: "grid", grid: { mode: "montage", cards: [{ title: "Windows", body: "Direct device sync" }, { title: "Linux" }] } }),
+        sc({ language: "grid", grid: { mode: "montage", cards: [{ title: "Alerts on every deploy" }] } }),
+        sc({ language: "grid", grid: { mode: "montage", cards: [{ title: "a b c d e f g h" }] } }),
+        sc({ language: "grid", pace: "bar", grid: { mode: "montage", cards: [{ title: "Mac", body: "Fast" }] } }),
+      ]),
+      opts,
+    ).scenes;
+    expect(dup!.data!.unit).toBeUndefined();
+    expect(keep!.data!.unit).toBe("x");
+    expect(fast!.grid!.cards.map((c) => c.body)).toEqual([undefined, undefined]);
+    expect(fast!.pace).toBe("beat");
+    expect(slow!.pace).toBe("bar");
+    expect(long!.pace).toBe("bar");
+    expect(roomy!.grid!.cards[0]!.body).toBe("Fast");
+  });
+
   it("görsel dizini verilen görsel sayısını aşarsa düşer", () => {
     const [gr, ob, ok] = normalizeFilm(
       film([

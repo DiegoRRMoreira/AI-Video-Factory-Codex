@@ -1,5 +1,5 @@
-import { beatSec, MOTION_FILM, sceneContent, sceneFrames, type LanguageCode, type MotionFilm, type MotionPalette, type MotionScene, type Timeline, type WordTiming } from "@ys/core";
-import { contrast, fitScene } from "@ys/video/film";
+import { beatSec, MOTION_FILM, PACE_BEATS, sceneContent, sceneFrames, type LanguageCode, type MotionFilm, type MotionPalette, type MotionScene, type Timeline, type WordTiming } from "@ys/core";
+import { contrast, fitScene, holdSec, wordsOf } from "@ys/video/film";
 
 /**
  * Hareketli grafik filmi (motion modu) için saf kurallar: yönetmen ajanının tarifini düzeltir (sahne kimlikleri, dil ile
@@ -67,7 +67,7 @@ export function fixPalette(p: MotionPalette, colors: readonly string[]): MotionP
 }
 
 /** Sahnenin içeriğini kurallara uydurur; dili ile içeriği uyuşmayan sahne undefined. */
-function cleanScene(s: MotionScene, images: number): MotionScene | undefined {
+function cleanScene(s: MotionScene, images: number, bpm: number): MotionScene | undefined {
   if (!sceneContent(s)) return undefined;
   const scene: MotionScene = { ...s };
   // Dilin dışındaki içerik atılır: render ve denetim yalnız dilinkini okur.
@@ -85,6 +85,8 @@ function cleanScene(s: MotionScene, images: number): MotionScene | undefined {
     else delete d.count;
     if (d.highlight !== undefined && d.highlight >= d.points.length) delete d.highlight;
     if (d.chart === "count") delete d.highlight;
+    // Birim son ekte de varsa bir kez yazılır (gerçek filmde sayaç "<50 ms ms" çıkacaktı).
+    if (d.count && d.unit && d.count.suffix.trim().endsWith(d.unit.trim())) delete d.unit;
     scene.data = d;
   }
   if (scene.diagram) {
@@ -104,8 +106,24 @@ function cleanScene(s: MotionScene, images: number): MotionScene | undefined {
     if (nodes.length < 2) return undefined;
   }
   if (scene.grid) scene.grid = { ...scene.grid, cards: scene.grid.cards.map((c) => (c.image !== undefined && c.image >= images ? { ...c, image: undefined } : c)) };
+  if (scene.grid?.mode === "montage") Object.assign(scene, readableMontage(scene, bpm));
   if (scene.object && scene.object.image !== undefined && scene.object.image >= images) scene.object = { ...scene.object, image: undefined };
   return scene;
+}
+
+/**
+ * Montaj kartı bir tempo adımı görünür: okunmayacak gövde metni atılır (montaj kartı bir bakışta okunur, rhythm.md §5;
+ * gerçek filmde vuruşta değişen kartlara "Direct device sync" gibi satırlar yazılmıştı), başlık bile okunmuyorsa tempo
+ * okunacak en hızlı adıma yavaşlar.
+ */
+function readableMontage(scene: MotionScene, bpm: number): Pick<MotionScene, "grid" | "pace"> {
+  const step = (pace: MotionScene["pace"]) => PACE_BEATS[pace] * beatSec(bpm);
+  const words = (text: string) => wordsOf(text).length;
+  const cards = scene.grid!.cards.map((c) => (c.body && step(scene.pace) < holdSec(words(c.title) + words(c.body)) ? { ...c, body: undefined } : c));
+  const need = Math.max(...cards.map((c) => (words(c.title) > 3 ? holdSec(words(c.title)) : 0)));
+  const paces = (["eighth", "beat", "half", "bar"] as const).filter((p) => PACE_BEATS[p] >= PACE_BEATS[scene.pace]);
+  const pace = paces.find((p) => step(p) >= need) ?? "bar";
+  return { grid: { ...scene.grid!, cards }, pace };
 }
 
 /**
@@ -116,7 +134,7 @@ function cleanScene(s: MotionScene, images: number): MotionScene | undefined {
 export function normalizeFilm(raw: MotionFilm, opts: { brief: string; images: number; colors: readonly string[]; targetSec: number; fps: number }): MotionFilm {
   let flashes = 0;
   let scenes = raw.scenes
-    .map((s) => cleanScene(s, opts.images))
+    .map((s) => cleanScene(s, opts.images, raw.bpm))
     .filter((s): s is MotionScene => !!s)
     .map((s, i) => {
       let transition = i === 0 ? "cut" : s.transition;

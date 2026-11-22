@@ -19,6 +19,8 @@ export interface MotionContext {
   agentDeps(): Parameters<typeof motionDirector>[1];
   music(state: EpisodeState, timeline: Timeline): Promise<void>;
   soundEffects(state: EpisodeState, timeline: Timeline): Promise<void>;
+  /** Sahnelerin önizleme kareleri (Stüdyo Çekimler sekmesi); çıkarılamazsa günlüğe yazılır, üretim sürer. */
+  previews(state: EpisodeState, timeline: Timeline): Promise<void>;
 }
 
 /** Filmde kullanılabilen görsel türleri (logo, ekran görüntüsü). */
@@ -167,6 +169,7 @@ export function motionStages(ctx: MotionContext): Partial<Record<Stage, StageFn>
       state.timeline = timeline;
       if (state.input.sfx !== false) await ctx.soundEffects(state, timeline);
       if (state.input.music !== false) await ctx.music(state, timeline);
+      await ctx.previews(state, timeline);
       const sec = timeline.durationInFrames / timeline.fps;
       ctx.log(msg("log.timeline.done", { min: (sec / 60).toFixed(1), visuals: timeline.visuals.length }));
     },

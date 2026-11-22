@@ -103,7 +103,11 @@ function Line({ text, highlight, q, pill, colors, style }: { text: string; highl
 export function Marked({ text, highlight, pill, colors }: { text: string; highlight?: string; pill: number; colors: PartProps["colors"] }): ReactNode {
   const i = highlight ? text.toLocaleLowerCase().indexOf(highlight.toLocaleLowerCase()) : -1;
   if (i < 0) return text;
-  const mark = text.slice(i, i + highlight!.length);
+  // Hapın hemen ardındaki noktalama hapın içine alınır: dikeyde hap kayınca nokta tek başına alt satıra düşüyordu; hap
+  // kendi içinde kayabilir.
+  const end = i + highlight!.length;
+  const tail = /^[^\s]*/.exec(text.slice(end))![0];
+  const mark = text.slice(i, end + tail.length);
   return (
     <>
       {text.slice(0, i)}
@@ -111,7 +115,7 @@ export function Marked({ text, highlight, pill, colors }: { text: string; highli
         <span style={{ position: "absolute", inset: "0.06em -0.2em -0.02em", borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
         {mark}
       </span>
-      {text.slice(i + highlight!.length)}
+      {text.slice(end + tail.length)}
     </>
   );
 }

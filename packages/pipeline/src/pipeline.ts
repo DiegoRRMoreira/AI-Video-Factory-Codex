@@ -2738,7 +2738,7 @@ export class EpisodePipeline {
     return (this.youtubeMap ??= youtubeStages(this.footageContext));
   }
 
-  private get footageContext(): Parameters<typeof footageStages>[0] {
+  private get footageContext(): Parameters<typeof footageStages>[0] & Parameters<typeof motionStages>[0] {
     return {
       store: this.deps.store,
       gateway: this.deps.gateway,
@@ -2750,7 +2750,18 @@ export class EpisodePipeline {
       runOptions: (state, stage, signal, refId) => this.runOptions(state, stage, signal, refId),
       music: (state, timeline) => this.music(state, timeline),
       soundEffects: (state, timeline) => this.soundEffects(state, timeline),
+      previews: (state, timeline) => this.filmPreviews(state, timeline),
     };
+  }
+
+  /** Film sahnelerinin önizleme kareleri: render'ı beklemeden Çekimler sekmesi dolsun (vectorPreviews gibi). */
+  private async filmPreviews(state: EpisodeState, timeline: Timeline): Promise<void> {
+    try {
+      await this.storeStills(state, await this.renderShotStills(state, timeline, await this.draftDir(state)));
+      this.log(msg("log.preview.done", { n: timeline.visuals.length }));
+    } catch (e) {
+      this.log(msg("log.preview.failed", { error: errorText(e) }));
+    }
   }
 
   private readonly stages: Record<Stage, (state: EpisodeState, opts: RunEpisodeOptions) => Promise<void>> = {
