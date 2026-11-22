@@ -51,7 +51,7 @@ export async function youtubeInfo(url: string): Promise<YtInfo> {
 export async function downloadVideo(url: string, dir: string): Promise<string> {
   await mkdir(dir, { recursive: true });
   const h = YOUTUBE.height;
-  await runYtDlp([
+  const args = [
     "-f",
     `bv*[height<=${h}][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=${h}]+ba/b[height<=${h}]/b`,
     "--merge-output-format",
@@ -64,7 +64,16 @@ export async function downloadVideo(url: string, dir: string): Promise<string> {
     join(dir, "video.%(ext)s"),
     "--",
     url,
-  ]);
+  ];
+  // YouTube akış adresi zaman zaman 403 verir; yeni bir çağrı yeni adres alır (22 Kas: ilk deneme 403, ikincisi indi).
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await runYtDlp(args);
+      break;
+    } catch (e) {
+      if (attempt >= YOUTUBE.downloadTries || !/\b403\b/.test((e as Error).message)) throw e;
+    }
+  }
   const file = join(dir, "video.mp4");
   if (!existsSync(file)) throw new LocalizedError(msg("err.youtube.ytdlp", { detail: "video.mp4 not written" }));
   return file;

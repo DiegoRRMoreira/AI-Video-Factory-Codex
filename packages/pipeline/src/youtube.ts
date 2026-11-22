@@ -15,6 +15,8 @@ export const YOUTUBE = {
   maxMin: 90,
   /** Dikey kırpma 1080p'nin üçte birini kullanır: daha düşük çözünürlük Short'ta bulanık kalır. */
   height: 1080,
+  /** İndirme 403 ile düşerse toplam deneme (akış adresi her çağrıda yenilenir). */
+  downloadTries: 2,
   /** ffmpeg sahne puanı eşiği ve en kısa sahne (daha kısası öncekine katılır: flaş, hızlı kurgu). */
   sceneThreshold: 0.35,
   minSceneMs: 1500,

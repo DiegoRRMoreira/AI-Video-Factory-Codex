@@ -10,12 +10,17 @@ const yt = vi.hoisted(() => ({
   stdout: "",
   error: undefined as (Error & { code?: string; stderr?: string }) | undefined,
   write: true,
+  /** Bu kadar çağrı daha `error` ile düşer (sonra başarılı). */
+  failTimes: 0,
 }));
 vi.mock("node:child_process", async (orig) => ({
   ...(await orig<object>()),
   execFile: (file: string, args: string[], _opts: unknown, cb: (e: Error | null, out?: { stdout: string; stderr: string }) => void) => {
     yt.calls.push({ file, args });
-    if (yt.error) return void cb(yt.error);
+    if (yt.error && yt.failTimes !== 0) {
+      if (yt.failTimes > 0) yt.failTimes--;
+      return void cb(yt.error);
+    }
     const at = args.indexOf("-o");
     const o = at >= 0 ? args[at + 1] : undefined;
     const done = () => cb(null, { stdout: yt.stdout, stderr: "" });
@@ -45,6 +50,7 @@ beforeEach(() => {
   yt.stdout = "";
   yt.error = undefined;
   yt.write = true;
+  yt.failTimes = -1;
   ff.calls = [];
   ff.stderr = "";
 });
@@ -81,6 +87,23 @@ describe("yt-dlp", () => {
     expect(args.slice(-2)).toEqual(["--", URL]);
     yt.write = false;
     await expect(downloadVideo(URL, join(dir, "other"))).rejects.toThrow("video.mp4 not written");
+  });
+
+  it("indirme 403 ile düşerse bir kez yeniden denenir; başka hata ya da ikinci 403 düşürür", async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "ys-ytm-")), "dl");
+    yt.error = Object.assign(new Error("Command failed"), { stderr: "ERROR: unable to download video data: HTTP Error 403: Forbidden" });
+    yt.failTimes = 1;
+    expect(await downloadVideo(URL, dir)).toBe(join(dir, "video.mp4"));
+    expect(yt.calls).toHaveLength(2);
+    yt.calls = [];
+    yt.failTimes = 2;
+    await expect(downloadVideo(URL, dir)).rejects.toThrow("HTTP Error 403");
+    expect(yt.calls).toHaveLength(2);
+    yt.calls = [];
+    yt.error = Object.assign(new Error("Command failed"), { stderr: "ERROR: Private video" });
+    yt.failTimes = 1;
+    await expect(downloadVideo(URL, dir)).rejects.toThrow("Private video");
+    expect(yt.calls).toHaveLength(1);
   });
 
   it("altyazı json3 olarak iner (elle ya da otomatik); yazılmadıysa undefined", async () => {
