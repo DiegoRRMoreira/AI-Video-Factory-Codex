@@ -2,6 +2,13 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.7 (2026-11-22)
+
+- Motion-graphics films show a preview still for every scene in the Shots tab before the render, so the preview gate can be judged without rendering.
+- Montage cards stay readable: a body that cannot be read while cards change on the beat is dropped, and long titles slow the montage down. A counter no longer repeats its unit ("50 ms ms").
+- In vertical films a highlighted phrase keeps its full stop, and counters stay on one line.
+- Tried on a real 9:16 film with Gemini 4 Neon through agy, including a remake with a producer note, through the preview gate to the render.
+
 ## v0.6.6 (2026-11-22)
 
 - **Motion-graphics films:** a new episode kind with no people and no drawings. A director agent writes a rhythm sheet (hook, build, stop, peak, resolve) and scenes measured in beats: kinetic type (slams, mask rises, word by word, chapter counters, a highlight pill), data (bars from zero, a line drawn to its point, a counter), system diagrams (edges drawing on, packets on the beat), card grids and full-frame montages cut on the beat, particle fields and 3D objects with your logo. Code draws every frame; transitions (cut, flash, colour flip, flood, iris, whip, push-through), the camera, a synthesized score that follows the rhythm sheet and the sound effects all share the film's tempo.
