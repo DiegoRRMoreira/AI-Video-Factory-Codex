@@ -9,6 +9,7 @@ import type { CastOut, LessonTarget, MotionMode, ScriptOut, ShotPlanOut, StoryOu
 import type { Ambience, AssetCheck, BudgetTier, FlagSpec, LineStyle, MapSpec, Msg, SceneBelow, ShotReviewRecord, Timeline, VectorShot, WordTiming } from "@ys/core";
 import { scenesBelow, stylePackOf } from "@ys/core";
 import type { FootageAssets, FootageCut, FootageInput, FootagePlan, FootageScan } from "./footage.ts";
+import type { YoutubeInput, YoutubeState } from "./youtube.ts";
 
 export type { MotionMode };
 
@@ -126,6 +127,13 @@ export interface EpisodeInput {
    * konsept ve kare aşamaları atlanır; kurgu ajanı parçaları seçer (footage.ts).
    */
   footage?: FootageInput;
+  /**
+   * YouTube analizi (22 Kas): verilen videonun sahne günlüğü, kesilecek yerleri ve Short adayları. Analiz bölümü render
+   * etmez; seçilen adaylar ayrı footage Short bölümleri olur (youtube.ts).
+   */
+  youtube?: YoutubeInput;
+  /** Bu Short bir YouTube analizinin adayından üretildi (Stüdyo analize ve videodaki yerine bağlar). */
+  fromYoutube?: { analysis: string; candidate: string; url: string };
   width: number;
   height: number;
   fps: number;
@@ -293,6 +301,8 @@ export interface EpisodeState {
   footageAssets?: FootageAssets & { sig: Record<string, string> };
   /** Footage modu: parça başına kadraj denetimi (clips aşaması); özne kesildiyse düzeltilen odak ve kadraj. */
   footageCheck?: Record<string, { verdict: "ok" | "subject_cut" | "empty"; evidence: string; fixed?: { focusX: number; fit: "cover" | "contain" } }>;
+  /** YouTube analizi: indirme, döküm, sahneler, pencere analizleri ve rapor. */
+  youtube?: YoutubeState;
   keyframes?: Record<string, AssetRef>;
   /** Human-selected real archive inserts; original generated shots stay available for restoration. */
   archives?: Record<string, ArchiveImage>;
@@ -391,6 +401,8 @@ export function draftBelow(state: EpisodeState): SceneBelow[] {
 }
 
 export function isApproved(state: EpisodeState, gate: Gate): boolean {
+  // YouTube analizinde onaylanacak bir şey yok: rapor biter, Short'lar kendi bölümlerinde onaylanır.
+  if (state.input.youtube) return true;
   // Footage modunda konsept (karakter/mekân seçimi) yok: kapı kendiliğinden geçer.
   if (gate === "concept" && state.input.footage) return true;
   // Barajı geçemeyen sahne varken render otomatik onaylanmaz: yapımcı ya yeniden oluşturur ya da bilerek onaylar (12 Kas).

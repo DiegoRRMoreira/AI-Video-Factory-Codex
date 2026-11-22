@@ -4,7 +4,7 @@ import { collectVoiceAudit, type VoiceMeasure } from "./voice-audit.ts";
 import { loadPronunciationBook, pronunciationLanguage, pronunciationRulesFingerprint, pronunciationTerms, pronunciationTermsFingerprint } from "./pronunciation-settings.ts";
 import { PronunciationEntry, pronunciationTermKey, type PronunciationBook } from "@ys/core";
 import { measureVoiceAudio } from "@ys/video/voice-audit";
-import { shotIntentText, type AcpBackend } from "@ys/core";
+import { shotIntentText, type AcpBackend, type WordTiming } from "@ys/core";
 import type { auditRenderedVideo } from "@ys/video/audit";
 import { collectRenderAudit, pendingRenderAudit } from "./render-audit.ts";
 import { compareRenderedStyle, styleSamples } from "./style-comparison.ts";
@@ -151,7 +151,9 @@ import {
 import { existingSamples, loadStyleSamples, SAMPLE_BRIEF, STYLE_SAMPLES_ID, STYLE_SAMPLES_KEY, type StyleSample, type StyleSamples } from "./samples.ts";
 import { shortRange, shortTimeline } from "./short.ts";
 import { addFootageSources, checkFootageInput, footageStages } from "./footage-stages.ts";
-import { posterMs } from "./footage.ts";
+import { youtubeStages } from "./youtube-stages.ts";
+import { candidatePlan, candidateWords, type YoutubeInput } from "./youtube.ts";
+import { planScript, posterMs, type FootageSource } from "./footage.ts";
 import { posterFrame } from "./footage-media.ts";
 import { buildTimeline, clipSeconds, resolveShotTimes, sceneOffsets, toSrt } from "./timing.ts";
 import { assignReverseViews, reverseCandidates, varyShotSizes } from "./variety.ts";
@@ -426,6 +428,71 @@ export class EpisodePipeline {
     return state;
   }
 
+  /** YouTube analiz bölümü: adres doğrulanmış girdiyle (youtubeInput) açılır; indirme ve analiz çalıştırmada. */
+  async createYoutube(input: EpisodeInput & { youtube: YoutubeInput }): Promise<EpisodeState> {
+    const state = newEpisodeState(input);
+    await this.save(state);
+    return state;
+  }
+
+  /**
+   * Analizin seçilen adaylarından footage Short bölümleri: kaynak kütüphanedeki video (kopyalanmaz), döküm adayın
+   * parçalarına düşen kelimeler, kurgu adaydan (özgün ses, anlatım yok, kanca yazısı). `review` değilse senaryo onaylı
+   * açılır (çalıştırınca önizleme kapısına kadar gider); öyleyse kurgu Stüdyo'da düzenlenip onaylanır.
+   */
+  async createYoutubeShorts(analysisId: string, picks: string[], opts: { review?: boolean; music?: boolean } = {}): Promise<EpisodeState[]> {
+    const analysis = await this.load(analysisId);
+    const yt = analysis.youtube;
+    const report = yt?.report;
+    if (!analysis.input.youtube || !report || !yt.video || !yt.meta) throw new LocalizedError(msg("err.youtube.noReport"));
+    const chosen = picks.map((id) => {
+      const c = report.candidates.find((x) => x.id === id);
+      if (!c) throw new LocalizedError(msg("err.youtube.candidate", { id }));
+      return c;
+    });
+    const words = yt.transcript?.key ? ((await getJson<WordTiming[]>(this.deps.store, yt.transcript.key)) ?? []) : [];
+    const source: FootageSource = { id: "f1", key: yt.video.key, name: `${yt.meta.title}.mp4`, ext: "mp4", kind: "video", durationMs: yt.video.durationMs, width: yt.video.width, height: yt.video.height, audio: yt.video.audio };
+    const now = new Date().toISOString();
+    const created: EpisodeState[] = [];
+    for (const c of chosen) {
+      // İncelenecek Short otomatik onaylanmaz (kurgu Stüdyo'da düzenlenir); değilse analizin onay ayarını taşır.
+      const { youtube: _youtube, ...base } = analysis.input;
+      const state = newEpisodeState({
+        ...base,
+        topic: c.title || analysis.input.topic,
+        targetSec: Math.round(c.durationMs / 1000),
+        aiClipRatio: 0,
+        width: 1080,
+        height: 1920,
+        footage: { sources: [source], narration: false, transcribe: false, texts: [] },
+        ...(opts.review ? { autoApprove: false } : {}),
+        ...(opts.music === false ? { music: false } : {}),
+        fromYoutube: { analysis: analysis.id, candidate: c.id, url: analysis.input.youtube.url },
+      });
+      const plan = candidatePlan(c, source);
+      // Stüdyo'nun kurgu görünümü için adayın aralığındaki küçük kareler bölüme kopyalanır (analiz silinse de kalsın).
+      const frames: { atMs: number; key: string }[] = [];
+      for (const f of (yt.frames ?? []).filter((f) => c.segments.some((s) => f.atMs >= s.fromMs && f.atMs < s.toMs))) {
+        const bytes = await this.deps.store.get(f.key);
+        if (!bytes) continue;
+        const key = `assets/footage/${state.id}/frames/${f.atMs}.jpg`;
+        await this.deps.store.put(key, bytes, "image/jpeg");
+        frames.push({ atMs: f.atMs, key });
+      }
+      state.footageScan = { f1: { frames, words: candidateWords(words, c) } };
+      state.footagePlan = plan;
+      state.story = { title: c.title, logline: c.why, premise: "", hook: c.hook, beats: [] };
+      state.script = planScript(plan);
+      state.done = { story: now, script: now };
+      if (!opts.review) state.approvals = { script: now };
+      await this.save(state);
+      created.push(state);
+    }
+    yt.shorts = [...(yt.shorts ?? []), ...created.map((s, i) => ({ candidate: chosen[i]!.id, episodeId: s.id }))];
+    await this.save(analysis);
+    return created;
+  }
+
   async load(id: string): Promise<EpisodeState> {
     const state = await getJson<EpisodeState>(this.deps.store, this.stateKey(id));
     if (!state) throw new LocalizedError(msg("err.episode.notFound", { id }));
@@ -645,7 +712,7 @@ export class EpisodePipeline {
       state.stats![stage] = { ...state.stats![stage]!, endedAt: new Date().toISOString(), durationMs: Date.now() - started };
     };
     try {
-      await ((state.input.footage ? this.footage[stage] : undefined) ?? this.stages[stage])(state, opts);
+      await (state.input.youtube ? this.youtube[stage] : ((state.input.footage ? this.footage[stage] : undefined) ?? this.stages[stage]))(state, opts);
       // Newly planned shot ids can describe different content; prior explicit image choices need a new review.
       if (stage === "shots") delete state.archives;
     } catch (e) {
@@ -2689,7 +2756,16 @@ export class EpisodePipeline {
   private footageMap?: ReturnType<typeof footageStages>;
   /** Footage modunun aşamaları (footage-stages.ts); verilmeyen aşama normal aşamadır. */
   private get footage(): ReturnType<typeof footageStages> {
-    return (this.footageMap ??= footageStages({
+    return (this.footageMap ??= footageStages(this.footageContext));
+  }
+
+  private youtubeMap?: ReturnType<typeof youtubeStages>;
+  private get youtube(): ReturnType<typeof youtubeStages> {
+    return (this.youtubeMap ??= youtubeStages(this.footageContext));
+  }
+
+  private get footageContext(): Parameters<typeof footageStages>[0] {
+    return {
       store: this.deps.store,
       gateway: this.deps.gateway,
       workDir: this.deps.workDir,
@@ -2700,7 +2776,7 @@ export class EpisodePipeline {
       runOptions: (state, stage, signal, refId) => this.runOptions(state, stage, signal, refId),
       music: (state, timeline) => this.music(state, timeline),
       soundEffects: (state, timeline) => this.soundEffects(state, timeline),
-    }));
+    };
   }
 
   private readonly stages: Record<Stage, (state: EpisodeState, opts: RunEpisodeOptions) => Promise<void>> = {

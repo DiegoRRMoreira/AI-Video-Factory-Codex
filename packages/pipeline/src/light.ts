@@ -16,3 +16,4 @@ export * from "./voice-audit.ts";
 export * from "./pronunciation-settings.ts";
 export * from "./summaries.ts";
 export * from "./footage.ts";
+export * from "./youtube.ts";

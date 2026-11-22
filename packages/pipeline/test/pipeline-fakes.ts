@@ -41,6 +41,8 @@ export const AGENT_NAMES = [
   "setDresser",
   "footageEditor",
   "footageInspector",
+  "youtubeAnalyst",
+  "youtubeCurator",
 ] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 

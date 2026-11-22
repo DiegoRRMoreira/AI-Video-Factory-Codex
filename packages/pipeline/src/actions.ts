@@ -100,7 +100,7 @@ export class EpisodeRepo {
 }
 
 /** Bölümün depodaki kendi dosyaları: inceleme kareleri, efekt ve müzik izleri; durum ve çalışma kilidi en sonda. */
-export const episodePrefixes = (id: string): string[] => [`assets/stills/${id}/`, `assets/sfx/${id}/`, `assets/music/${id}/`, `assets/footage/${id}/`, `episodes/${id}/`];
+export const episodePrefixes = (id: string): string[] => [`assets/stills/${id}/`, `assets/sfx/${id}/`, `assets/music/${id}/`, `assets/footage/${id}/`, `assets/youtube/${id}/`, `episodes/${id}/`];
 
 /**
  * Bölümü depodan siler (yarım kalmış ya da bitmiş); silinen dosya sayısını döner. Durum dosyası en son gider: yarıda

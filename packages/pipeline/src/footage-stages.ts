@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { footageEditor, footageInspector, type AgentResult, type FootageCheckOut, type FootageCheckPart } from "@ys/agents";
 import { errorText, LocalizedError, msg, type Text, type Timeline, type WordTiming } from "@ys/core";
 import type { MediaGateway, RunOptions } from "@ys/media-gateway";
@@ -75,8 +75,9 @@ export function footageStages(ctx: FootageContext): Partial<Record<Stage, StageF
 
   /** Kaynağın yerel kopyası (render klasöründe, bir kez indirilir): ffmpeg dosyadan okur. */
   const local = async (state: EpisodeState, src: FootageSource): Promise<string> => {
-    const dir = resolve(ctx.workDir, state.id, "footage");
-    const file = join(dir, basename(src.key));
+    // Kütüphanedeki kaynak (YouTube videosu) bölümler arasında paylaşılır: her Short ayrı bir kopya indirmesin.
+    const file = src.key.startsWith("library/") ? resolve(ctx.workDir, "_library", ...src.key.split("/")) : join(resolve(ctx.workDir, state.id, "footage"), basename(src.key));
+    const dir = dirname(file);
     if (existsSync(file)) return file;
     const bytes = await ctx.store.get(src.key);
     if (!bytes) throw new LocalizedError(msg("err.store.missing", { key: src.key }));

@@ -17,3 +17,6 @@ export * from "./footage.ts";
 export * from "./footage-media.ts";
 export * from "./footage-stages.ts";
 export * from "./acp-settings.ts";
+export * from "./youtube.ts";
+export * from "./youtube-media.ts";
+export * from "./youtube-stages.ts";

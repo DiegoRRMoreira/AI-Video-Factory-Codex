@@ -290,6 +290,8 @@ describe("episode ve render-demo", () => {
     await cli("episode", "new", "--footage", "a.mp4", "--footage", "b.jpg", "--sec", "45", "--overlay", "Bir", "--overlay", "İki", "--no-narration", "--no-transcribe");
     const args = (episodeMod.episodeCommand.mock.calls[0] as unknown as unknown[])[3] as Record<string, unknown>;
     expect(args).toMatchObject({ footage: ["a.mp4", "b.jpg"], sec: "45", overlay: ["Bir", "İki"], noNarration: true, noTranscribe: true });
+    await cli("episode", "new", "--youtube", "dQw4w9WgXcQ", "--count", "4", "--min", "25", "--max", "50", "--candidates", "c1,c2", "--review", "--no-music");
+    expect((episodeMod.episodeCommand.mock.calls[1] as unknown as unknown[])[3]).toMatchObject({ youtube: "dQw4w9WgXcQ", count: "4", min: "25", max: "50", candidates: "c1,c2", review: true, noMusic: true });
   });
 
   it("render-demo API'siz demo hattını çalıştırır", async () => {

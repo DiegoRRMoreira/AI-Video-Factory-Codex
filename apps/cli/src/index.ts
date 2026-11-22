@@ -55,6 +55,11 @@ Komutlar:
               [--no-narration] [--no-transcribe] [--no-qa: kadraj denetimi kapalı] [--voice id] [--lang tr]
                                     Kendi videonla resimlerinden dikey Short (15–180 sn): AI kurgu, anlatım,
                                     konuşma dökümü (ElevenLabs Scribe), altyazı, ekran yazıları, müzik, efekt
+  episode new --youtube <adres> [--count 6] [--min 20] [--max 60] [--lang tr] [--no-transcribe]
+                                    YouTube videosunu indirir (yt-dlp), sahne sahne analiz eder; kesilecek yerler ve
+                                    Short adayları (episode run <id> ile çalışır; model: Stüdyo → Modeller, ACP de olur)
+  episode shorts <id> --candidates c1,c2 [--review: kurguyu Stüdyo'da düzenleyip onayla] [--no-music]
+                                    Analizin adaylarından dikey Short bölümleri (incelemesizse hemen üretilir)
   episode run <id> [--until <aşama>] [--from <aşama>] [--only <aşama>]
               aşamalar: style story script voice shots keyframes clips timeline render
   episode show <id>
@@ -162,6 +167,13 @@ async function main(): Promise<void> {
       overlay: { type: "string", multiple: true },
       "no-narration": { type: "boolean", default: false },
       "no-transcribe": { type: "boolean", default: false },
+      youtube: { type: "string" },
+      count: { type: "string" },
+      min: { type: "string" },
+      max: { type: "string" },
+      candidates: { type: "string" },
+      review: { type: "boolean", default: false },
+      "no-music": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       // "--version" seçenek olarak tanımlı değilse parseArgs "Unknown option" ile düşüyordu.
       version: { type: "boolean", default: false },
@@ -303,6 +315,7 @@ async function main(): Promise<void> {
       noSetDressing: values["no-set-dressing"],
       noNarration: values["no-narration"],
       noTranscribe: values["no-transcribe"],
+      noMusic: values["no-music"],
       stylePack: values["style-pack"],
       gate: positionals[3],
       pick: positionals[3],

@@ -12,6 +12,7 @@ import {
   estimateWordTimings,
   selectCandidate,
   STAGES,
+  youtubeInput,
   type EpisodeState,
   type MotionMode,
   type Stage,
@@ -56,6 +57,14 @@ export interface EpisodeArgs {
   overlay?: string[];
   noNarration?: boolean;
   noTranscribe?: boolean;
+  /** YouTube analizi: adres, aday sayısı, Short süresi (sn); adaylardan Short: kimlikler (virgüllü), inceleme, müzik. */
+  youtube?: string;
+  count?: string;
+  min?: string;
+  max?: string;
+  candidates?: string;
+  review?: boolean;
+  noMusic?: boolean;
 }
 
 const parseStage = (s: string | undefined): Stage | undefined => {
@@ -98,7 +107,41 @@ export async function episodeCommand(
       if ((args.short ? state.short : state.render)?.audit?.status !== "complete") throw new Error("Video denetimi tamamlanamadı; bölümdeki denetim ayrıntılarına bakın.");
       return;
     }
+    case "shorts": {
+      if (!id || !args.candidates?.trim()) throw new Error("Kullanım: episode shorts <analiz kimliği> --candidates c1,c2 [--review] [--no-music]");
+      const picks = args.candidates.split(",").map((s) => s.trim()).filter(Boolean);
+      const created = await pipeline.createYoutubeShorts(id, picks, { review: args.review === true, music: !args.noMusic });
+      for (const s of created) console.log(s.id);
+      // İncelemesiz Short'lar hemen üretilir (sırayla: kesim ve render makineyi paylaşır).
+      if (!args.review) for (const s of created) printSummary(await pipeline.run(s.id));
+      return;
+    }
     case "new": {
+      if (args.youtube) {
+        const state = await pipeline.createYoutube({
+          topic: args.topic?.trim() || "YouTube",
+          lang: args.lang ?? "tr",
+          targetSec: 60,
+          tier: BudgetTier.parse(args.tier ?? "economy"),
+          budgetUsd: positive("--budget", args.budget ?? 5),
+          aiClipRatio: 0,
+          autoApprove: !args.manual,
+          captions: !args.noCaptions,
+          qa: !args.noQa,
+          youtube: youtubeInput({
+            url: args.youtube,
+            count: args.count === undefined ? undefined : positive("--count", args.count),
+            minSec: args.min === undefined ? undefined : positive("--min", args.min),
+            maxSec: args.max === undefined ? undefined : positive("--max", args.max),
+            transcribe: !args.noTranscribe,
+          }),
+          width: 1080,
+          height: 1920,
+          fps: 30,
+        });
+        console.log(state.id);
+        return;
+      }
       if (args.footage?.length) {
         const sec = positive("--sec", args.sec ?? 30);
         const state = await pipeline.createFootage(
@@ -195,7 +238,7 @@ export async function episodeCommand(
       return;
     }
     default:
-      throw new Error("Kullanım: episode new|run|show|preview|approve|select|audit");
+      throw new Error("Kullanım: episode new|run|show|preview|approve|select|audit|shorts");
   }
 }
 
@@ -204,6 +247,15 @@ function parseMotion(m: string | undefined): MotionMode | undefined {
   if (m !== "animated" && m !== "mixed" && m !== "still" && m !== "vector") throw new Error("--motion animated|mixed|still|vector");
   return m;
 }
+
+/** Videodaki yer: d:ss ya da s:dd:ss. */
+const clock = (ms: number) => {
+  const sec = Math.round(ms / 1000);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = String(sec % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+};
 
 function printSummary(s: EpisodeState): void {
   console.log(`Bölüm:   ${s.id}`);
@@ -226,6 +278,16 @@ function printSummary(s: EpisodeState): void {
     }
   }
   if (s.shots) console.log(`Çekim:   ${s.shots.length} (${Object.keys(s.keyframes ?? {}).length} keyframe, ${Object.keys(s.clips ?? {}).length} klip)`);
+  const report = s.youtube?.report;
+  if (report) {
+    console.log(`Analiz:  ${report.scenes.length} sahne, ${report.cuts.length} kesim önerisi, ${report.candidates.length} Short adayı`);
+    for (const c of report.candidates) {
+      const parts = c.segments.map((p) => `${clock(p.fromMs)}–${clock(p.toMs)}`).join(", ");
+      const made = s.youtube!.shorts?.find((x) => x.candidate === c.id)?.episodeId;
+      console.log(`  ${c.id} [${c.score}/10] ${c.title} (${Math.round(c.durationMs / 1000)} sn: ${parts})${made ? ` → ${made}` : ""}`);
+    }
+    if (report.candidates.length) console.log(`  Short üret: pnpm ys episode shorts ${s.id} --candidates ${report.candidates[0]!.id}`);
+  }
   console.log(`Ajan maliyeti: $${s.agentCostUsd.toFixed(4)}`);
   if (s.render) console.log(`Video:   ${s.render.path}`);
 }

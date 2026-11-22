@@ -39,13 +39,25 @@ const base = (over: Partial<EpisodeState> = {}): EpisodeState =>
 /** Sahte pipeline: durumları bellekte tutar, çağrıları kaydeder. */
 function fakePipeline(initial: EpisodeState[] = []) {
   const states = new Map(initial.map((s) => [s.id, structuredClone(s)]));
-  const calls = { footage: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[], create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[] };
+  const calls = { footage: [] as { input: EpisodeInput; files: { name: string; path: string }[] }[], create: [] as EpisodeInput[], run: [] as [string, unknown][], saved: [] as EpisodeState[], previewed: [] as string[], audited: [] as string[], youtube: [] as EpisodeInput[], shorts: [] as [string, string[], unknown][] };
   const pipeline = {
     create: async (input: EpisodeInput) => {
       calls.create.push(input);
       const s = base({ id: `yeni-${calls.create.length}`, input });
       states.set(s.id, s);
       return s;
+    },
+    createYoutube: async (input: EpisodeInput) => {
+      calls.youtube.push(input);
+      return base({ id: "analiz-1", input });
+    },
+    createYoutubeShorts: async (id: string, picks: string[], opts: unknown) => {
+      calls.shorts.push([id, picks, opts]);
+      return picks.map((p) => {
+        const s = base({ id: `short-${p}` });
+        states.set(s.id, s);
+        return s;
+      });
     },
     createFootage: async (input: EpisodeInput, files: { name: string; path: string }[]) => {
       calls.footage.push({ input, files });
@@ -138,6 +150,68 @@ describe("positive", () => {
     expect(positive("--budget", "2,5")).toBe(2.5);
     expect(positive("--budget", 3)).toBe(3);
     for (const v of ["0", "-1", "$5", "abc", ""]) expect(() => positive("--budget", v)).toThrow("--budget pozitif bir sayı olmalı (ör. 2.5)");
+  });
+});
+
+describe("YouTube analizi ve Short'ları", () => {
+  it("new --youtube: adres doğrulanır, varsayılanlar ve bayraklar", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "new", undefined, { youtube: "https://youtu.be/dQw4w9WgXcQ" });
+    expect(calls.youtube[0]).toEqual({
+      topic: "YouTube",
+      lang: "tr",
+      targetSec: 60,
+      tier: "economy",
+      budgetUsd: 5,
+      aiClipRatio: 0,
+      autoApprove: true,
+      captions: true,
+      qa: true,
+      youtube: { videoId: "dQw4w9WgXcQ", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", count: 6, minSec: 20, maxSec: 60 },
+      width: 1080,
+      height: 1920,
+      fps: 30,
+    });
+    expect(out).toEqual(["analiz-1"]);
+    await episodeCommand(pipeline, "new", undefined, { youtube: "dQw4w9WgXcQ", topic: " Sohbet ", count: "3", min: "30", max: "90", noTranscribe: true, manual: true, noQa: true, noCaptions: true, lang: "en", tier: "premium", budget: "1" });
+    expect(calls.youtube[1]).toMatchObject({ topic: "Sohbet", lang: "en", tier: "premium", budgetUsd: 1, autoApprove: false, qa: false, captions: false, youtube: { count: 3, minSec: 30, maxSec: 90, transcribe: false } });
+    await expect(episodeCommand(pipeline, "new", undefined, { youtube: "dQw4w9WgXcQ", count: "0" })).rejects.toThrow("--count pozitif");
+    await expect(episodeCommand(pipeline, "new", undefined, { youtube: "vimeo.com/1" })).rejects.toThrow("Geçerli bir YouTube video adresi değil");
+  });
+
+  it("shorts: adaylardan bölümler; incelemesizse hemen çalışır; kullanım hatası", async () => {
+    const { pipeline, calls } = fakePipeline();
+    await episodeCommand(pipeline, "shorts", "analiz-1", { candidates: " c1, ,c3 ", noMusic: true });
+    expect(calls.shorts[0]).toEqual(["analiz-1", ["c1", "c3"], { review: false, music: false }]);
+    expect(calls.run.map((r) => r[0])).toEqual(["short-c1", "short-c3"]);
+    expect(out.slice(0, 2)).toEqual(["short-c1", "short-c3"]);
+    await episodeCommand(pipeline, "shorts", "analiz-1", { candidates: "c2", review: true });
+    expect(calls.shorts[1]).toEqual(["analiz-1", ["c2"], { review: true, music: true }]);
+    expect(calls.run).toHaveLength(2);
+    await expect(episodeCommand(pipeline, "shorts", "analiz-1", {})).rejects.toThrow("Kullanım: episode shorts");
+    await expect(episodeCommand(pipeline, "shorts", undefined, { candidates: "c1" })).rejects.toThrow("Kullanım: episode shorts");
+  });
+
+  it("show analiz raporunu, adayların yerini ve üretilen Short'ları yazar", async () => {
+    const report = {
+      scenes: [{}],
+      cuts: [],
+      moments: [],
+      candidates: [
+        { id: "c1", title: "Soru", hook: "", why: "", score: 9, mood: "warm", durationMs: 25_000, segments: [{ fromMs: 30_000, toMs: 55_000, focusX: 0.5, fit: "cover" }] },
+        { id: "c2", title: "Final", hook: "", why: "", score: 6, mood: "warm", durationMs: 40_000, segments: [{ fromMs: 3_800_000, toMs: 3_840_000, focusX: 0.5, fit: "cover" }] },
+      ],
+    };
+    const state = base({ id: "analiz-1", youtube: { report, shorts: [{ candidate: "c2", episodeId: "short-x" }] } as never });
+    const { pipeline } = fakePipeline([state, base({ id: "bos", youtube: { report: { ...report, candidates: [] } } as never })]);
+    await episodeCommand(pipeline, "show", "analiz-1", {});
+    expect(out).toContain("Analiz:  1 sahne, 0 kesim önerisi, 2 Short adayı");
+    expect(out).toContain("  c1 [9/10] Soru (25 sn: 0:30–0:55)");
+    expect(out).toContain("  c2 [6/10] Final (40 sn: 1:03:20–1:04:00) → short-x");
+    expect(out).toContain("  Short üret: pnpm ys episode shorts analiz-1 --candidates c1");
+    out = [];
+    await episodeCommand(pipeline, "show", "bos", {});
+    expect(out.some((l) => l.startsWith("  Short üret"))).toBe(false);
   });
 });
 

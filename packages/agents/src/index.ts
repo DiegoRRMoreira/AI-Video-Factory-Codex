@@ -11,3 +11,4 @@ export * from "./set-dresser.ts";
 export * from "./style-analyst.ts";
 export * from "./footage.ts";
 export * from "./acp.ts";
+export * from "./youtube.ts";
