@@ -14,6 +14,7 @@ import {
   enterK,
   expoOut,
   FILM,
+  filmStill,
   formatValue,
   luminance,
   safeBox,
@@ -52,6 +53,15 @@ describe("film zamanlaması", () => {
     expect(enterFrames(kinetic("slam", { pace: "half" }), 240, 120, 30)).toEqual([0, 30]);
     expect(enterFrames(field({ field: { kind: "sparks", title: "t" } }), 100, 120, 30)).toEqual([0]);
     expect(enterFrames(field({ field: { kind: "sparks" } }), 100, 120, 30)).toEqual([]);
+  });
+
+  it("inceleme karesi son öğe oturduktan sonra: en erken %80, en geç son kare", () => {
+    const words = kinetic("words");
+    // Son giriş 60. kare, oturma 0,95 sn (28,5 kare) + 1 kare.
+    expect(filmStill(words, 100, 120, 30)).toBeCloseTo(0.895);
+    expect(filmStill(words, 240, 120, 30)).toBe(FILM.still);
+    expect(filmStill(words, 60, 120, 30)).toBeCloseTo(59 / 60);
+    expect(filmStill(field({ field: { kind: "sparks" } }), 100, 120, 30)).toBe(FILM.still);
   });
 
   it("giriş expo ile, kamera türleri ve en büyük ölçekleri", () => {

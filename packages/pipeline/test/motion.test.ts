@@ -1,5 +1,6 @@
 import { MotionFilm, MotionScene } from "@ys/core";
 import { describe, expect, it } from "vitest";
+import { betterFilm, reviewShare } from "../src/motion-stages.ts";
 import { shortTimeline } from "../src/short.ts";
 import { clipSections, describeScene, filmOffsets, filmPosterMs, filmScript, filmShots, filmTimeline, fitSections, fitToVoice, fixPalette, illustrative, MOTION, normalizeFilm, numbersIn } from "../src/motion.ts";
 
@@ -245,5 +246,18 @@ describe("anlatım, senaryo, çekim ve timeline", () => {
     const silent = filmTimeline({ episodeId: "e", lang: "tr", fps: 30, width: 1920, height: 1080, film: f, images: [], voice, captions: false });
     expect(silent.captions).toEqual([]);
     expect(silent.speech).toHaveLength(1);
+  });
+});
+
+describe("film düzeltmesinin ölçüsü", () => {
+  it("geçemeyen pay küçülürse ya da aynı payda ortalama yükselirse daha iyi", () => {
+    // Kontrol listeli kayıtta 8 barajı; denetlenmeyen kare (m3) geçemez sayılır.
+    const shots = { m1: { score: 10, issues: [], checks: {} }, m2: { score: 7, issues: [], checks: {} } };
+    expect(reviewShare({ shots }, ["m1", "m2", "m3"])).toEqual({ share: 2 / 3, mean: 8.5 });
+    expect(reviewShare({ shots: {} }, [])).toEqual({ share: 0, mean: 0 });
+    expect(betterFilm({ share: 0.2, mean: 6 }, { share: 0.5, mean: 9 })).toBe(true);
+    expect(betterFilm({ share: 0.5, mean: 9 }, { share: 0.5, mean: 8 })).toBe(true);
+    expect(betterFilm({ share: 0.5, mean: 8 }, { share: 0.5, mean: 8 })).toBe(false);
+    expect(betterFilm({ share: 0.6, mean: 10 }, { share: 0.5, mean: 8 })).toBe(false);
   });
 });

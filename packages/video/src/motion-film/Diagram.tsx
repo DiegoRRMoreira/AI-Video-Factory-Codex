@@ -58,8 +58,7 @@ export function Diagram(p: PartProps) {
               {e.label && k > 0.98 && (
                 // Etiket bağın yanında, çizgiye dik yönde (üstüne binmez), zemin renginde bir hale ile.
                 <text
-                  x={(s.x1 + s.x2) / 2 + Math.sin(ang) * label * 0.9}
-                  y={(s.y1 + s.y2) / 2 - Math.abs(Math.cos(ang)) * label * 0.9}
+                  {...labelSpot(s, e.label.length * Math.round(label * 0.75) * body.em, Math.round(label * 0.75), label * 0.3)}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fill={colors.fg}
@@ -115,6 +114,21 @@ export function Diagram(p: PartProps) {
 }
 
 /** Etiketin iki satıra bölünmüş hâlinin uzun satırı (tek kelimeyse kendisi). */
+/**
+ * Bağ etiketinin merkezi: bağın ortasından çizgiye dik, üst yana (yatay bağda yukarı, dikeyde yana), etiketin kutusu
+ * çizgiye değmeyecek kadar (kutunun dik yöndeki yarı genişliği + gap). 23 Kas, film denetçisi AI Video Factory m13:
+ * eğik bağda yalnız yazı yüksekliği kadar açılan "< 8 puan" çizginin üstüne biniyordu; sola giden bağda kayma çizgiye dik
+ * de değildi ("tekrar").
+ */
+export function labelSpot(s: { x1: number; y1: number; x2: number; y2: number }, w: number, h: number, gap: number): { x: number; y: number } {
+  const ang = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+  const [sin, cos] = [Math.sin(ang), Math.cos(ang)];
+  // Dik yön (sin, −cos); aşağı bakıyorsa ters çevrilir (etiket bağın üstünde).
+  const flip = -cos > 1e-9 ? -1 : 1;
+  const off = (w / 2) * Math.abs(sin) + (h / 2) * Math.abs(cos) + gap;
+  return { x: (s.x1 + s.x2) / 2 + flip * sin * off, y: (s.y1 + s.y2) / 2 - flip * cos * off };
+}
+
 export function halves(label: string): string {
   const words = label.split(/\s+/);
   let best = label;

@@ -621,6 +621,14 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
   yeniden yaz". CLI: `episode new --film`.
 - **Doğrulama (22 Kas):** gerçek brifle agy/Gemini 4 Neon yönetmeni 60 sn'de 14 sahne, 120 BPM, 32 sn; denetim
   temiz, render, paket ve dikey Short tamam, ücretli API yok.
+- **Kare denetimi (23 Kas):** render'dan önce `film-critic` her sahnenin son öğesi oturduktan sonraki karesine film
+  kontrol listesiyle bakar (eksik öğe, kesik yazı, çakışma, okunmazlık ağır; tarife uymayan yazı, kalabalık, dengesiz
+  kompozisyon hafif); puanı taslak incelemesinin motoru verir, baraj 8. Anlatımsızda barajın altındaki sahneler bulgularla
+  yönetmene bir kez döner, düzeltilmiş film ancak daha iyi denetlenirse kalır; anlatımlıda yalnız render kapısını tutar.
+  Ritim ve geçişler kodun denetiminde kalır, film dersleri ortak deftere yazılmaz. Kalibrasyon (agy/Gemini 3.8 Flash,
+  iki gerçek film, 25 kare): denetçinin bulduğu üç kusur gerçekti ve kodda düzeltildi (dar maske vurgu hapını kesiyordu,
+  büyük puntoda alt uzantılar haptan taşıyordu, eğik bağın etiketi çizgiye biniyordu); düzeltmeden sonra bütün kareler 8
+  ve üstü.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

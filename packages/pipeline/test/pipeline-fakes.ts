@@ -44,6 +44,7 @@ export const AGENT_NAMES = [
   "youtubeAnalyst",
   "youtubeCurator",
   "motionDirector",
+  "filmCritic",
 ] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 
@@ -81,6 +82,15 @@ export function checked(shotId: string, fails: Record<string, string> = {}) {
     checks: Object.fromEntries(
       [...MAJOR, ...MINOR].map((id) => [id, id in fails ? { evidence: fails[id]!, verdict: "fail" } : { evidence: `looked at ${id} in the frame`, verdict: "pass" }]),
     ),
+  };
+}
+
+/** Film denetçisinin maddeleri (agents/src/review.ts FILM_CHECKS); `fails` kalanlar, gerisi kanıtlı "pass". */
+const FILM_IDS = ["missing", "text_cut", "overlap", "unreadable", "off_brief", "cluttered", "unbalanced"];
+export function filmChecked(shotId: string, fails: Record<string, string> = {}) {
+  return {
+    shotId,
+    checks: Object.fromEntries(FILM_IDS.map((id) => [id, id in fails ? { evidence: fails[id]!, verdict: "fail" } : { evidence: `looked at ${id} in the frame`, verdict: "pass" }])),
   };
 }
 

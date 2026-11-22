@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MotionFilmOut } from "@ys/agents";
 import { approve, isApproved, redrawShots, remakeFilm, type EpisodeInput, type EpisodeState } from "../src/index.ts";
-import { callsOf, media, onAgent, render, resetFakes } from "./pipeline-fakes.ts";
+import { callsOf, filmChecked, media, onAgent, render, resetFakes } from "./pipeline-fakes.ts";
 import { harness, makeState } from "./pipeline-harness.ts";
 
 vi.mock("@ys/agents", async (orig) => (await import("./pipeline-fakes.ts")).mockAgents(await orig()));
@@ -77,6 +77,7 @@ beforeEach(() => {
   media.probe.mockImplementation(async () => 2000);
   media.silences.mockImplementation(async () => []);
   onAgent("motionDirector", () => FILM);
+  onAgent("filmCritic", (items: { shotId: string }[]) => ({ shots: items.map((i) => filmChecked(i.shotId)) }));
   onAgent("packager", () => ({ title: "P", thumbnailText: "T", description: "D", chapters: [], tags: [], hashtags: [], short: { from: "m1", to: "m3", title: "S" } }));
 });
 
@@ -134,8 +135,19 @@ describe("film hattı", () => {
     expect(t.visuals.map((v) => v.film!.id)).toEqual(["m1", "m2", "m3"]);
     expect(t.audio.map((a) => a.role).sort()).toEqual(["music", "sfx"]);
     expect(h.logs.some((l) => l.includes("hook → build"))).toBe(true);
-    // Render'dan önce sahne önizlemeleri (Çekimler sekmesi).
+    // Render'dan önce sahne önizlemeleri (Çekimler sekmesi): kare denetiminin kareleri.
     expect(Object.keys(state.stills!)).toEqual(["m1", "m2", "m3"]);
+    // Kare denetimi film kontrol listesiyle, sahnenin tarifine bakarak; hepsi geçer, render otomatik onaylanır.
+    const [items, look] = callsOf("filmCritic")[0]!.args as [{ shotId: string; intent: string }[], { tall: boolean; subtitles: boolean; palette: { accent: string } }];
+    expect(items.map((i) => i.shotId)).toEqual(["m1", "m2", "m3"]);
+    expect(items[0]!.intent).toMatch(/^spec \{"language":"kinetic"/);
+    expect(items[0]!.intent).not.toContain("narration");
+    expect(look).toMatchObject({ tall: false, subtitles: false, palette: { accent: "#2563eb" } });
+    expect(state.draftReview).toMatchObject({ rubric: 1, avg: 10, revisedScenes: [], lessons: [] });
+    expect(state.draftReview!.shots.m1!.checks!.missing!.verdict).toBe("pass");
+    // Kare son öğe oturduktan sonra alınır (en erken sahnenin %80'i).
+    const frames = render.stills.mock.calls[0]![0] as { frames: Record<string, number> };
+    expect(frames.frames.m1! - t.visuals[0]!.fromFrame).toBeGreaterThanOrEqual(Math.floor(t.visuals[0]!.durationInFrames * 0.8));
     // Render görselleri render klasörüne indirir.
     const staged = render.episode.mock.calls[0]![0] as { publicDir: string };
     expect(await import("node:fs").then((fs) => fs.existsSync(join(staged.publicDir, ...state.input.motion!.images[0]!.key.split("/"))))).toBe(true);
@@ -238,6 +250,14 @@ describe("film hattı", () => {
     expect(state.timeline!.visuals).toHaveLength(3);
     expect(state.stills).toBeUndefined();
     expect(h.logs.some((l) => l.includes("chrome yok"))).toBe(true);
+    // Denetim kapalıyken yalnız önizleme çıkarılır; o da düşerse günlüğe yazılır.
+    const off = harness();
+    render.stills.mockRejectedValueOnce(new Error("sekme kapandı"));
+    const b = await off.pipeline.createMotion(input({ qa: false }));
+    const plain = await off.pipeline.run(b.id, { until: "timeline" });
+    expect(plain.timeline!.visuals).toHaveLength(3);
+    expect(plain.stills).toBeUndefined();
+    expect(off.logs.some((l) => l.includes("sekme kapandı"))).toBe(true);
   });
 
   it("zamanlanmamış film de timeline olur; efekt ve müzik kapatılabilir", async () => {
@@ -273,5 +293,124 @@ describe("film eylemleri", () => {
     withFilm.script = { scenes: [] };
     approve(withFilm, "script");
     expect(() => remakeFilm(withFilm, "y")).toThrow();
+  });
+});
+
+describe("film kare denetimi", () => {
+  type Item = { shotId: string; intent: string };
+  /** Denetçi: `fail` çağrı sırasına göre (0: ilk inceleme) geçemeyen sahneleri söyler. */
+  const critic = (fail: (call: number) => Record<string, Record<string, string>>) => {
+    let call = 0;
+    onAgent("filmCritic", (items: Item[]) => {
+      const f = fail(call++);
+      return { shots: items.map((i) => filmChecked(i.shotId, f[i.shotId])) };
+    });
+  };
+
+  it("geçemeyen sahne bulgularla yönetmene döner; daha iyi denetlenen düzeltme kalır", async () => {
+    const h = harness();
+    critic((call): Record<string, Record<string, string>> => (call === 0 ? { m2: { text_cut: "The title 'Deploy time' runs off the right edge." } } : {}));
+    let n = 0;
+    onAgent("motionDirector", () => (n++ ? { ...FILM, title: "Relay 2" } : FILM));
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id, { until: "timeline" });
+    const notes = (callsOf("motionDirector")[1]!.args[0] as { revise: { notes: string[] } }).revise.notes;
+    expect(notes).toEqual(["frame check m2 (7/10): text_cut: The title 'Deploy time' runs off the right edge."]);
+    expect(state.story!.title).toBe("Relay 2");
+    expect(state.draftReview!.revisedScenes).toEqual(["m2"]);
+    expect(state.draftReview!.shots.m2!.score).toBe(10);
+    expect(h.logs.some((l) => l.includes("%33 → %0"))).toBe(true);
+    expect(isApproved(state, "preview")).toBe(true);
+  });
+
+  it("düzeltme daha iyi değilse önceki film, kareler ve inceleme geri gelir; render onay bekler", async () => {
+    const h = harness();
+    critic(() => ({ m2: { overlap: "The bar labels run into the title." } }));
+    let n = 0;
+    onAgent("motionDirector", () => (n++ ? { ...FILM, title: "Relay 2" } : FILM));
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id);
+    expect(callsOf("filmCritic")).toHaveLength(2);
+    expect(state.story!.title).toBe("Relay");
+    expect(state.motionFilm!.title).toBe("Relay");
+    expect(state.draftReview!.revisedScenes).toEqual([]);
+    expect(Object.keys(state.stills!)).toEqual(["m1", "m2", "m3"]);
+    expect(h.logs.some((l) => l.includes("önceki film kalıyor") && l.includes("%33 → %33"))).toBe(true);
+    // Otomatik onay da durur: barajın altında sahne var.
+    expect(state.done.render).toBeFalsy();
+    expect(h.logs.some((l) => l.includes("m2"))).toBe(true);
+  });
+
+  it("ikinci inceleme yapılamazsa ya da yönetmen düşerse önceki film kalır", async () => {
+    const h = harness();
+    let call = 0;
+    onAgent("filmCritic", (items: Item[]) => {
+      if (call++) throw new Error("denetçi düştü");
+      return { shots: items.map((i) => filmChecked(i.shotId, i.shotId === "m1" ? { missing: "The headline is not on screen yet." } : {})) };
+    });
+    let n = 0;
+    onAgent("motionDirector", () => (n++ ? { ...FILM, title: "Relay 2" } : FILM));
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id, { until: "timeline" });
+    expect(state.story!.title).toBe("Relay");
+    expect(state.draftReview!.shots.m1!.score).toBe(7);
+    expect(h.logs.some((l) => l.includes("%33 → %100"))).toBe(true);
+
+    const h2 = harness();
+    critic(() => ({ m1: { missing: "The headline is not on screen yet." } }));
+    let m = 0;
+    onAgent("motionDirector", () => {
+      if (m++) throw new Error("yönetmen düştü");
+      return FILM;
+    });
+    const b = await h2.pipeline.createMotion(input());
+    const kept = await h2.pipeline.run(b.id, { until: "timeline" });
+    // Çağrılar testte birikir: ilk bölümün iki incelemesi + bu bölümün tek incelemesi (yönetmen düştü, ikinci inceleme yok).
+    expect(callsOf("filmCritic")).toHaveLength(3);
+    expect(kept.draftReview!.shots.m1!.score).toBe(7);
+    expect(h2.logs.some((l) => l.includes("yönetmen düştü"))).toBe(true);
+  });
+
+  it("anlatımlı filmde yalnız kapı tutar; geçersiz yanıt denetlenmemiş sayılır, düzeltilecek bulgu yoktur", async () => {
+    const h = harness();
+    critic(() => ({ m1: { unreadable: "The headline is pale on the pale ground." } }));
+    const a = await h.pipeline.createMotion(input({}, { narration: true }));
+    const state = await h.pipeline.run(a.id, { until: "timeline" });
+    expect(callsOf("motionDirector")).toHaveLength(1);
+    expect(state.draftReview!.shots.m1!.score).toBe(7);
+    expect((callsOf("filmCritic")[0]!.args[1] as { subtitles: boolean }).subtitles).toBe(true);
+    expect(isApproved(state, "preview")).toBe(false);
+
+    const h2 = harness();
+    onAgent("filmCritic", (items: Item[]) => ({ shots: items.map((i) => ({ shotId: i.shotId, checks: { missing: { evidence: "ok", verdict: "pass" } } })) }));
+    const b = await h2.pipeline.createMotion(input());
+    const bad = await h2.pipeline.run(b.id, { until: "timeline" });
+    expect(bad.draftReview).toMatchObject({ avg: 0, shots: {} });
+    // Bulgu yok: yönetmen yalnız iki bölümün senaryosunu yazdı.
+    expect(callsOf("motionDirector")).toHaveLength(2);
+  });
+
+  it("hiçbir kare denetlenemezse boş kayıt kalır, render onay bekler; qa kapalıyken denetim yok, yalnız önizleme", async () => {
+    const h = harness();
+    onAgent("filmCritic", () => {
+      throw new Error("kota doldu");
+    });
+    const a = await h.pipeline.createMotion(input());
+    const state = await h.pipeline.run(a.id);
+    expect(state.draftReview).toMatchObject({ rubric: 1, shots: {} });
+    expect(Object.keys(state.stills!)).toEqual(["m1", "m2", "m3"]);
+    expect(state.done.render).toBeFalsy();
+    expect(h.logs.some((l) => l.includes("kota doldu"))).toBe(true);
+
+    const off = harness();
+    const b = await off.pipeline.createMotion(input({ qa: false }));
+    const seeded = await off.load(b.id);
+    seeded.draftReview = { at: "x", rubric: 1, shots: {}, lessons: [], avg: 0, revisedScenes: [] };
+    await off.seed(seeded);
+    const done = await off.pipeline.run(b.id, { until: "timeline" });
+    // Yalnız ilk bölümün (düşen) çağrısı.
+    expect(callsOf("filmCritic")).toHaveLength(1);
+    expect(done.draftReview).toBeUndefined();
+    expect(Object.keys(done.stills!)).toEqual(["m1", "m2", "m3"]);
   });
 });

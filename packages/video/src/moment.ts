@@ -2,6 +2,7 @@ import { ARM_GESTURES, type Timeline, type VectorAnim, type VectorAnimType } fro
 import { bubbleSize, sayWindow } from "./bubble.ts";
 import { visualVector } from "./entrance.ts";
 import { revealWindow } from "./kinetic-timing.ts";
+import { filmStill } from "./motion-film/timing.ts";
 import { FOREARM_LAG, gestureTimes } from "./motion.ts";
 import { shotModel } from "./Vector.tsx";
 
@@ -30,7 +31,9 @@ const TEXT = new Set<VectorAnimType>(["typewriter", "count_up", "kinetic"]);
  * başlamamışken kişilerin en çok jestinin göründüğü an; eşitlikte at'e en yakını. Jestler sahnelenmiş plandan
  * (staging: kısalan, sıraya giren jest render'daki gibi).
  */
-export function stillMoment(visual: Visual, assets: Assets, fps: number): number {
+export function stillMoment(visual: Visual, assets: Assets, fps: number, bpm?: number): number {
+  // Film sahnesi: öğeleri vuruşla girer; kare son öğe oturduktan sonra (timeline.motion.bpm).
+  if (visual.film && bpm) return filmStill(visual.film, visual.durationInFrames, bpm, fps);
   if (!visual.vector) return STILL.at;
   const dur = visual.durationInFrames / fps;
   const { spec, safe } = shotModel(visualVector(visual, assets, fps)!, assets, "outline", 1920, 1080, Boolean(visual.overlay), dur, visual.dressing);

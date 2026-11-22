@@ -23,7 +23,7 @@ vi.mock("../src/Scene3D.tsx", () => ({ Scene3D: (p: { spec: Record<string, unkno
 
 const { FilmScene, ILLUSTRATIVE } = await import("../src/motion-film/Film.tsx");
 const { markedWords } = await import("../src/motion-film/Kinetic.tsx");
-const { halves, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
+const { halves, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
 const { gridShape } = await import("../src/motion-film/Grid.tsx");
 const { fileSrc } = await import("../src/motion-film/context.ts");
 const { Episode } = await import("../src/Episode.tsx");
@@ -90,6 +90,9 @@ describe("kinetik yazı", () => {
     expect((draw(kinetic("slam"), 0).querySelector("[data-pill]") as HTMLElement).style.color).toBe("");
     expect(draw(kinetic("rise", { kinetic: { lines: ["Plain"], mode: "rise" } }), 60).querySelector("[data-pill]")).toBeNull();
     expect(draw(kinetic("rise"), 60).querySelectorAll("[data-line]").length).toBe(2);
+    // Maske hapın taşmasını kesmez: iki yandan geniş, yerleşim aynı.
+    const mask = draw(kinetic("rise"), 60).querySelector<HTMLElement>("[data-line]")!.style;
+    expect([mask.padding, mask.margin]).toEqual(["0px 0.3em 0.2em", "0px -0.3em -0.12em"]);
   });
 
   it("kelime kelime: vurgu ifadesi birkaç kelimeye yayılır; dikeyde sola yaslı", () => {
@@ -184,6 +187,22 @@ describe("sistem diyagramı", () => {
     expect(layoutNodes(straight.diagram!, area, true).at.get("b")).toEqual({ x: 300, y: 100 });
     expect(layoutNodes(straight.diagram!, area, false).at.get("b")).toEqual({ x: 100, y: 300 });
     expect(halves("Kurgu ve Render")).toBe("Kurgu ve");
+    // Bağ etiketi çizgiye değmez: kutunun dik yöndeki yarısı + boşluk kadar, bağın üst yanına.
+    const gap = (s: { x1: number; y1: number; x2: number; y2: number }, w: number, h: number) => {
+      const p = labelSpot(s, w, h, 10);
+      const [dx, dy] = [s.x2 - s.x1, s.y2 - s.y1];
+      const len = Math.hypot(dx, dy);
+      const dist = ((p.x - s.x1) * dy - (p.y - s.y1) * dx) / len;
+      const reach = (w / 2) * Math.abs(dy / len) + (h / 2) * Math.abs(dx / len);
+      return { p, clear: Math.abs(dist) - reach };
+    };
+    expect(gap({ x1: 0, y1: 0, x2: 200, y2: 0 }, 100, 20)).toEqual({ p: { x: 100, y: -20 }, clear: 10 });
+    for (const s of [{ x1: 0, y1: 0, x2: 120, y2: 140 }, { x1: 300, y1: 200, x2: 0, y2: 0 }, { x1: 0, y1: 0, x2: 0, y2: 200 }]) {
+      const { p, clear } = gap(s, 110, 24);
+      expect(clear).toBeCloseTo(10);
+      // Eğik bağda etiket bağın üst yanında kalır.
+      if (s.y1 !== s.y2 && s.x1 !== s.x2) expect(p.y).toBeLessThan((s.y1 + s.y2) / 2);
+    }
     expect(halves("Deploy")).toBe("Deploy");
   });
 });

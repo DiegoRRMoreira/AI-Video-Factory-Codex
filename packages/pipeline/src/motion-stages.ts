@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import { motionDirector, type AgentResult, type MotionFilmOut } from "@ys/agents";
-import { errorText, LocalizedError, MOTION_FILM, msg, type MotionFilm, type Text, type Timeline } from "@ys/core";
+import { errorText, LocalizedError, MOTION_FILM, msg, shotPasses, type MotionFilm, type ShotReviewRecord, type Text, type Timeline } from "@ys/core";
 import type { AssetStore } from "@ys/storage";
 import { lintFilm, type FilmIssue } from "@ys/video/film";
 import { FOOTAGE_TYPES, sniffFootage } from "./footage.ts";
 import { filmScript, filmShots, filmTimeline, fitToVoice, MOTION, normalizeFilm, type MotionInput } from "./motion.ts";
-import type { EpisodeState, Stage } from "./state.ts";
+import type { EpisodeReview, EpisodeState, Stage } from "./state.ts";
 
 type StageFn = (state: EpisodeState, opts: { signal?: AbortSignal }) => Promise<void>;
 
@@ -21,6 +21,28 @@ export interface MotionContext {
   soundEffects(state: EpisodeState, timeline: Timeline): Promise<void>;
   /** Sahnelerin önizleme kareleri (Stüdyo Çekimler sekmesi); çıkarılamazsa günlüğe yazılır, üretim sürer. */
   previews(state: EpisodeState, timeline: Timeline): Promise<void>;
+  /**
+   * Sahnelerin karelerini çıkarır, önizleme olarak yazar ve film denetçisine denetletir; inceleme state.draftReview'a
+   * yazılır. Kareler çıkarılamaz ya da hiçbiri denetlenemezse boş (rubrikli) kayıt kalır ve undefined döner.
+   */
+  review(state: EpisodeState, timeline: Timeline): Promise<EpisodeReview | undefined>;
+  /** Barajı geçemeyen sahneler kaldıysa günlüğe yazar (render yapımcının onayını bekler). */
+  logBelow(state: EpisodeState): void;
+}
+
+/** Bir incelemenin özeti: geçemeyen ya da denetlenemeyen kare payı ve denetlenen karelerin ortalaması. */
+export function reviewShare(review: { shots: Record<string, ShotReviewRecord> }, ids: readonly string[]): { share: number; mean: number } {
+  const scores = ids.flatMap((id) => (review.shots[id] ? [review.shots[id]!.score] : []));
+  const failing = ids.filter((id) => !shotPasses(review.shots[id])).length;
+  return { share: failing / Math.max(1, ids.length), mean: scores.reduce((a, b) => a + b, 0) / Math.max(1, scores.length) };
+}
+
+/**
+ * Düzeltilmiş film eskisinden iyi mi: geçemeyen pay daha küçük, ya da aynı payda ortalama daha yüksek (sahne sayısı
+ * değişebildiği için pay; taslak incelemesinin worseScene'iyle aynı ölçü).
+ */
+export function betterFilm(after: { share: number; mean: number }, before: { share: number; mean: number }): boolean {
+  return after.share < before.share - 1e-9 || (Math.abs(after.share - before.share) <= 1e-9 && after.mean > before.mean);
 }
 
 /** Filmde kullanılabilen görsel türleri (logo, ekran görüntüsü). */
@@ -151,27 +173,82 @@ export function motionStages(ctx: MotionContext): Partial<Record<Stage, StageFn>
       ctx.log(msg("log.motion.fit", { sec: sec.toFixed(1), target: state.input.targetSec, max: MOTION_FILM.maxSec }));
     },
 
-    /** Timeline: sahneler, anlatım ve altyazı; sonra filmin temposunda müzik ve efekt. */
+    /**
+     * Timeline: sahneler, anlatım ve altyazı; sonra filmin temposunda müzik ve efekt; sonra kare denetimi (qa kapalı
+     * değilse). Anlatımsız filmde barajı geçemeyen sahneler denetçinin bulgularıyla yönetmene bir kez döner; düzeltilmiş
+     * film ancak daha iyi denetlenirse kalır. Anlatımlı filmde sahne uzunlukları sese bağlı: yalnız kapı tutar.
+     */
     timeline: async (state) => {
-      const film = state.motionTimed ?? state.motionFilm;
-      if (!film) throw new LocalizedError(msg("err.missing", { what: "motionFilm" }));
-      const timeline = filmTimeline({
-        episodeId: state.id,
-        lang: state.input.lang,
-        fps: state.input.fps,
-        width: state.input.width,
-        height: state.input.height,
-        film,
-        images: imagesOf(state).map((i) => i.key),
-        voice: state.voice ?? {},
-        captions: state.input.motion!.narration && state.input.captions !== false,
-      });
-      state.timeline = timeline;
-      if (state.input.sfx !== false) await ctx.soundEffects(state, timeline);
-      if (state.input.music !== false) await ctx.music(state, timeline);
-      await ctx.previews(state, timeline);
+      let timeline = await build(state);
+      if (state.input.qa === false) {
+        delete state.draftReview;
+        await ctx.previews(state, timeline);
+      } else {
+        const review = await ctx.review(state, timeline);
+        if (review && !state.input.motion!.narration) timeline = await revise(state, review);
+        if (review) ctx.logBelow(state);
+      }
       const sec = timeline.durationInFrames / timeline.fps;
       ctx.log(msg("log.timeline.done", { min: (sec / 60).toFixed(1), visuals: timeline.visuals.length }));
     },
   };
+
+  /** Filmin timeline'ı, efektleri ve müziği (state.timeline'a yazılır). */
+  async function build(state: EpisodeState): Promise<Timeline> {
+    const film = state.motionTimed ?? state.motionFilm;
+    if (!film) throw new LocalizedError(msg("err.missing", { what: "motionFilm" }));
+    const timeline = filmTimeline({
+      episodeId: state.id,
+      lang: state.input.lang,
+      fps: state.input.fps,
+      width: state.input.width,
+      height: state.input.height,
+      film,
+      images: imagesOf(state).map((i) => i.key),
+      voice: state.voice ?? {},
+      captions: state.input.motion!.narration && state.input.captions !== false,
+    });
+    state.timeline = timeline;
+    if (state.input.sfx !== false) await ctx.soundEffects(state, timeline);
+    if (state.input.music !== false) await ctx.music(state, timeline);
+    return state.timeline;
+  }
+
+  /**
+   * Kare denetiminin bulgularıyla bir düzeltme turu (22 Kas). Yönetmen geçemeyen sahneleri bulgularla düzeltir, film
+   * yeniden zamanlanır ve denetlenir; daha iyi değilse önceki film, timeline, kareler ve inceleme geri gelir (eski
+   * kareler ve sesler içerik adresli anahtarlarda durur). Döner: geçerli timeline.
+   */
+  async function revise(state: EpisodeState, review: EpisodeReview): Promise<Timeline> {
+    const failing = state.shots!.filter((s) => !shotPasses(review.shots[s.id]) && review.shots[s.id]);
+    if (!failing.length) return state.timeline!;
+    ctx.log(msg("log.motion.critic", { n: failing.length, scenes: failing.map((s) => s.id).join(", ") }));
+    const notes = failing.map((s) => `frame check ${s.id} (${review.shots[s.id]!.score}/10): ${review.shots[s.id]!.issues.map((i) => `${i.type}: ${i.detail}`).join("; ")}`);
+    const before = { motionFilm: state.motionFilm, motionTimed: state.motionTimed, motionLint: state.motionLint, script: state.script, story: state.story, shots: state.shots, timeline: state.timeline, draftReview: state.draftReview, stills: state.stills };
+    const was = reviewShare(review, before.shots!.map((s) => s.id));
+    let film: MotionFilm;
+    try {
+      film = await direct(state, { film: state.motionFilm!, notes });
+    } catch (e) {
+      ctx.log(msg("log.motion.reviseSkipped", { error: errorText(e) }));
+      return state.timeline!;
+    }
+    state.motionFilm = film;
+    state.motionLint = lintFilm(film, state.input.fps);
+    state.script = filmScript(film);
+    state.story = { ...state.story!, title: film.title };
+    state.motionTimed = fitToVoice(film, {});
+    state.shots = filmShots(state.motionTimed, state.input.fps);
+    const timeline = await build(state);
+    const again = await ctx.review(state, timeline);
+    const now = again ? reviewShare(again, state.shots.map((s) => s.id)) : undefined;
+    if (again && betterFilm(now!, was)) {
+      state.draftReview = { ...state.draftReview!, revisedScenes: failing.map((s) => s.id) };
+      ctx.log(msg("log.motion.criticKept", { before: Math.round(was.share * 100), after: Math.round(now!.share * 100) }));
+      return timeline;
+    }
+    Object.assign(state, before);
+    ctx.log(msg("log.motion.criticReverted", { before: Math.round(was.share * 100), after: now ? Math.round(now.share * 100) : 100 }));
+    return state.timeline!;
+  }
 }

@@ -22,7 +22,11 @@ import {
   checklistIssues,
   checklistProblem,
   checklistScore,
+  FILM_CHECKS,
+  filmCritic,
+  REVIEW_CHECKS,
   settleChecks,
+  type ShotChecks,
   stylePicker,
   scriptDoctor,
   storyArchitect,
@@ -1618,6 +1622,17 @@ export class EpisodePipeline {
         .filter((w) => w.startMs >= startMs && w.startMs < endMs)
         .map((w) => w.text)
         .join(" ");
+    // Hareketli grafik filmi kendi kontrol listesiyle denetlenir: kişi, çizim ve sahne grameri yok; karenin ne
+    // göstermesi gerektiğini sahnenin tarifi (JSON) söyler.
+    const look = timeline.motion;
+    const specs = new Map(
+      timeline.visuals.flatMap((v) => {
+        if (!v.film) return [];
+        const { id: _id, beats: _beats, transition: _transition, hit: _hit, narration: _narration, ...spec } = v.film;
+        return [[v.shotId, JSON.stringify(spec)] as const];
+      }),
+    );
+    const list = look ? FILM_CHECKS : REVIEW_CHECKS;
     const review: EpisodeReview = { at: new Date().toISOString(), rubric: REVIEW_RUBRIC, shots: {}, lessons: [] };
     let reviewed = 0;
     const errors: unknown[] = [];
@@ -1634,27 +1649,30 @@ export class EpisodePipeline {
           .map(async (s) => ({
             shotId: s.id,
             image: { data: new Uint8Array(await readFile(files[s.id]!)), mimeType: "image/jpeg" },
-            intent: `${state.archives?.[s.id] ? `Intentional real archive photograph/document insert (title as source data: ${JSON.stringify(state.archives[s.id]!.source.title)}); do not require the episode's illustrated character style. ` : ""}${s.description} | narration: "${spoken(s.startMs, s.endMs)}"${s.intent ? ` | ${shotIntentText(s.intent)}` : ""}`,
+            intent: specs.has(s.id) ? `spec ${specs.get(s.id)!}` : `${state.archives?.[s.id] ? `Intentional real archive photograph/document insert (title as source data: ${JSON.stringify(state.archives[s.id]!.source.title)}); do not require the episode's illustrated character style. ` : ""}${s.description} | narration: "${spoken(s.startMs, s.endMs)}"${s.intent ? ` | ${shotIntentText(s.intent)}` : ""}`,
           })),
       );
       if (!items.length) return;
       try {
-        const out = await this.agent(state, stage, sceneCritic(items, known, this.agentDeps, subtitles, style));
+        const out = look
+          ? await this.agent(state, stage, filmCritic(items, { tall: timeline.height > timeline.width, palette: look.palette, subtitles: timeline.captions.length > 0 }, this.agentDeps))
+          : await this.agent(state, stage, sceneCritic(items, known, this.agentDeps, subtitles, style));
         const asked = new Set(items.map((i) => i.shotId));
         for (const s of out.shots) {
           if (!asked.has(s.shotId)) continue;
-          // Altyazısız videoda "altyazı alanında" kusuru olamaz (denetçi yine de derse sayılmaz).
-          const checks = settleChecks(s.checks, subtitles);
+          // Altyazısız videoda "altyazı alanında" kusuru olamaz (denetçi yine de derse sayılmaz); filmin listesinde bu madde yok.
+          const checks = look ? s.checks : settleChecks(s.checks as ShotChecks, subtitles);
           // Gerçekten bakılmamış kare (eksik madde, kanıtsız karar, her karede bakılacak maddeye "uygulanmaz") denetlenmemiş
           // sayılır: kaydı yazılmaz, bir kez daha istenir; yine olmazsa sahnesi barajı geçemez.
-          const problem = checklistProblem(checks);
+          const problem = checklistProblem(checks, list);
           if (problem) {
             this.log(msg("log.review.invalid", { shot: s.shotId, reason: problem }));
             continue;
           }
-          review.shots[s.shotId] = { score: checklistScore(checks), issues: checklistIssues(checks), checks };
+          review.shots[s.shotId] = { score: checklistScore(checks, list), issues: checklistIssues(checks, list), checks };
         }
-        review.lessons.push(...out.lessons);
+        // Film denetçisi ders vermez: film kuralları çizim ve yerleşim ajanlarının defterine karışmasın.
+        if ("lessons" in out) review.lessons.push(...out.lessons);
         reviewed++;
       } catch (e) {
         // İnceleme videoyu bozmaz; başarısız grup atlanır.
@@ -1684,7 +1702,7 @@ export class EpisodePipeline {
     const frames = Object.fromEntries(
       timeline.visuals
         .filter((v) => !only || only.has(v.shotId))
-        .map((v) => [v.shotId, v.fromFrame + Math.floor(v.durationInFrames * stillMoment(v, timeline.vectorAssets, timeline.fps))]),
+        .map((v) => [v.shotId, v.fromFrame + Math.floor(v.durationInFrames * stillMoment(v, timeline.vectorAssets, timeline.fps, timeline.motion?.bpm))]),
     );
     const outDir = join(dir, "stills");
     await mkdir(outDir, { recursive: true });
@@ -2751,7 +2769,39 @@ export class EpisodePipeline {
       music: (state, timeline) => this.music(state, timeline),
       soundEffects: (state, timeline) => this.soundEffects(state, timeline),
       previews: (state, timeline) => this.filmPreviews(state, timeline),
+      review: (state, timeline) => this.filmReview(state, timeline),
+      logBelow: (state) => this.logBelow(state),
     };
+  }
+
+  /**
+   * Film karelerinin denetimi (22 Kas): kareler önizleme olarak da yazılır (ayrıca çıkarılmaz), inceleme film kontrol
+   * listesiyle (FILM_CHECKS) yapılır ve taslak incelemesi gibi render kapısını tutar. Kareler çıkarılamaz ya da hiçbiri
+   * denetlenemezse boş kayıt kalır: her sahne barajın altında sayılır, render yapımcının onayını bekler.
+   */
+  private async filmReview(state: EpisodeState, timeline: Timeline): Promise<EpisodeReview | undefined> {
+    let critique: Awaited<ReturnType<typeof this.critiqueShots>>;
+    try {
+      critique = await this.critiqueShots(state, "timeline", timeline, await this.draftDir(state), []);
+    } catch (e) {
+      this.log(msg("log.draft.failed", { reason: firstLine(e) }));
+      this.unreviewedDraft(state);
+      return undefined;
+    }
+    state.stills = {};
+    await this.storeStills(state, critique.files);
+    if (critique.unreviewed) {
+      this.log(msg("log.draft.unreviewed", { error: critique.unreviewed }));
+      this.unreviewedDraft(state);
+      return undefined;
+    }
+    const { review } = critique;
+    const scores = Object.values(review.shots).map((s) => s.score);
+    const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    const below = state.shots!.filter((s) => !shotPasses(review.shots[s.id])).length;
+    this.log(msg("log.draft.summary", { frames: scores.length, avg: avg.toFixed(1), scenes: below }));
+    state.draftReview = { ...review, avg, revisedScenes: [] };
+    return state.draftReview;
   }
 
   /** Film sahnelerinin önizleme kareleri: render'ı beklemeden Çekimler sekmesi dolsun (vectorPreviews gibi). */

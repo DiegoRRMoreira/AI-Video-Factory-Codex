@@ -139,6 +139,12 @@ montage cut on the beat), a particle field or a 3D object. Code checks the plan 
 the middle, no more than two bars without something new, readable text, elements that fit their scene); readability
 and fit are fixed in code, the rest goes back to the director once. Transitions (cut, flash, colour flip, flood, iris,
 whip, push-through), the camera and the score share the film's tempo; sound effects land on the cuts and elements.
+Before the render the `film-critic` agent checks one frame per scene, taken after its last element has settled, against a
+film checklist (elements the scene lists are on screen; no text cut, overlapping or unreadable; text and numbers as
+written; one focal point; a balanced composition) and the code scores it like the draft review: a scene passes at 8.
+Without narration the scenes below the bar go back to the director once with the findings, and the revised film is kept
+only if it checks better; with narration (scene lengths follow the voice) the check only holds the render for your
+approval. The frames are the Shots tab's previews; `--no-qa` skips the check.
 `episode show` prints the rhythm sheet, the scenes and any remaining check findings. In the Studio: **New episode →
 Motion-graphics film**; the Script tab shows the treatment and **Remake with a note** sends a note to the director.
 

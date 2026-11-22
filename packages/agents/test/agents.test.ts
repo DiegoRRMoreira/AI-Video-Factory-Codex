@@ -17,6 +17,9 @@ import {
   REVIEW_CHECKS,
   sceneCritic,
   SceneCriticOut,
+  FILM_CHECKS,
+  filmCritic,
+  FilmCriticOut,
   checklistIssues,
   checklistProblem,
   checklistScore,
@@ -265,6 +268,35 @@ describe("görsel denetçiler", () => {
     expect(settleChecks(flagged, true)).toBe(flagged);
     expect(settleChecks(flagged, false).text_on_subtitles).toEqual({ evidence: "No burned-in subtitles in this video.", verdict: "na" });
     expect(checklistScore(settleChecks(flagged, false))).toBe(10);
+  });
+
+  it("film denetçisi: filmin kendi listesi, sahne tarifine bakar, ders vermez; motor aynı puanı hesaplar", async () => {
+    const shots = [{ shotId: "m1", image: img(3), intent: 'spec {"language":"kinetic"}' }];
+    const palette = { ground: "#f3efe6", ink: "#141414", accent: "#2563eb" };
+    const a = await capture((d) => filmCritic(shots, { tall: true, palette, subtitles: false }, d));
+    expect(a.system).toContain("motion-graphics film (9:16 vertical)");
+    expect(a.system).toContain("Palette: ground #f3efe6, ink #141414, accent #2563eb. Image N");
+    expect(a.system).not.toContain("subtitles may sit");
+    // Kodun bilerek yaptıkları kusur sayılmaz; ritim ve sayıların doğruluğu burada sorulmaz.
+    expect(a.system).toContain('a small "illustrative data" badge in a corner');
+    expect(a.system).toContain("Pacing, transitions and rhythm are measured elsewhere: do not judge them.");
+    expect(a.system).toContain("The verdict follows your own evidence");
+    for (const c of FILM_CHECKS) expect(a.system).toContain(`- ${c.id}: ${c.ask}`);
+    expect(a.prompt).toBe('Image 1 = m1: spec {"language":"kinetic"}\nAnswer all 7 checks for each of the 1 image(s).');
+    const b = await capture((d) => filmCritic(shots, { tall: false, palette, subtitles: true }, d));
+    expect(b.system).toContain("(16:9)");
+    expect(b.system).toContain("; narration subtitles may sit at the bottom");
+    // Şemada ders yok; her madde zorunlu.
+    const clean = Object.fromEntries(FILM_CHECKS.map((c) => [c.id, { evidence: `looked at ${c.id} closely`, verdict: "pass" as const }]));
+    expect(FilmCriticOut.safeParse({ shots: [{ shotId: "m1", checks: clean }] }).success).toBe(true);
+    const { overlap: _dropped, ...partial } = clean;
+    expect(FilmCriticOut.safeParse({ shots: [{ shotId: "m1", checks: partial }] }).success).toBe(false);
+    expect(checklistProblem(clean, FILM_CHECKS)).toBeUndefined();
+    expect(checklistProblem(clean)).toBe("off_story: missing");
+    expect(checklistProblem({ ...clean, missing: { evidence: "The headline is centred.", verdict: "na" } }, FILM_CHECKS)).toBe("missing: na is not allowed");
+    const failed = { ...clean, text_cut: { evidence: "The title runs off the right edge.", verdict: "fail" as const }, unbalanced: { evidence: "The chart hugs the left edge.", verdict: "fail" as const } };
+    expect(checklistScore(failed, FILM_CHECKS)).toBe(6);
+    expect(checklistIssues(failed, FILM_CHECKS)).toEqual([{ type: "text_cut", detail: "The title runs off the right edge." }, { type: "unbalanced", detail: "The chart hugs the left edge." }]);
   });
 
   it("ders küratörü kuralları indeksli listeler", async () => {

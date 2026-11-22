@@ -59,7 +59,7 @@ Komutlar:
                                     YouTube videosunu indirir (yt-dlp), sahne sahne analiz eder; kesilecek yerler ve
                                     Short adayları (episode run <id> ile çalışır; model: Stüdyo → Modeller, ACP de olur)
   episode new --film --topic "brif" [--sec 30] [--vertical] [--color "#ff4f1f"]... [--asset logo.png]... [--narration]
-              [--voice id] [--lang tr]
+              [--voice id] [--lang tr] [--no-qa: kare denetimi kapalı]
                                     Hareketli grafik filmi (10–180 sn): insan figürü ve çizim yok; kinetik yazı, veri,
                                     diyagram, kart montajı, parçacık alanı, 3D nesne; vuruşa oturan müzik ve efekt
                                     (yönetmen ajanı tek çağrı; anlatım yalnız --narration ile, TTS ücretli)

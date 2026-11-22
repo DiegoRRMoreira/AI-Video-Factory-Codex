@@ -53,6 +53,13 @@ export const REVIEW_CHECKS = [
   { id: "other", severity: "minor", always: true, ask: "Anything else a viewer would notice as broken or wrong: a garbled drawing, an object from the wrong era, a wrong detail the intent names? pass when nothing." },
 ] as const satisfies readonly { id: z.infer<typeof ShotIssueType>; severity: "major" | "minor"; always: boolean; ask: string }[];
 export type CheckId = (typeof REVIEW_CHECKS)[number]["id"];
+/** Bir kontrol listesi maddesi (kare denetçisi ve film denetçisi aynı motoru kullanır). */
+export interface CheckDef {
+  id: string;
+  severity: "major" | "minor";
+  always: boolean;
+  ask: string;
+}
 
 const Check = z.object({
   evidence: z.string().describe("What you actually see in THIS frame that decides the check: name the thing and where it is (for fail: the problem and where). One short sentence."),
@@ -76,8 +83,8 @@ export function settleChecks(checks: ShotChecks, subtitles: boolean): ShotChecks
  * Yanıt gerçekten kontrol edilmiş mi: her madde var, kanıtı gözlem (geçiştirme değil), her karede bakılacak madde
  * "uygulanmaz" değil. Sorun varsa nedeni, yoksa undefined. Geçersiz kare denetlenmemiş sayılır (yeniden istenir).
  */
-export function checklistProblem(checks: Partial<Record<CheckId, CheckAnswer>> | undefined): string | undefined {
-  for (const c of REVIEW_CHECKS) {
+export function checklistProblem(checks: Partial<Record<string, CheckAnswer>> | undefined, list: readonly CheckDef[] = REVIEW_CHECKS): string | undefined {
+  for (const c of list) {
     const a = checks?.[c.id];
     if (!a) return `${c.id}: missing`;
     const evidence = a.evidence.trim();
@@ -88,14 +95,14 @@ export function checklistProblem(checks: Partial<Record<CheckId, CheckAnswer>> |
 }
 
 /** Kontrol listesinden puan: 10'dan başlar, ağır kusur DRAFT_REVIEW.major, hafif kusur DRAFT_REVIEW.minor düşürür. */
-export function checklistScore(checks: ShotChecks): number {
-  const lost = REVIEW_CHECKS.reduce((n, c) => n + (checks[c.id].verdict === "fail" ? (c.severity === "major" ? DRAFT_REVIEW.major : DRAFT_REVIEW.minor) : 0), 0);
+export function checklistScore(checks: Record<string, CheckAnswer>, list: readonly CheckDef[] = REVIEW_CHECKS): number {
+  const lost = list.reduce((n, c) => n + (checks[c.id]!.verdict === "fail" ? (c.severity === "major" ? DRAFT_REVIEW.major : DRAFT_REVIEW.minor) : 0), 0);
   return Math.max(0, 10 - lost);
 }
 
 /** Kalan maddeler sorun olarak (bulgular, kalite görünümü, dersler ve yeniden plan notu bunları okur). */
-export function checklistIssues(checks: ShotChecks): { type: CheckId; detail: string }[] {
-  return REVIEW_CHECKS.filter((c) => checks[c.id].verdict === "fail").map((c) => ({ type: c.id, detail: checks[c.id].evidence.trim() }));
+export function checklistIssues(checks: Record<string, CheckAnswer>, list: readonly CheckDef[] = REVIEW_CHECKS): { type: string; detail: string }[] {
+  return list.filter((c) => checks[c.id]!.verdict === "fail").map((c) => ({ type: c.id, detail: checks[c.id]!.evidence.trim() }));
 }
 
 export const SceneCriticOut = z.object({
@@ -151,6 +158,61 @@ The camera behaves like a real lens: in medium and close shots the wall, extras 
 lessons: up to 3 general rules (not about a single shot) for the director (layout, texts, mood), the designer (drawing assets) or the script, only if a problem appears in several shots. Skip rules already known:
 ${known.map((k) => `- ${k}`).join("\n") || "- (none yet)"}`,
       prompt: `${shots.map((s, i) => `Image ${i + 1} = ${s.shotId}: ${s.intent}`).join("\n")}\nAnswer all ${REVIEW_CHECKS.length} checks for each of the ${shots.length} image(s).`,
+    },
+    deps,
+  );
+}
+
+/**
+ * Hareketli grafik filminin kare kontrol listesi (22 Kas): filmde kişi, çizim, altyazı alanı ya da sahne grameri yok;
+ * kusurlar yazının kesilmesi, öğelerin çakışması, okunmazlık, eksik öğe ve kompozisyon. Ritim, geçiş ve tempo kodun film
+ * denetiminde (lintFilm) ölçülür, burada sorulmaz. Puanı aynı motor hesaplar (checklistScore), 8 barajı aynıdır.
+ */
+export const FILM_CHECKS = [
+  { id: "missing", severity: "major", always: true, ask: "Does the frame show what the scene's spec lists: its text, chart, diagram, cards, image or 3D object? fail when an element the spec names is absent, blank, a placeholder box or still half transparent." },
+  { id: "text_cut", severity: "major", always: false, ask: "Is every text whole: not cut by the frame edge or by its card, not broken inside a word, no line pushed out of its box? na when there is no text." },
+  { id: "overlap", severity: "major", always: false, ask: "Do texts, cards, nodes, chart labels, the badge or the logo run into each other so that one of them cannot be read? Intended layering (a highlight pill behind its words, a packet dot on an edge, a card over a blurred ground) passes. na when there is a single element." },
+  { id: "unreadable", severity: "major", always: false, ask: "Can every text be read at normal viewing on a phone: large enough and with enough contrast against what is behind it? na when there is no text." },
+  { id: "off_brief", severity: "minor", always: true, ask: "Does the written text match the spec: the same words and numbers, nothing misspelled, no garbled glyphs, boxes or missing letters (accented letters included)?" },
+  { id: "cluttered", severity: "minor", always: true, ask: "Is there one clear focal point? fail when several elements of equal weight compete or the frame reads as noise." },
+  { id: "unbalanced", severity: "minor", always: true, ask: "Does the composition sit well in the frame? fail when the content is crammed against one edge or corner with the rest empty, or a block is clearly off the centre it was meant for. A deliberately sparse frame with one word or a logo in the middle passes." },
+] as const satisfies readonly CheckDef[];
+export type FilmCheckId = (typeof FILM_CHECKS)[number]["id"];
+const FilmChecks = z.object(Object.fromEntries(FILM_CHECKS.map((c) => [c.id, Check.describe(c.ask)])) as Record<FilmCheckId, typeof Check>);
+
+export const FilmCriticOut = z.object({
+  shots: z.array(
+    z.object({
+      shotId: z.string(),
+      checks: FilmChecks.describe("Every check for this frame, each with evidence from the frame and a verdict"),
+    }),
+  ),
+});
+export type FilmCriticOut = z.infer<typeof FilmCriticOut>;
+
+/**
+ * Film karelerini denetler (ucuz görsel model). intent her karenin sahne tarifidir (JSON): denetçi yazının ve sayıların
+ * doğru çizildiğini ona göre söyler. Dersler deftere yazılmaz: film kuralları çizim/yerleşim ajanlarının defterine
+ * karışmasın.
+ */
+export function filmCritic(
+  shots: CriticShot[],
+  look: { tall: boolean; palette: { ground: string; ink: string; accent: string }; subtitles: boolean },
+  deps?: AgentDeps,
+): Promise<AgentResult<FilmCriticOut>> {
+  return runStructured(
+    {
+      name: "film-critic",
+      model: models().cheap,
+      effort: "low",
+      schema: FilmCriticOut,
+      images: shots.map((s) => s.image),
+      system: `You review still frames of a motion-graphics film (${look.tall ? "9:16 vertical" : "16:9"}): kinetic type, charts, system diagrams, card grids and montages, particle fields and 3D objects, drawn by code. There are no people and no illustrations. Palette: ground ${look.palette.ground}, ink ${look.palette.ink}, accent ${look.palette.accent}${look.subtitles ? "; narration subtitles may sit at the bottom" : ""}. Image N belongs to the N-th scene listed in the prompt; each scene comes with its spec as JSON, which says what should be on screen.
+Each frame is taken after every element of its scene has entered. These are intended and pass: big bold type filling the frame, a full-colour ground, a coloured highlight box behind some words, a small "illustrative data" badge in a corner (code marks numbers that were not in the brief; report it only if it covers a text), a montage showing a single card, a grid or diagram showing exactly the items its spec lists, packet dots on diagram edges, particles, grain and motion blur, and a sparse frame for a stop or resolve section. Pacing, transitions and rhythm are measured elsewhere: do not judge them. Do not judge whether a number is true; only whether it is drawn as the spec says.
+For EVERY image answer EVERY check in "checks". For each check first write the evidence: what you see in that frame that decides it (name the element and where it is; for a fail, the problem and where), then the verdict: pass, fail, or na where the check allows it. An answer that could be written without looking ("ok", "fine", "no issues") is rejected and the frame is asked again; every evidence, na included, is a phrase of at least ${MIN_EVIDENCE} characters, e.g. "The headline 'Ship faster' sits centred in two lines.". You give no score: the code counts the failed checks. Fail only what a viewer would notice at normal viewing. The verdict follows your own evidence: when the evidence names a problem, the verdict is fail.
+The checks:
+${FILM_CHECKS.map((c) => `- ${c.id}: ${c.ask}${c.always ? " (never na)" : ""}`).join("\n")}`,
+      prompt: `${shots.map((s, i) => `Image ${i + 1} = ${s.shotId}: ${s.intent}`).join("\n")}\nAnswer all ${FILM_CHECKS.length} checks for each of the ${shots.length} image(s).`,
     },
     deps,
   );

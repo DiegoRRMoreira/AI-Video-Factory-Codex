@@ -2,6 +2,12 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.8 (2026-11-23)
+
+- Motion-graphics films get a frame check before the render: a film critic looks at every scene after its last element has settled and checks that the listed elements are there and that no text is cut, overlapping or unreadable. A scene passes at 8 out of 10, like the draft review. Without narration, scenes below the bar go back to the director once and the revision is kept only if it checks better; the render waits for your approval while a scene is below the bar.
+- The frame check found and these fixes removed: a highlight cut off at the text edge in rising lines, descenders (y, g, Ç) hanging below a large highlight, and a diagonal arrow's label sitting on its line.
+- Models page: the film critic can be set to its own model.
+
 ## v0.6.7 (2026-11-22)
 
 - Motion-graphics films show a preview still for every scene in the Shots tab before the render, so the preview gate can be judged without rendering.

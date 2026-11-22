@@ -23,6 +23,10 @@ const at = (shot: object) => stillMoment(visual(shot), ASSETS, 30);
 describe("inceleme karesinin anı", () => {
   it("vektör değilse, jest yoksa ya da jest bütün çekimi kaplıyorsa çekimin %80'i", () => {
     expect(stillMoment(TimelineVisual.parse({ shotId: "s1", assetUrl: "a.mp4", kind: "motion_graphic", fromFrame: 0, durationInFrames: 300 }), ASSETS, 30)).toBe(STILL.at);
+    // Film sahnesi kendi anını alır (filmin temposu verilirse).
+    const film = TimelineVisual.parse({ shotId: "m1", assetUrl: "", kind: "motion_graphic", fromFrame: 0, durationInFrames: 60, film: { id: "m1", language: "kinetic", beats: 4, kinetic: { lines: ["Ship it now"], mode: "words" } } });
+    expect(stillMoment(film, ASSETS, 30, 120)).toBeCloseTo(59 / 60);
+    expect(stillMoment(film, ASSETS, 30)).toBe(STILL.at);
     expect(at({ layers: [hero([{ type: "talk" }]), { asset: "cup", x: 1200, depth: 0.3, anims: [{ type: "point" }] }] })).toBe(STILL.at);
     expect(at({ layers: [hero([{ type: "explain", start: 0, end: 1 }])] })).toBe(STILL.at);
     // Çizilmemiş varlığı gösteren katman kişi sayılmaz.

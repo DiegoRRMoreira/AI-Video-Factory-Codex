@@ -88,10 +88,15 @@ export function markedWords(line: string, highlight?: string): boolean[] {
 /** Hap, satır oturduktan sonra açılır (girişten 1,5 giriş süresi sonra, yarım saniyede). */
 const pillK = (frame: number, at: number, fps: number) => expoOut((frame - at - FILM.enterSec * fps * 1.5) / (0.4 * fps));
 
-/** Maskenin altından yükselen satır. */
+/**
+ * Maskenin altından yükselen satır. Maske iki yandan LINE_BLEED kadar geniş (negatif kenar boşluğuyla yerleşim aynı):
+ * vurgu hapı yazının 0,2 em dışına taşar, dar maske onu yazının hizasında kesiyordu (23 Kas, film denetçisi Lumen m11:
+ * "hap 'Lumen'in kenarında bitiyor"). Altta da hapın alt uzantı payı kadar yer var (0,2 em; yerleşim eskisi gibi 0,08 em).
+ */
+const LINE_BLEED = "0.3em";
 function Line({ text, highlight, q, pill, colors, style }: { text: string; highlight?: string; q: number; pill: number; colors: PartProps["colors"]; style: Record<string, string | number> }) {
   return (
-    <div data-line="" style={{ ...style, overflow: "hidden", paddingBottom: "0.08em" }}>
+    <div data-line="" style={{ ...style, overflow: "hidden", padding: `0 ${LINE_BLEED} 0.2em`, margin: `0 -${LINE_BLEED} -0.12em` }}>
       <div style={{ transform: `translateY(${(1 - q) * 110}%)` }}>
         <Marked text={text} highlight={highlight} pill={pill} colors={colors} />
       </div>
@@ -100,6 +105,10 @@ function Line({ text, highlight, q, pill, colors, style }: { text: string; highl
 }
 
 /** Metnin içindeki vurgu sözcüğünü hapa alır (büyük/küçük harf duyarsız; yoksa metin olduğu gibi). */
+/**
+ * Hap alt uzantıları da kapsar (inset altı −0,16 em): büyük puntoda "Senaryo"nun y'si, "Çıktı"nın Ç çengeli hapın altından
+ * taşıyordu (23 Kas, film denetçisi AI Video Factory m5/m7/m8).
+ */
 export function Marked({ text, highlight, pill, colors }: { text: string; highlight?: string; pill: number; colors: PartProps["colors"] }): ReactNode {
   const i = highlight ? text.toLocaleLowerCase().indexOf(highlight.toLocaleLowerCase()) : -1;
   if (i < 0) return text;
@@ -112,7 +121,7 @@ export function Marked({ text, highlight, pill, colors }: { text: string; highli
     <>
       {text.slice(0, i)}
       <span data-pill="" style={{ position: "relative", display: "inline-block", isolation: "isolate", color: pill > 0.5 ? colors.onAccent : undefined }}>
-        <span style={{ position: "absolute", inset: "0.06em -0.2em -0.02em", borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
+        <span style={{ position: "absolute", inset: "0.04em -0.2em -0.16em", borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
         {mark}
       </span>
       {text.slice(end + tail.length)}

@@ -27,6 +27,13 @@ export const FILM = {
   holdBase: 0.5,
   /** Paket noktası bir kenarı bu kadar vuruşta geçer. */
   packetBeats: 2,
+  /**
+   * Son öğenin oturma süresi (sn): girişi (enterSec), vurgu kutusunun gecikmeli açılışı (enterSec × 1,5 + 0,4 sn) ve
+   * sayacın sayışı (countSec) bunun içinde biter. İnceleme karesi bundan önce alınmaz.
+   */
+  settle: 0.95,
+  /** İnceleme karesinin en erken anı (sahnenin kesri): öğeler sığmak için sıkışmışsa da son öğe okunur hâlde olsun. */
+  still: 0.8,
 } as const;
 
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -70,6 +77,16 @@ export function enterFrames(scene: MotionScene, frames: number, bpm: number, fps
   const room = (frames * FILM.fill) / Math.max(1, units - 1);
   const gap = units > 1 ? Math.min(step, room) : step;
   return Array.from({ length: units }, (_, i) => Math.round(i * gap));
+}
+
+/**
+ * Film sahnesinin inceleme karesi (sahnenin kesri): bütün öğeler girip oturduktan sonra (son giriş + FILM.settle), en
+ * erken FILM.still, en geç son kare. Vektör çekimlerin anı (stillMoment) film sahnesine bakamaz: %80'de kısa bir sahnenin
+ * son öğesi daha girerken ya da sayacı sayarken yakalanır, denetçi "eksik" sanardı.
+ */
+export function filmStill(scene: MotionScene, frames: number, bpm: number, fps: number): number {
+  const last = Math.max(0, ...enterFrames(scene, frames, bpm, fps));
+  return Math.min(1 - 1 / frames, Math.max(FILM.still, (last + FILM.settle * fps + 1) / frames));
 }
 
 /** Öğenin giriş ilerlemesi (0–1, expo): giriş karesinden FILM.enterSec içinde. */
