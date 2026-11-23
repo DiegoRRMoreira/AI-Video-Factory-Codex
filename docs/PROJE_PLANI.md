@@ -630,7 +630,7 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
   planlarında denetçi 11 karenin 2'sini (Lumen) ve 14 karenin 3'ünü (AI Video Factory) geçirmedi; hepsi gerçek kusurdu ve
   kodda düzeltildi (dar maske vurgu hapını kesiyordu, büyük puntoda alt uzantılar haptan taşıyordu, eğik bağın etiketi
   çizgiye biniyordu). Sola yaslı bölüm sayacına iki çalıştırmada da gelen hafif "dengesiz" notu için isteme sola yaslı
-  yazının düzen olduğu eklendi. Düzeltmelerle Lumen 11 karede 10, AI Video Factory 9,9 (tek hafif not o "dengesiz" notuydu; istem değişmeden önce ölçüldü).
+  yazının düzen olduğu eklendi. Düzeltmelerle Lumen 11 karede 10, AI Video Factory 9,9 (tek hafif not o "dengesiz" notuydu); istem değiştikten sonra yeniden ölçüldü, 14 karenin hepsi 10.
 
 ## 17. Pazar Haritası (Ekim 2026)
 
