@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Img } from "remotion";
 import { PixiParticles } from "../PixiParticles.tsx";
 import { Scene3D } from "../Scene3D.tsx";
-import { fileSrc, fitSize, fitWrapped, type PartProps } from "./context.ts";
+import { fileSrc, fitSize, fitWrapped, labelParts, type PartProps } from "./context.ts";
 import { enterK } from "./timing.ts";
 
 /** Hex → Pixi renk sayısı. */
@@ -52,16 +52,31 @@ export function Object3D(p: PartProps) {
   );
 }
 
-/** Ortalanmış başlık + alt yazı, giriş karelerinde maskeden yükselir. */
+/**
+ * Ortalanmış başlık + alt yazı, giriş karelerinde maskeden yükselir. Alt yazı başlığın 0,42'sidir, en az SUB_MIN; başlık
+ * yoksa tek yazıdır ve kendi yüzüyle en çok iki satıra sığan en büyük boydadır; ayraçlı not ("Ad · slogan") ayraçta
+ * iki satıra bölünür, satırlar dengeli kayar. Eskiden başlıksız alt yazı başlık gibi
+ * sığdırılıp 0,42'ye iniyordu: 42 harflik not dikeyde ~30, yatayda ~23 px kalıyordu (23 Kas, 9:16 film m12 logo sahnesi).
+ */
+export function titleSizes(p: Pick<PartProps, "width" | "height" | "box" | "heading" | "body">, title?: string, sub?: string): { title: number; sub: number } {
+  const head = !title ? 0 : p.height > p.width ? fitWrapped([title], p.box.w, p.box.h * 0.3, 96, p.heading.em) : fitSize([title], p.box.w, 112, p.heading.em);
+  if (!sub) return { title: head, sub: 0 };
+  if (title) return { title: head, sub: Math.max(SUB_MIN, Math.round(head * 0.42)) };
+  return { title: 0, sub: fitWrapped(labelParts(sub), p.box.w, SUB_ALONE * 1.3 * 2, SUB_ALONE, p.body.em, 1.3) };
+}
+
+/** Başlığın altındaki notun en küçük boyu ve başlıksız notun en büyük boyu (px). */
+const SUB_MIN = 32;
+const SUB_ALONE = 64;
+
 function Titles({ p, title, sub, y, skipFirst }: { p: PartProps; title?: string; sub?: string; y: number; skipFirst?: boolean }) {
-  const lines = [title, sub].filter((x): x is string => !!x);
-  if (!lines.length) return null;
-  const size = p.height > p.width ? fitWrapped([title ?? sub!], p.box.w, p.box.h * 0.3, 96, p.heading.em) : fitSize([title ?? sub!], p.box.w, 112, p.heading.em);
+  if (!title && !sub) return null;
+  const size = titleSizes(p, title, sub);
   let n = skipFirst ? 1 : 0;
   return (
     <div style={{ position: "absolute", left: p.box.x, width: p.box.w, top: p.box.y + p.box.h * y, transform: "translateY(-50%)", textAlign: "center", color: p.colors.fg }}>
-      {title && <Rise q={enterK(p.frame, p.enters[n++]!, p.fps)} style={{ fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: size, lineHeight: 1.08 }} text={title} />}
-      {sub && <Rise q={enterK(p.frame, p.enters[n]!, p.fps)} style={{ fontFamily: p.body.family, fontWeight: p.body.weight, fontSize: Math.round(size * 0.42), lineHeight: 1.3, opacity: 0.85 }} text={sub} />}
+      {title && <Rise q={enterK(p.frame, p.enters[n++]!, p.fps)} style={{ fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: size.title, lineHeight: 1.08 }} text={title} />}
+      {sub && <Rise q={enterK(p.frame, p.enters[n]!, p.fps)} style={{ fontFamily: p.body.family, fontWeight: p.body.weight, fontSize: size.sub, lineHeight: 1.3, opacity: 0.85 }} text={labelParts(sub).join("\n")} />}
     </div>
   );
 }
@@ -69,7 +84,7 @@ function Titles({ p, title, sub, y, skipFirst }: { p: PartProps; title?: string;
 function Rise({ q, style, text }: { q: number; style: Record<string, string | number>; text: string }) {
   return (
     <div data-rise="" style={{ overflow: "hidden", paddingBottom: "0.08em" }}>
-      <div style={{ ...style, transform: `translateY(${(1 - q) * 110}%)` }}>{text}</div>
+      <div style={{ ...style, whiteSpace: "pre-line", textWrap: "balance", transform: `translateY(${(1 - q) * 110}%)` }}>{text}</div>
     </div>
   );
 }

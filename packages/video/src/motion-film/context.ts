@@ -69,3 +69,15 @@ export function fitSize(lines: readonly string[], width: number, max: number, pe
   const longest = Math.max(1, ...lines.map((l) => l.length));
   return Math.round(Math.min(max, width / (longest * perChar)));
 }
+
+/**
+ * Ayraçlı etiket ya da not ("İzle · Sahneler", "Dinle - Metin") ad ve alt yazı olarak iki satırdır, ayraç düşer: kendiliğinden
+ * kayınca ayraç ilk satırın sonunda asılı kalıyordu (23 Kas, 16:9 film m4: "İzle · / Sahneler").
+ */
+export function labelParts(label: string): [string] | [string, string] {
+  const m = /^(.+?)\s+([·•|–—-])\s+(.+)$/.exec(label);
+  if (!m || /\s[·•|–—-]\s/.test(m[3]!)) return [label];
+  // İki sayı arasındaki tire aralıktır ("31 – 60 sn"), ayraç değil: bölünse tire düşer, anlam değişirdi.
+  if (/[–—-]/.test(m[2]!) && /\d$/.test(m[1]!) && /^\d/.test(m[3]!)) return [label];
+  return [m[1]!, m[3]!];
+}

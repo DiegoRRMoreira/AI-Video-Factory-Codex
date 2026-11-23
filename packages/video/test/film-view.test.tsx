@@ -23,9 +23,10 @@ vi.mock("../src/Scene3D.tsx", () => ({ Scene3D: (p: { spec: Record<string, unkno
 
 const { FilmScene, ILLUSTRATIVE } = await import("../src/motion-film/Film.tsx");
 const { foldedIndex, markedWords } = await import("../src/motion-film/Kinetic.tsx");
-const { halves, labelParts, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
+const { halves, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
 const { gridShape } = await import("../src/motion-film/Grid.tsx");
-const { fileSrc } = await import("../src/motion-film/context.ts");
+const { titleSizes } = await import("../src/motion-film/Ambient.tsx");
+const { fileSrc, labelParts } = await import("../src/motion-film/context.ts");
 const { calloutPoint } = await import("../src/motion-film/Data.tsx");
 const { Episode } = await import("../src/Episode.tsx");
 const { chunkKeys } = await import("../src/chunks.ts");
@@ -363,6 +364,26 @@ describe("alan ve 3D nesne", () => {
     expect(logo.querySelector("[data-image]")).not.toBeNull();
     expect([...logo.querySelectorAll("[data-rise]")].map((e) => e.textContent)).toEqual(["Ship"]);
     expect(draw(object({ object: { preset: "atom", image: 5 } }), 100).querySelector("[data-image]")).toBeNull();
+  });
+
+  it("başlıksız not kendi boyunda okunur; başlığın altındaki not en az 32 px", () => {
+    const face = { em: 0.64 } as never;
+    const wide = { width: 1920, height: 1080, box: { x: 0, y: 0, w: 1500, h: 800 }, heading: face, body: { em: 0.55 } as never };
+    const tall = { ...wide, width: 1080, height: 1920, box: { x: 0, y: 0, w: 787, h: 1136 } };
+    const note = "Northwind Relay · Messages that never wait";
+    expect(titleSizes(wide, undefined, note)).toEqual({ title: 0, sub: 64 });
+    expect(titleSizes(tall, undefined, note).sub).toBeGreaterThanOrEqual(56);
+    expect(titleSizes(wide, "Relay").sub).toBe(0);
+    expect(titleSizes(wide, "Relay", "Ship").sub).toBe(Math.round(titleSizes(wide, "Relay").title * 0.42));
+    expect(titleSizes(wide, "A much longer object title for the end card here", "Ship").sub).toBe(32);
+    const sub = (c: HTMLElement) => parseFloat(([...c.querySelectorAll("[data-rise] > div")].at(-1) as HTMLElement).style.fontSize);
+    const wideNote = draw(object({ object: { preset: "atom", image: 0, caption: note } }), 100);
+    expect(sub(wideNote)).toBeGreaterThanOrEqual(48);
+    // Ayraçlı not ayraçta iki satıra bölünür.
+    expect(([...wideNote.querySelectorAll("[data-rise] > div")].at(-1) as HTMLElement).textContent).toBe("Northwind Relay\nMessages that never wait");
+    clock.width = 1080;
+    clock.height = 1920;
+    expect(sub(draw(object({ object: { preset: "atom", image: 0, caption: note } }), 100))).toBeGreaterThanOrEqual(48);
   });
 });
 

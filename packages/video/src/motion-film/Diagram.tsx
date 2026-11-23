@@ -1,5 +1,5 @@
 import type { MotionDiagram } from "@ys/core";
-import { fitSize, rowsOf, type PartProps } from "./context.ts";
+import { fitSize, labelParts, rowsOf, type PartProps } from "./context.ts";
 import { diagramOrder, edgeKey } from "./order.ts";
 import { beatFrames, clamp01, enterK, expoOut, FILM } from "./timing.ts";
 
@@ -128,18 +128,6 @@ export function labelSpot(s: { x1: number; y1: number; x2: number; y2: number },
   const flip = -cos > 1e-9 ? -1 : 1;
   const off = (w / 2) * Math.abs(sin) + (h / 2) * Math.abs(cos) + gap;
   return { x: (s.x1 + s.x2) / 2 + flip * sin * off, y: (s.y1 + s.y2) / 2 - flip * cos * off };
-}
-
-/**
- * Ayraçlı etiket ("İzle · Sahneler", "Dinle - Metin") ad ve alt yazı olarak iki satırdır, ayraç düşer: kendiliğinden
- * kayınca ayraç ilk satırın sonunda asılı kalıyordu (23 Kas, 16:9 film m4: "İzle · / Sahneler").
- */
-export function labelParts(label: string): [string] | [string, string] {
-  const m = /^(.+?)\s+([·•|–—-])\s+(.+)$/.exec(label);
-  if (!m || /\s[·•|–—-]\s/.test(m[3]!)) return [label];
-  // İki sayı arasındaki tire aralıktır ("31 – 60 sn"), ayraç değil: bölünse tire düşer, anlam değişirdi.
-  if (/[–—-]/.test(m[2]!) && /\d$/.test(m[1]!) && /^\d/.test(m[3]!)) return [label];
-  return [m[1]!, m[3]!];
 }
 
 function NodeLabel({ label }: { label: string }) {
