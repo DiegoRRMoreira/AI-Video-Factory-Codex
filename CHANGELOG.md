@@ -2,6 +2,11 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.13 (2026-11-23)
+
+- Motion-graphics films: the caption of a logo or particle scene without a title is now drawn at a readable size (it was about 30 px tall in vertical films and 23 px in landscape), and a caption such as "Name · tagline" breaks onto two lines at the dot.
+- A caption under a title is at least 32 px.
+
 ## v0.6.12 (2026-11-23)
 
 - Motion-graphics films: the highlight box now covers the right words when a capital "İ" (Turkish) comes before them in the line; it slipped one letter to the right.
