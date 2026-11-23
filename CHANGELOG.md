@@ -2,6 +2,13 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.12 (2026-11-23)
+
+- Motion-graphics films: the highlight box now covers the right words in lines that start with a capital "İ" (Turkish); it slipped one letter to the right.
+- A card's figure stays on one line ("31-60 sn" was split in two), and card titles wrap at most once.
+- A figure on a grid card uses the accent colour only when it reads on that card; otherwise it takes the card's text colour.
+- A diagram node labelled "name · detail" shows the name over a smaller second line instead of leaving the dot at the end of a line.
+
 ## v0.6.11 (2026-11-23)
 
 - Vertical motion-graphics films: a diagram whose nodes run step by step is drawn as one column, so its nodes and labels are about twice as large.
