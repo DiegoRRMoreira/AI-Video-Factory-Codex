@@ -1,5 +1,5 @@
 import type { MotionData } from "@ys/core";
-import type { PartProps } from "./context.ts";
+import { rowsOf, type PartProps } from "./context.ts";
 import { clamp01, countAt, enterK, expoOut, FILM, formatValue } from "./timing.ts";
 
 /** Veri hikayesi (kanıt): çubuklar sıfırdan büyür, çizgi noktadan noktaya çizilir, sayı sayarak oturur; not vurgulanan noktaya iner. */
@@ -13,19 +13,27 @@ export function Data(p: PartProps) {
   // Harfli birim ayrı yazılır ("27 dk"), simge bitişik ("40%").
   const unit = d.unit ? (/^\p{L}/u.test(d.unit) ? ` ${d.unit}` : d.unit) : "";
   const fmt = (v: number) => `${formatValue(v, decimals, lang)}${unit}`;
-  const chart = { x: box.x, y: box.y + titleSize * 1.9, w: box.w, h: box.h - titleSize * 1.9 - small * 3.2 };
+  const titleW = p.scene.illustrative ? box.w * 0.76 : box.w;
+  // Grafik başlığın kaç satıra kaydığına göre başlar (dikeyde iki satırlık başlık grafiğin üstüne iniyordu); çubuklarda not
+  // grafiğin üstünde kendi bandındadır: vurgulanan kısa çubuğun üstüne konan not yandaki uzun çubuğa biniyordu (23 Kas,
+  // film denetçisi m16: "turuncu not 'Before' çubuğunun kenarına değiyor").
+  const calloutSize = Math.round(small * 1.5);
+  // Bant notun kendisi ve en uzun çubuğun değer etiketi kadar (not o etiketin üstünde durur, bkz. calloutPoint).
+  const band = d.callout && d.chart === "bars" ? calloutSize * 3.75 : 0;
+  const head = titleSize * (rowsOf(d.title, titleW, titleSize * heading.em) * 1.1 + 0.8) + band;
+  const chart = { x: box.x, y: box.y + head, w: box.w, h: box.h - head - small * 3.2 };
   const calloutAt = d.callout ? enters.at(-1)! : undefined;
 
   return (
     <div style={{ position: "absolute", inset: 0, color: colors.fg }}>
-      <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: p.scene.illustrative ? box.w * 0.76 : box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, lineHeight: 1.1, opacity: tq, transform: `translateY(${(1 - tq) * 30}px)` }}>
+      <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: titleW, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, lineHeight: 1.1, textWrap: "balance", opacity: tq, transform: `translateY(${(1 - tq) * 30}px)` }}>
         {d.title}
       </div>
       {d.chart === "bars" && <Bars d={d} p={p} chart={chart} fmt={fmt} small={small} />}
       {d.chart === "line" && <Line d={d} p={p} chart={chart} fmt={fmt} small={small} />}
       {d.chart === "count" && <Count d={d} p={p} chart={chart} size={titleSize} />}
       {calloutAt !== undefined && (
-        <Callout text={d.callout!} q={enterK(frame, calloutAt, fps)} at={calloutPoint(d, chart, p, small * 1.5)} colors={colors} font={body} size={Math.round(small * 1.5)} />
+        <Callout text={d.callout!} q={enterK(frame, calloutAt, fps)} at={calloutPoint(d, chart, d.callout!.length * calloutSize * body.em + calloutSize * 1.4, calloutSize)} colors={colors} font={body} size={calloutSize} />
       )}
       {d.source && (
         <div data-source="" style={{ position: "absolute", left: box.x, top: box.y + box.h - small * 1.4, fontFamily: body.family, fontWeight: body.weight, fontSize: small, opacity: 0.6 * tq }}>
@@ -55,12 +63,18 @@ function pointAt(d: MotionData, chart: Box, i: number): { x: number; y: number }
   return { x, y: chart.y + chart.h - ((d.points[i]!.value - lo) / (hi - lo)) * chart.h };
 }
 
-/** Notun alt ortası: vurgulanan noktanın üstünde, grafiğin içinde (başlık satırına ve rozete taşmaz). */
-function calloutPoint(d: MotionData, chart: Box, p: PartProps, size: number): { x: number; y: number } {
+/**
+ * Notun alt ortası: vurgulanan noktanın hizasında, notun kendi genişliğiyle grafiğin içinde (w: notun tahmini genişliği).
+ * Çubuklarda grafiğin üstündeki bantta, çizgide noktanın üstünde (başlık satırına taşmaz).
+ */
+export function calloutPoint(d: MotionData, chart: Box, w: number, size: number): { x: number; y: number } {
   if (d.chart === "count") return { x: chart.x + chart.w / 2, y: chart.y + chart.h * 0.78 };
   const i = Math.min(d.highlight ?? d.points.length - 1, d.points.length - 1);
   const pt = pointAt(d, chart, i);
-  return { x: Math.min(Math.max(pt.x, chart.x + p.box.w * 0.18), chart.x + chart.w - p.box.w * 0.18), y: Math.max(chart.y + size * 1.9, pt.y - chart.h * 0.16) };
+  const x = w >= chart.w ? chart.x + chart.w / 2 : Math.min(Math.max(pt.x, chart.x + w / 2), chart.x + chart.w - w / 2);
+  // Çubuklarda en uzun çubuğun değer etiketi grafiğin %12'lik üst payına taşar (small × 1,9 = size × 1,27): not onun da
+  // üstünde biter, vurgulanan çubuk en uzunsa etiketle arasında boşluk sıfıra iniyordu.
+  return { x, y: d.chart === "bars" ? chart.y - size * 1.6 : Math.max(chart.y + size * 1.9, pt.y - chart.h * 0.16) };
 }
 
 function Bars({ d, p, chart, fmt, small }: { d: MotionData; p: PartProps; chart: Box; fmt: (v: number) => string; small: number }) {

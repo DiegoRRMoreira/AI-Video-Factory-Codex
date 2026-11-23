@@ -2,6 +2,13 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.11 (2026-11-23)
+
+- Vertical motion-graphics films: a diagram whose nodes run step by step is drawn as one column, so its nodes and labels are about twice as large.
+- A chart's callout over a short highlighted bar no longer runs into the tall bar beside it.
+- Wrapped headlines and titles no longer end on a single word.
+- Charts and diagrams leave room for a title that wraps onto two lines.
+
 ## v0.6.10 (2026-11-23)
 
 - Motion-graphics films: a montage now shows its title as a small label at the top while the cards cut underneath; before, the title was never drawn.

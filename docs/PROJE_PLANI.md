@@ -634,6 +634,12 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
   ızgara başlığını hiç çizmiyordu (denetçi buldu; şimdi montaj boyunca üstte küçük sabit etiket) ve kelime kipinde hap
   kelime aralığını yiyip önceki kelimeye yapışıyordu (gözle bulundu, denetçi geçirmişti). Montaj kartlarının zemin ile
   mürekkep arasında döndüğü isteme eklendi; düzeltmelerle 9 karenin hepsi 10.
+  İkinci yeni brif (9:16, İngilizce, 17 sahne) dikey düzende üç kusur daha çıkardı: çapraz 4 düğümlü şema dönünce de
+  merdivendi, düğümler genişliğin dörtte birine sığıyordu (her düğüm kendi adımında ve bağlar komşu adımları bağlıyorsa
+  artık tek sütun); kısa vurgulu çubuğun üstündeki not yandaki uzun çubuğa değiyordu (çubuklarda not artık grafiğin
+  üstündeki kendi bandında); kayan kinetik satırlar tek kelimeyle bitiyordu ("Verified on / a"; `text-wrap: balance`).
+  Denetçi istemi düğümün col/row değerlerinin konum değil ızgara ipucu olduğunu söyler. Düzeltilmiş kopya 17 karede 10,
+  AVF 16:9 filmi 14 karede 10.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

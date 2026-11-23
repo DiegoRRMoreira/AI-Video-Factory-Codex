@@ -1,5 +1,5 @@
 import type { MotionDiagram } from "@ys/core";
-import { fitSize, type PartProps } from "./context.ts";
+import { fitSize, rowsOf, type PartProps } from "./context.ts";
 import { diagramOrder, edgeKey } from "./order.ts";
 import { beatFrames, clamp01, enterK, expoOut, FILM } from "./timing.ts";
 
@@ -13,7 +13,8 @@ export function Diagram(p: PartProps) {
   const { box, colors, heading, body, frame, fps } = p;
   const tall = p.height > p.width;
   const titleSize = Math.round(Math.min(box.h * 0.075, 64));
-  const top = g.title ? titleSize * 1.8 : 0;
+  // Kayan başlığın satırları kadar yer (dikeyde iki satırlık başlık ilk düğüme değiyordu).
+  const top = g.title ? titleSize * (rowsOf(g.title, box.w, titleSize * heading.em) * 1.1 + 0.7) : 0;
   const area = { x: box.x, y: box.y + top, w: box.w, h: box.h - top };
   const at = new Map(diagramOrder(g).map((u, i) => [u, p.enters[i]!]));
   const place = layoutNodes(g, area, tall);
@@ -27,7 +28,7 @@ export function Diagram(p: PartProps) {
   return (
     <div style={{ position: "absolute", inset: 0, color: colors.fg }}>
       {g.title && (
-        <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, opacity: tq }}>
+        <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: titleSize, lineHeight: 1.1, textWrap: "balance", opacity: tq }}>
           {g.title}
         </div>
       )}
@@ -141,10 +142,14 @@ export function halves(label: string): string {
   return best;
 }
 
-/** Düğümlerin merkezleri: kullanılan sütun/satır aralığı alana yayılır, dikeyde ızgara döner. */
+/**
+ * Düğümlerin merkezleri: kullanılan sütun/satır aralığı alana yayılır, dikeyde ızgara döner. Dikeyde her düğüm kendi
+ * satırındaysa ve bağlar yalnız komşu satırları bağlıyorsa düğümler tek sütuna toplanır: yatay için çizilmiş çapraz
+ * merdiven dönünce de merdivendi, dört düğüm genişliğin dörtte birine sığıyordu (23 Kas, 9:16 film m4: etiketler ~30 px).
+ */
 export function layoutNodes(g: MotionDiagram, area: { x: number; y: number; w: number; h: number }, tall: boolean) {
-  const across = g.nodes.map((n) => (tall ? n.row : n.col));
   const down = g.nodes.map((n) => (tall ? n.col : n.row));
+  const across = tall && chainDown(g, down) ? down.map(() => 0) : g.nodes.map((n) => (tall ? n.row : n.col));
   const [a0, a1] = [Math.min(...across), Math.max(...across)];
   const [d0, d1] = [Math.min(...down), Math.max(...down)];
   const cols = a1 - a0 + 1;
@@ -153,6 +158,14 @@ export function layoutNodes(g: MotionDiagram, area: { x: number; y: number; w: n
   const cellH = area.h / rows;
   const at = new Map(g.nodes.map((n, i) => [n.id, { x: area.x + (across[i]! - a0 + 0.5) * cellW, y: area.y + (down[i]! - d0 + 0.5) * cellH }]));
   return { at, cellW, cellH };
+}
+
+/** Düğümler ayrı satırlarda ve her bağ sıralamada komşu iki satırı bağlıyor (tek sütunda bağ başka düğümün üstünden geçmez). */
+function chainDown(g: MotionDiagram, down: readonly number[]): boolean {
+  const levels = [...new Set(down)].sort((a, b) => a - b);
+  if (levels.length !== down.length) return false;
+  const rank = new Map(g.nodes.map((n, i) => [n.id, levels.indexOf(down[i]!)]));
+  return g.edges.every((e) => Math.abs(rank.get(e.from)! - rank.get(e.to)!) === 1);
 }
 
 /** Bağ, iki düğümün kutularının kenarından kenarına (merkezden çıkan ışının kutuyla kesiştiği yer). */

@@ -26,6 +26,7 @@ const { markedWords } = await import("../src/motion-film/Kinetic.tsx");
 const { halves, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
 const { gridShape } = await import("../src/motion-film/Grid.tsx");
 const { fileSrc } = await import("../src/motion-film/context.ts");
+const { calloutPoint } = await import("../src/motion-film/Data.tsx");
 const { Episode } = await import("../src/Episode.tsx");
 const { chunkKeys } = await import("../src/chunks.ts");
 
@@ -161,6 +162,30 @@ describe("veri hikayesi", () => {
     expect(noted.textContent).toContain("~2.5x");
     expect(noted.querySelector("[data-callout]")!.textContent).toBe("Wow");
   });
+
+  it("çubuklarda not grafiğin üstündeki bantta, genişliğiyle grafiğin içinde; kayan başlık grafiği aşağı iter", () => {
+    const chart = { x: 100, y: 300, w: 800, h: 600 };
+    const d = bars().data!;
+    // Vurgulanan C sağda (x 766): 300 px'lik not sağ kenarı aşmaz, bandın altına oturur.
+    expect(calloutPoint(d, chart, 300, 40)).toEqual({ x: 750, y: 236 });
+    expect(calloutPoint({ ...d, highlight: 1 }, chart, 300, 40).x).toBe(500);
+    expect(calloutPoint(d, chart, 900, 40).x).toBe(500);
+    // Çizgide noktanın üstünde, başlık payının altında.
+    expect(calloutPoint(line().data!, chart, 200, 40)).toEqual({ x: 800, y: 376 });
+    clock.width = 1080;
+    clock.height = 1920;
+    const barTop = (over: Record<string, unknown>) => parseFloat((draw(bars({ data: { ...bars().data!, ...over } }), 200).querySelector('[data-bar="0"] > div') as HTMLElement).style.top);
+    expect(barTop({ title: "Audio rendered separately from the picture" })).toBeGreaterThan(barTop({}));
+    expect(barTop({ callout: undefined })).toBeLessThan(barTop({}));
+    // Vurgulanan çubuk en uzunsa not onun değer etiketinin üstünde biter (iki oranda da).
+    for (const [w, h] of [[1920, 1080], [1080, 1920]] as const) {
+      clock.width = w;
+      clock.height = h;
+      const c = draw(bars({ data: { ...bars().data!, highlight: 0 } }), 200);
+      const label = parseFloat((c.querySelector('[data-bar="0"] > div:nth-child(2)') as HTMLElement).style.top);
+      expect(parseFloat((c.querySelector("[data-callout]") as HTMLElement).style.top)).toBeLessThan(label - 15);
+    }
+  });
 });
 
 describe("sistem diyagramı", () => {
@@ -208,6 +233,28 @@ describe("sistem diyagramı", () => {
       if (s.y1 !== s.y2 && s.x1 !== s.x2) expect(p.y).toBeLessThan((s.y1 + s.y2) / 2);
     }
     expect(halves("Deploy")).toBe("Deploy");
+  });
+
+  it("dikeyde her düğüm kendi satırındaki zincir tek sütuna toplanır; atlayan bağ, ortak satır ya da yatay kare dokunmaz", () => {
+    const area = { x: 0, y: 0, w: 400, h: 800 };
+    const nodes = [0, 1, 2, 3].map((i) => ({ id: `n${i}`, label: `N${i}`, col: i, row: i }));
+    const chain = [{ from: "n0", to: "n1" }, { from: "n1", to: "n2" }, { from: "n2", to: "n3" }];
+    const stair = layoutNodes({ nodes, edges: chain, packets: false }, area, true);
+    expect(stair.cellW).toBe(400);
+    expect(nodes.map((n) => stair.at.get(n.id)!.x)).toEqual([200, 200, 200, 200]);
+    expect(nodes.map((n) => stair.at.get(n.id)!.y)).toEqual([100, 300, 500, 700]);
+    // Atlayan bağ tek sütunda aradaki düğümün üstünden geçerdi: merdiven kalır.
+    expect(layoutNodes({ nodes, edges: [...chain, { from: "n0", to: "n2" }], packets: false }, area, true).cellW).toBe(100);
+    // İki düğüm aynı satırda (dalda): ızgara kalır.
+    expect(layoutNodes({ nodes: [...nodes.slice(0, 3), { id: "n3", label: "N3", col: 2, row: 0 }], edges: chain, packets: false }, area, true).cellW).toBe(400 / 3);
+    expect(layoutNodes({ nodes, edges: chain, packets: false }, area, false).cellH).toBe(200);
+  });
+
+  it("dikeyde iki satıra kayan başlık düğümleri aşağı iter", () => {
+    clock.width = 1080;
+    clock.height = 1920;
+    const topOf = (title: string) => parseFloat((draw(diagram({ diagram: { ...diagram().diagram!, title } }), 239).querySelector('[data-node="a"]') as HTMLElement).style.top);
+    expect(topOf("A much longer diagram title that wraps")).toBeGreaterThan(topOf("Flow"));
   });
 });
 

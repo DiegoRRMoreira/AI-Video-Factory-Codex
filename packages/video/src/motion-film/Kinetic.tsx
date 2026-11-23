@@ -13,7 +13,9 @@ export function Kinetic(p: PartProps) {
   const tall = p.height > p.width;
   // Dikeyde satırlar kayar (fitWrapped), yatayda her satır tek satıra sığar.
   const size = tall ? fitWrapped(k.lines, box.w, box.h * 0.8, 170, heading.em) : fitSize(k.lines, box.w, 220, heading.em);
-  const font = { fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.08, letterSpacing: "-0.02em" };
+  // Kayan satırlar dengelenir, sonda tek kelime kalmaz (text-wrap: balance, satır sayısını artırmaz; 23 Kas, 9:16 film:
+  // "Verified on / a", "that draws / it."; Chrome 157'de pretty bu kısa satırlarda bir şey değiştirmedi).
+  const font = { fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.08, letterSpacing: "-0.02em", textWrap: "balance" };
 
   if (k.mode === "chapter") {
     const index = String(k.chapter?.index ?? 1).padStart(2, "0");

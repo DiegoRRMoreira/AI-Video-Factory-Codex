@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emOf, fitSize, fitWrapped } from "../src/motion-film/context.ts";
+import { emOf, fitSize, fitWrapped, rowsOf } from "../src/motion-film/context.ts";
 import { FILM_LINT, filmEvents, fitScene, holdSec, lintFilm, neededFrames, textUnits } from "../src/motion-film/lint.ts";
 import { diagramOrder, edgeKey } from "../src/motion-film/order.ts";
 import {
@@ -124,6 +124,11 @@ describe("film zamanlaması", () => {
     expect(fitWrapped(["Supercalifragilistic"], 400, 1000, 170, 0.5)).toBeLessThanOrEqual(40);
     expect(fitWrapped(["a b c d e f g h"], 100, 200, 170, 0.5)).toBeLessThan(60);
     expect(fitWrapped(["x".repeat(500)], 100, 100, 170, 0.5)).toBe(24);
+    // Açgözlü kaydırmanın satır sayısı: boş satır bir satırdır, sığmayan tek kelime yine bir satır.
+    expect(rowsOf("a bb ccc", 100, 10)).toBe(1);
+    expect(rowsOf("a bb ccc", 50, 10)).toBe(2);
+    expect(rowsOf("", 50, 10)).toBe(1);
+    expect(rowsOf("xxxxxxxxxx", 50, 10)).toBe(1);
   });
 });
 

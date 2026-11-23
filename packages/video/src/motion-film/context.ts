@@ -43,23 +43,25 @@ export function emOf(face: { id: string; generic: string }): number {
 export function fitWrapped(lines: readonly string[], width: number, height: number, max: number, perChar: number, lineHeight = 1.12): number {
   for (let size = max; size > 24; size *= 0.96) {
     const char = size * perChar;
-    let rows = 0;
-    let fits = true;
-    for (const line of lines) {
-      let used = 0;
-      rows++;
-      for (const word of line.split(/\s+/).filter(Boolean)) {
-        const w = word.length * char;
-        if (w > width) fits = false;
-        if (used && used + char + w > width) {
-          rows++;
-          used = w;
-        } else used += (used ? char : 0) + w;
-      }
-    }
+    const fits = lines.every((line) => line.split(/\s+/).every((word) => word.length * char <= width));
+    const rows = lines.reduce((n, line) => n + rowsOf(line, width, char), 0);
     if (fits && rows * size * lineHeight <= height) return Math.round(size);
   }
   return 24;
+}
+
+/** Satırın kelime sınırından kayınca kaç satır tuttuğu (açgözlü kaydırma; char: bir harfin genişliği, px). */
+export function rowsOf(line: string, width: number, char: number): number {
+  let rows = 1;
+  let used = 0;
+  for (const word of line.split(/\s+/).filter(Boolean)) {
+    const w = word.length * char;
+    if (used && used + char + w > width) {
+      rows++;
+      used = w;
+    } else used += (used ? char : 0) + w;
+  }
+  return rows;
 }
 
 /** Uzun dikey metinde satır başına sığan yazı boyu (px): en uzun satır kutunun genişliğine sığar. */
