@@ -6,7 +6,7 @@ Releases are cut with `pnpm release`. The Studio shows an update banner when a n
 
 - Vertical motion-graphics films: a diagram whose nodes run step by step is drawn as one column, so its nodes and labels are about twice as large.
 - A chart's callout over a short highlighted bar no longer runs into the tall bar beside it.
-- Wrapped headlines and titles no longer end on a single word.
+- Wrapped headlines (rise, slam and chapter lines) and chart and diagram titles no longer end on a single word.
 - Charts and diagrams leave room for a title that wraps onto two lines.
 
 ## v0.6.10 (2026-11-23)
