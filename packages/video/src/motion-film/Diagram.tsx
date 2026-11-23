@@ -20,6 +20,7 @@ export function Diagram(p: PartProps) {
   const place = layoutNodes(g, area, tall);
   const nodeW = Math.min(place.cellW * 0.82, tall ? 440 : 420);
   const nodeH = Math.min(place.cellH * 0.56, 156);
+  const pad = Math.round(nodeW * 0.04);
   // Etiket iki satıra inebilir: en uzun satır, kelime sınırından ikiye bölünmüş hâlinin uzunu.
   const label = fitSize(g.nodes.map((n) => { const [a, b] = labelParts(n.label); return b === undefined ? halves(a) : a.length >= b.length ? a : b; }), nodeW * 0.86, nodeH * 0.36, heading.em);
   const beat = beatFrames(p.bpm, fps);
@@ -88,8 +89,12 @@ export function Diagram(p: PartProps) {
               position: "absolute",
               left: c.x - nodeW / 2,
               top: c.y - nodeH / 2,
-              width: nodeW,
+              // Yazı kenara değmesin: iç boşluk iki yandan %4, dış boyut aynı (23 Kas, 9:16 film m3: tahmin edilenden dar yazı
+              // yüzünde "48 Saatte Kapına" kayması gerekirken kenardan kenara tek satırdı). Etiket 0,86'ya sığdırılır, içerik
+              // 0,92: %7'lik boşluk tahminle tam ölçülen eşaralıklı yüzde "Kurgu ve" satırını üçe kaydırıp taşırmıştı.
+              width: nodeW - pad * 2,
               height: nodeH,
+              padding: `0 ${pad}px`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -102,6 +107,7 @@ export function Diagram(p: PartProps) {
               fontWeight: heading.weight,
               fontSize: label,
               lineHeight: 1.1,
+              textWrap: "balance",
               opacity: clamp01(q * 2),
               transform: `scale(${0.82 + 0.18 * q})`,
             }}

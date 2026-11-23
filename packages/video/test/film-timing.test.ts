@@ -13,6 +13,7 @@ import {
   enterFrames,
   enterK,
   expoOut,
+  figureOn,
   FILM,
   filmStill,
   formatValue,
@@ -84,6 +85,9 @@ describe("film zamanlaması", () => {
   it("renkler: karşıtlık, zemine göre yazı ve vurgu", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21);
     expect(luminance("#ffffff")).toBeCloseTo(1);
+    // Rakam vurgu renginde yalnız zeminde okunuyorsa (4,5:1).
+    expect(figureOn("#f3e6d3", "#e8a33d", "#2b1b17")).toBe("#2b1b17");
+    expect(figureOn("#2b1b17", "#e8a33d", "#f3e6d3")).toBe("#e8a33d");
     expect(colorsOf("ground", PALETTE)).toMatchObject({ bg: PALETTE.ground, fg: PALETTE.ink, accent: PALETTE.accent, card: PALETTE.alt });
     expect(colorsOf("ink", PALETTE)).toMatchObject({ bg: PALETTE.ink, fg: PALETTE.ground });
     const onAccent = colorsOf("accent", PALETTE);
@@ -145,7 +149,12 @@ describe("film denetimi", () => {
     expect(textUnits(kinetic("chapter"))).toEqual([{ unit: 1, words: 3 }, { unit: 2, words: 2 }]);
     expect(textUnits(kinetic("slam"))).toEqual([{ unit: 0, words: 3 }, { unit: 1, words: 2 }]);
     expect(textUnits(bars())).toEqual([{ unit: 0, words: 2 }, { unit: 4, words: 1 }]);
-    expect(textUnits(count())).toEqual([{ unit: 0, words: 1 }]);
+    expect(textUnits(count())).toEqual([{ unit: 0, words: 1 }, { unit: 1, words: 1, after: FILM.countSec }]);
+    expect(textUnits(count({ data: { chart: "count", title: "T", callout: "c d", count: { to: 5 } } }))).toEqual([
+      { unit: 0, words: 1 },
+      { unit: 1, words: 1, after: FILM.countSec },
+      { unit: 2, words: 2 },
+    ]);
     expect(textUnits(diagram())).toEqual([{ unit: 0, words: 1 }, { unit: 1, words: 2 }, { unit: 3, words: 1 }]);
     expect(textUnits(grid("grid"))).toEqual([{ unit: 0, words: 3 }, { unit: 1, words: 1 }, { unit: 2, words: 3 }, { unit: 3, words: 4 }]);
     expect(textUnits(grid("grid", { grid: { cards: [{ title: "x" }] } }))).toEqual([{ unit: 0, words: 1 }]);
@@ -170,6 +179,9 @@ describe("film denetimi", () => {
     // Montaj kartı kendi süresince okunur, sahneyi uzatmaz.
     expect(neededFrames(grid("montage", { pace: "eighth" }), 120, 30)).toBe(Math.ceil((2 * 7.5) / 0.7));
     expect(neededFrames(field({ field: { kind: "sparks" } }), 120, 30)).toBe(1);
+    // Sayaç 15. karede girer, 0,9 sn sayar, son değeri 0,75 sn okunur: 65 kare = 5 vuruş (2 vuruşta kesmede yarım kalıyordu).
+    expect(neededFrames(count({ beats: 2 }), 120, 30)).toBe(65);
+    expect(fitScene(count({ beats: 2 }), 120, 30).beats).toBe(5);
   });
 
   it("olaylar: kesmeler, girişler, montaj kesmeleri; öğesiz sahne kesmesiyle sayılır", () => {
@@ -204,5 +216,8 @@ describe("film denetimi", () => {
     const montage = lintFilm(film([grid("montage", { beats: 2, pace: "eighth" })]), 30);
     expect(montage.filter((i) => i.kind === "hold").length).toBeGreaterThan(0);
     expect(lintFilm(film([kinetic("slam", { beats: 8 })]), 30).filter((i) => i.kind === "hold")).toEqual([]);
+    // Sayacın okunması sayış bittikten sonra başlar.
+    expect(lintFilm(film([count({ beats: 4 })]), 30).filter((i) => i.kind === "hold")).toHaveLength(1);
+    expect(lintFilm(film([count({ beats: 5 })]), 30).filter((i) => i.kind === "hold")).toEqual([]);
   });
 });

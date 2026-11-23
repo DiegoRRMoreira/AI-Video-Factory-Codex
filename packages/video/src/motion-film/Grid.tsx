@@ -1,7 +1,7 @@
 import type { MotionGrid } from "@ys/core";
 import { Img } from "remotion";
 import { fileSrc, fitSize, fitWrapped, type PartProps } from "./context.ts";
-import { clamp01, contrast, enterK } from "./timing.ts";
+import { clamp01, contrast, enterK, figureOn } from "./timing.ts";
 
 /**
  * Kart ızgarası ve montaj (liste, çeşitlilik): grid kipinde kartlar vuruşlarda ızgaraya oturur (grid-card-assemble);
@@ -77,7 +77,7 @@ function Montage({ g, p }: { g: MotionGrid; p: PartProps }) {
       )}
       <div style={{ position: "absolute", left: box.x, top: box.y + top, width: box.w, height: box.h - top, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: size * 0.2, transform: `scale(${1.12 - 0.12 * k})` }}>
         {image && <Img data-image="" src={fileSrc(image)} style={{ maxWidth: "70%", maxHeight: "50%", objectFit: "contain", borderRadius: 16 }} />}
-        {card.stat && <div style={{ fontFamily: heading.family, fontWeight: heading.weight, fontSize: fitSize([card.stat], box.w, size * 1.2, heading.em), lineHeight: 1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: colors.accent }}>{card.stat}</div>}
+        {card.stat && <div style={{ fontFamily: heading.family, fontWeight: heading.weight, fontSize: fitSize([card.stat], box.w, size * 1.2, heading.em), lineHeight: 1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: figureOn(bg, colors.accent, fg) }}>{card.stat}</div>}
         <div style={{ fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.05, letterSpacing: "-0.02em" }}>{card.title}</div>
         {card.body && <div style={{ fontFamily: body.family, fontWeight: body.weight, fontSize: Math.round(size * 0.3), lineHeight: 1.3, opacity: 0.8 }}>{card.body}</div>}
       </div>
@@ -89,9 +89,8 @@ function Card({ card, p, w, h, bg }: { card: MotionGrid["cards"][number]; p: Par
   const { colors, heading, body, images } = p;
   // Kartın yazısı kart renginde en okunan uçtan.
   const fg = contrast(bg, colors.fg) >= contrast(bg, colors.bg) ? colors.fg : colors.bg;
-  // Rakam vurgu rengindedir, kart renginde okunmuyorsa (4,5:1 altı) kartın yazı rengindedir: paletlerin çoğunda kart ile
-  // vurgu arası 2-3:1 (23 Kas, 16:9 film m6: sarı kartta mavi "31-60 sn", 3,1:1, denetçi okunmaz dedi).
-  const figure = contrast(bg, colors.accent) >= 4.5 ? colors.accent : fg;
+  // Rakam vurgu rengindedir, kart renginde okunmuyorsa kartın yazı rengindedir (figureOn).
+  const figure = figureOn(bg, colors.accent, fg);
   const image = card.image !== undefined ? images[card.image] : undefined;
   // Boylar kartın iç genişliğinden ve yazı yüzünün harf genişliğinden: başlık en çok iki satıra kayar, en uzun kelimesi
   // sığar; rakam tek satırdır. Eski oran dolguyu ve harf genişliğini saymıyordu, "31-60 sn" kartta "31-60 / sn" diye

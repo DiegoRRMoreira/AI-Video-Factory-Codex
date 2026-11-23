@@ -22,7 +22,7 @@ vi.mock("../src/PixiParticles.tsx", () => ({ PixiParticles: (p: Record<string, u
 vi.mock("../src/Scene3D.tsx", () => ({ Scene3D: (p: { spec: Record<string, unknown> }) => (gl.three.push(p.spec), <canvas data-three={String(p.spec.preset)} />) }));
 
 const { FilmScene, ILLUSTRATIVE } = await import("../src/motion-film/Film.tsx");
-const { foldedIndex, markedWords } = await import("../src/motion-film/Kinetic.tsx");
+const { foldedIndex, markedWords, pillRoom } = await import("../src/motion-film/Kinetic.tsx");
 const { halves, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
 const { gridShape } = await import("../src/motion-film/Grid.tsx");
 const { titleSizes } = await import("../src/motion-film/Ambient.tsx");
@@ -122,6 +122,25 @@ describe("kinetik yazı", () => {
     expect(markedWords("İzle. Seç.", "seç.")).toEqual([false, true]);
   });
 
+  it("satır içi hap komşu yazının yanında taşması kadar boşluk bırakır; sığdırma bunu bir harf sayar", () => {
+    const pillOf = (line: string, highlight: string) => draw(kinetic("rise", { kinetic: { lines: [line], mode: "rise", highlight } }), 60).querySelector<HTMLElement>("[data-pill]")!.style;
+    expect([pillOf("ilk altı ayı.", "altı ayı").marginLeft, pillOf("ilk altı ayı.", "altı ayı").marginRight]).toEqual(["0.2em", "0px"]);
+    expect([pillOf("14 çiftlik.", "14").marginLeft, pillOf("14 çiftlik.", "14").marginRight]).toEqual(["0px", "0.2em"]);
+    expect([pillOf("a b c", "b").marginLeft, pillOf("a b c", "b").marginRight]).toEqual(["0.2em", "0.2em"]);
+    expect([pillOf("Kavruk.", "Kavruk").marginLeft, pillOf("Kavruk.", "Kavruk").marginRight]).toEqual(["0px", "0px"]);
+    expect(pillRoom("ilk altı ayı.", "altı ayı")).toBe("ilk altı ayı.x");
+    expect(pillRoom("14 çiftlik.", "14")).toBe("14x çiftlik.");
+    expect(pillRoom("Kavruk.", "kavruk")).toBe("Kavruk.");
+    expect(pillRoom("a b", "zz")).toBe("a b");
+    expect(pillRoom("a b")).toBe("a b");
+    // Genişliğe dayanan uzun satırda komşulu hap yazıyı küçültür (satır ve bölüm kartı kipi).
+    const long = "Kapına kırk sekiz saatte taze kahve gelir";
+    const sizeOf = (mode: "rise" | "chapter", highlight?: string) =>
+      parseFloat(draw(kinetic(mode, { kinetic: { lines: [long], mode, highlight } }), 60).querySelector<HTMLElement>("[data-line]")!.style.fontSize);
+    expect(sizeOf("rise", "sekiz saatte")).toBeLessThan(sizeOf("rise"));
+    expect(sizeOf("chapter", "sekiz saatte")).toBeLessThan(sizeOf("chapter"));
+  });
+
   it("bölüm kartı: sayaç ve toplam, bölüm bilgisi yoksa 01/01", () => {
     const c = draw(kinetic("chapter"), 100);
     expect(c.querySelector("[data-chapter]")!.textContent).toBe("02/05");
@@ -168,6 +187,10 @@ describe("veri hikayesi", () => {
     const noted = draw(count({ data: { chart: "count", title: "t", unit: "x", callout: "Wow", count: { to: 2.5, decimals: 1, prefix: "~" } } }), 200);
     expect(noted.textContent).toContain("~2.5x");
     expect(noted.querySelector("[data-callout]")!.textContent).toBe("Wow");
+    // Sayı vurgu rengindedir, zeminde okunmuyorsa (4,5:1 altı) yazı rengindedir: açık zeminde turuncu 2,9:1.
+    const colorOf = (ground: MotionScene["ground"]) => (draw(count({ ground }), 200).querySelector("[data-count]") as HTMLElement).style.color;
+    expect(colorOf("ground")).toBe(PALETTE.ink);
+    expect(colorOf("ink")).toBe(PALETTE.accent);
   });
 
   it("çubuklarda not grafiğin üstündeki bantta, genişliğiyle grafiğin içinde; kayan başlık grafiği aşağı iter", () => {
@@ -204,6 +227,12 @@ describe("sistem diyagramı", () => {
     expect(c.querySelector("text")!.textContent).toBe("push");
     expect(c.querySelectorAll("[data-packet]").length).toBe(2);
     expect((c.querySelector('[data-node="c"]') as HTMLElement).style.background).toBe(PALETTE.accent);
+    // Yazı kenara değmez: iç boşluk iki yandan genişliğin %4'ü, dış boyut aynı.
+    const node = (c.querySelector('[data-node="c"]') as HTMLElement).style;
+    const pad = parseFloat(node.padding.split(" ")[1]!);
+    expect(pad).toBeGreaterThan(0);
+    expect(Math.round((parseFloat(node.width) + pad * 2) * 0.04)).toBe(pad);
+    expect(node.textWrap).toBe("balance");
     expect(c.querySelector("[data-title]")!.textContent).toBe("Flow");
     // Bağ henüz girmemiş; paket yok.
     const early = draw(diagram({ diagram: { ...diagram().diagram!, packets: false, title: undefined } }), 0);
@@ -320,6 +349,10 @@ describe("kart ızgarası ve montaj", () => {
     const reel = (s: string) => stat(draw(grid("montage", { grid: { mode: "montage", cards: [{ title: "x", stat: s }] } }), 0));
     expect(reel("12").style.whiteSpace).toBe("nowrap");
     expect(parseFloat(reel("1750 kelime!").style.fontSize)).toBeLessThan(parseFloat(reel("12").style.fontSize));
+    // Montaj rakamı da kart zemininde okunmuyorsa kartın yazı rengindedir; koyu kartta vurgu.
+    expect(reel("12").style.color).toBe(PALETTE.ink);
+    const second = draw(grid("montage", { grid: { mode: "montage", cards: [{ title: "x" }, { title: "y", stat: "12" }] } }), 16);
+    expect((second.querySelector("[data-montage] div > div") as HTMLElement).style.color).toBe(PALETTE.accent);
   });
 
   it("montajda her tempo adımında tek kart kareyi doldurur, zemin ile mürekkep arasında döner", () => {

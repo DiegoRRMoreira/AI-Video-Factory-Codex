@@ -12,7 +12,8 @@ export function Kinetic(p: PartProps) {
   const { box, colors, heading, frame, fps, enters } = p;
   const tall = p.height > p.width;
   // Dikeyde satırlar kayar (fitWrapped), yatayda her satır tek satıra sığar.
-  const size = tall ? fitWrapped(k.lines, box.w, box.h * 0.8, 170, heading.em) : fitSize(k.lines, box.w, 220, heading.em);
+  const fit = k.lines.map((l) => pillRoom(l, k.highlight));
+  const size = tall ? fitWrapped(fit, box.w, box.h * 0.8, 170, heading.em) : fitSize(fit, box.w, 220, heading.em);
   // Kayan satırlar dengelenir, sonda tek kelime kalmaz (text-wrap: balance, satır sayısını artırmaz; 23 Kas, 9:16 film:
   // "Verified on / a", "that draws / it."; Chrome 157'de pretty bu kısa satırlarda bir şey değiştirmedi).
   const font = { fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.08, letterSpacing: "-0.02em", textWrap: "balance" };
@@ -22,7 +23,7 @@ export function Kinetic(p: PartProps) {
     const total = String(k.chapter?.total ?? k.chapter?.index ?? 1).padStart(2, "0");
     const q = enterK(frame, enters[0]!, fps);
     // Bölüm kartı: etiket satırları kutuya sığar, sayaç onun 2,6 katı (kutuyu aşmadan).
-    const lineSize = tall ? fitWrapped(k.lines, box.w, box.h * 0.45, 110, heading.em) : fitSize(k.lines, box.w, 130, heading.em);
+    const lineSize = tall ? fitWrapped(fit, box.w, box.h * 0.45, 110, heading.em) : fitSize(fit, box.w, 130, heading.em);
     const counter = Math.min(lineSize * 2.6, box.w * 0.42);
     return (
       <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, display: "flex", flexDirection: "column", justifyContent: "center", color: colors.fg }}>
@@ -135,14 +136,31 @@ export function Marked({ text, highlight, pill, colors }: { text: string; highli
   const end = i + highlight!.length;
   const tail = /^[^\s]*/.exec(text.slice(end))![0];
   const mark = text.slice(i, end + tail.length);
+  const before = text.slice(0, i);
+  const after = text.slice(end + tail.length);
+  // Hap iki yana PILL_BLEED taşar: satırda komşu yazı olan yanda o kadar boşluk eklenir, yoksa kelime aralığı ~0,05 em'e
+  // iner ve hap komşu kelimeye yapışır (23 Kas, 9:16 film: "ilk|altı ayı.", "14|çiftlik."; kelime kipi bunu zaten yapıyordu).
   return (
     <>
-      {text.slice(0, i)}
-      <span data-pill="" style={{ position: "relative", display: "inline-block", isolation: "isolate", color: pill > 0.5 ? colors.onAccent : undefined }}>
+      {before}
+      <span data-pill="" style={{ position: "relative", display: "inline-block", isolation: "isolate", marginLeft: before ? PILL_BLEED : 0, marginRight: after ? PILL_BLEED : 0, color: pill > 0.5 ? colors.onAccent : undefined }}>
         <span style={{ position: "absolute", inset: `0.04em -${PILL_BLEED} -0.16em`, borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
         {mark}
       </span>
-      {text.slice(end + tail.length)}
+      {after}
     </>
   );
+}
+
+/**
+ * Sığdırma için satır: hapın komşu yazı olan yanlardaki payı (en çok 2 × PILL_BLEED = 0,4 em) hapın son kelimesine bir
+ * harf eklenerek sayılır (bir harf ~0,5 em).
+ */
+export function pillRoom(line: string, highlight?: string): string {
+  const i = highlight ? foldedIndex(line, highlight) : -1;
+  if (i < 0) return line;
+  const end = i + highlight!.length;
+  const stop = end + /^[^\s]*/.exec(line.slice(end))![0].length;
+  if (i === 0 && stop === line.length) return line;
+  return `${line.slice(0, stop)}x${line.slice(stop)}`;
 }

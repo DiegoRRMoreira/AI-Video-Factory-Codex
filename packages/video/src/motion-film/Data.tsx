@@ -1,6 +1,6 @@
 import type { MotionData } from "@ys/core";
 import { rowsOf, type PartProps } from "./context.ts";
-import { clamp01, countAt, enterK, expoOut, FILM, formatValue } from "./timing.ts";
+import { clamp01, countAt, enterK, expoOut, figureOn, FILM, formatValue } from "./timing.ts";
 
 /** Veri hikayesi (kanıt): çubuklar sıfırdan büyür, çizgi noktadan noktaya çizilir, sayı sayarak oturur; not vurgulanan noktaya iner. */
 export function Data(p: PartProps) {
@@ -171,7 +171,7 @@ function Count({ d, p, chart, size }: { d: MotionData; p: PartProps; chart: Box;
   // Yazı tipinin harf genişliğiyle tek satıra sığar (eşaralıklı yazıda "<50 ms" ikiye bölünüyordu).
   const big = Math.round(Math.min(chart.h * 0.6, chart.w / (Math.max(3, text.length) * p.heading.em * 1.05), size * 4.2));
   return (
-    <div data-count="" style={{ position: "absolute", left: chart.x, top: chart.y, width: chart.w, height: chart.h, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: big, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: p.colors.accent, opacity: p.frame >= at ? 1 : 0, transform: `scale(${pop})` }}>
+    <div data-count="" style={{ position: "absolute", left: chart.x, top: chart.y, width: chart.w, height: chart.h, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: p.heading.family, fontWeight: p.heading.weight, fontSize: big, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: figureOn(p.colors.bg, p.colors.accent, p.colors.fg), opacity: p.frame >= at ? 1 : 0, transform: `scale(${pop})` }}>
       {text}
     </div>
   );
