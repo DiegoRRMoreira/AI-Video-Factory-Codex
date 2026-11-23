@@ -72,6 +72,8 @@ A integração de mídia passou em 183 testes locais, e a checagem de tipos pass
 
 A descoberta dos modelos Codex e a seleção dos papéis no Studio foram verificadas. Um episódio completo passando automaticamente pelos 31 papéis ainda não foi validado. A execução de testes/CI em outro computador também é uma verificação separada. O workflow original mantém suas próprias exigências de cobertura.
 
+Na preparação da publicação, um teste original de isolamento de arquivos (`benchmark-review.test.ts`) falhou com `EPERM` ao criar um link simbólico neste Windows, inclusive fora das restrições da sessão. O teste permanece inalterado; a execução geral não foi certificada como aprovada. Use um ambiente com permissão para links simbólicos para repetir essa verificação.
+
 ## Credenciais e arquivos pessoais
 
 `.env`, `.data`, `out`, dependências e resultados locais estão ignorados pelo Git. Tokens Kairogen ficam somente no diretório local de autenticação. Use as credenciais de cada usuário e não envie essas pastas ao compartilhar o código.
