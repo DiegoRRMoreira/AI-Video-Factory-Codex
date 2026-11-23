@@ -3,13 +3,17 @@
   "version": "0.6.13",
   "private": true,
   "license": "MIT",
-  "repository": "github:ersinkoc/AI-Video-Factory",
+  "repository": "github:DiegoRRMoreira/AI-Video-Factory-Codex",
   "type": "module",
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
+    "kairogen": "tsx scripts/kairogen.ts",
+    "kairogen:generate": "tsx scripts/kairogen-generate.ts",
+    "codex:setup": "tsx scripts/setup-codex.ts",
+    "reel:render": "tsx scripts/render-brand-reel.ts",
     "typecheck": "tsc -p tsconfig.json && tsc -p apps/studio/tsconfig.json",
     "motion:preview": "tsx scripts/preview-scene-motion.ts",
     "motion:film": "tsx scripts/preview-motion-film.ts",
@@ -39,6 +43,7 @@
     "infra:down": "docker compose down"
   },
   "devDependencies": {
+    "@agentclientprotocol/codex-acp": "2.9.0",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@types/node": "26.6.6",

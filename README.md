@@ -1,4 +1,6 @@
-# AI Video Factory
+# AI Video Factory — Codex + Kairogen
+
+> Community fork of [ersinkoc/AI-Video-Factory](https://github.com/ersinkoc/AI-Video-Factory), with Codex ACP setup, Kairogen MCP media generation and portable vertical-Reels editing. Original MIT license and attribution are preserved. Start with the **[Portuguese setup guide](README.pt-BR.md)** or the [integration guide](docs/KAIROGEN.md). Each user connects their own accounts; credentials and generated media are not included. The original overview follows below. A complete automated episode across all production roles has not yet been verified in this fork.
 
 **English** · [Türkçe](README-TR.md)
 

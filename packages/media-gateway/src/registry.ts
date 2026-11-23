@@ -9,6 +9,8 @@ import { FAL_MODELS } from "./providers/fal-models.ts";
 import { GeminiImageAdapter, GeminiTtsAdapter, OmniVideoAdapter, VeoAdapter } from "./providers/gemini.ts";
 import { msg, type Msg } from "@ys/core";
 import type { ProviderAdapter } from "./types.ts";
+import { KairogenAdapter, type KairogenModelSpec } from "./providers/kairogen.ts";
+import { kairogenDir } from "./providers/kairogen-client.ts";
 
 const GEMINI_PRICING = "https://ai.google.dev/gemini-api/docs/pricing";
 
@@ -54,6 +56,14 @@ export function createProvidersFromEnv(
 ): RegistryReport {
   const providers: ProviderAdapter[] = [];
   const skipped: Msg[] = [];
+
+  // Opt-in: credit accounting must be configured explicitly before paid calls are possible.
+  if (env.KAIROGEN_ENABLED === "1") {
+    const modelsFile = env.KAIROGEN_MODELS_FILE ?? join(env.KAIROGEN_AUTH_DIR ?? kairogenDir(), "models.json");
+    const specs = JSON.parse(readFileSync(modelsFile, "utf8")) as KairogenModelSpec[];
+    if (!Array.isArray(specs) || !specs.length) throw new Error("Kairogen models.json must contain at least one model.");
+    providers.push(...specs.map((spec) => new KairogenAdapter(spec)));
+  }
 
   // --- Yerel GPU (ComfyUI) ---
   const manifestPath = join(comfyDir, "manifest.json");

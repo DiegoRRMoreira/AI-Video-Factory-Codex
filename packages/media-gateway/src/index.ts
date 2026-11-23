@@ -12,3 +12,4 @@ export { FalAdapter, type FalModelSpec } from "./providers/fal.ts";
 export { FAL_MODELS } from "./providers/fal-models.ts";
 export { GeminiImageAdapter, GeminiTtsAdapter, OmniVideoAdapter, VeoAdapter } from "./providers/gemini.ts";
 export { WhisperCppSttAdapter, whisperWords, type WhisperRun } from "./providers/whisper.ts";
+export { KairogenAdapter, generateKairogenMedia, mapKairogenReference, type KairogenModelSpec } from "./providers/kairogen.ts";

@@ -1,0 +1,9 @@
+{
+  "model": "seedance-2-5-flash",
+  "prompt": "A premium vertical brand motion design film for a B2B technology consultancy. Strict palette warm yellow #FFC000, near black and white. Matte geometric panels connect through fine yellow paths and settle into a coherent honeycomb network. Calm deliberate camera movement. Leave the upper third dark and uncluttered for titles. The last three seconds settle into a quiet dark composition. No people, no text, letters, numbers, logos or watermarks. Silent: narration and branding will be added in editing.",
+  "duration_seconds": 20,
+  "aspect_ratio": "9:16",
+  "resolution": "720p",
+  "generate_audio": false,
+  "quantity": 1
+}

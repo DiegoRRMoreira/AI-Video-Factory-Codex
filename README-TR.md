@@ -1,4 +1,6 @@
-# AI Video Factory
+# AI Video Factory — Codex + Kairogen
+
+> Bu topluluk çatallaması [ersinkoc/AI-Video-Factory](https://github.com/ersinkoc/AI-Video-Factory) üzerine Codex ACP kurulumu, Kairogen MCP medya üretimi ve taşınabilir dikey Reels düzenlemesi ekler. Özgün MIT lisansı ve atıflar korunur. [Portekizce kurulum rehberi](README.pt-BR.md) ve [entegrasyon rehberi](docs/KAIROGEN.md). Her kullanıcı kendi hesabını bağlar; kimlik bilgileri ve üretilen medya dahil değildir. Tüm üretim rollerini kapsayan tam otomatik bir bölüm bu çatallamada henüz doğrulanmadı. Özgün genel bakış aşağıdadır.
 
 [English](README.md) · **Türkçe**
 
