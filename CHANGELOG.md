@@ -2,6 +2,13 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.10 (2026-11-23)
+
+- Motion-graphics films: a montage now shows its title as a small label at the top while the cards cut underneath; before, the title was never drawn.
+- A highlighted word in a word-by-word line no longer touches the word before it.
+- Long grid and montage titles shrink to fit one line instead of running into the cards.
+- The frame check knows that montage cards alternate the ground and ink colours.
+
 ## v0.6.9 (2026-11-23)
 
 - Security: the Prisma config in the trigger.dev worker chain pinned `effect` 3.21.0, which has a ReDoS in `Schema.TemplateLiteral` (GHSA-7589-6fvf-x4pw); it now uses 3.22.4, the copy the same chain already had. Development tooling only; the trigger.dev CLI and the Prisma config load were checked.
