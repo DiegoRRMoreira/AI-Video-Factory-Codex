@@ -26,6 +26,8 @@ export interface TextUnit {
   words: number;
   /** Montaj kartı: bir sonraki kartın girişine kadar görünür. */
   until?: number;
+  /** Okunma girişten bu kadar sonra başlar (sn): sayaç önce sayar, son değeri sonra okunur. */
+  after?: number;
 }
 
 export function textUnits(scene: MotionScene): TextUnit[] {
@@ -43,7 +45,10 @@ export function textUnits(scene: MotionScene): TextUnit[] {
     case "data": {
       const d = scene.data!;
       const units = unitsOf(scene);
-      return [{ unit: 0, words: count(d.title) }, ...(d.callout ? [{ unit: units - 1, words: count(d.callout) }] : [])];
+      // Sayacın son değeri sayış bittikten sonra okunacak kadar kalır: 2 vuruşluk sayaç sahnesi kesmede yarım kalıyordu
+      // (23 Kas, 9:16 film m8/m9: 122 BPM'de ~1 sn, sayış 0,9 sn girişten yarım vuruş sonra başlıyordu; "1.187", "3.088").
+      const counter = d.chart === "count" ? [{ unit: 1, words: 1, after: FILM.countSec }] : [];
+      return [{ unit: 0, words: count(d.title) }, ...counter, ...(d.callout ? [{ unit: units - 1, words: count(d.callout) }] : [])];
     }
     case "diagram": {
       const g = scene.diagram!;
@@ -84,7 +89,7 @@ export function neededFrames(scene: MotionScene, bpm: number, fps: number): numb
   let need = frames;
   for (const t of textUnits(scene)) {
     if (t.until !== undefined) continue;
-    need = Math.max(need, Math.ceil(enters[t.unit]! + holdSec(t.words) * fps));
+    need = Math.max(need, Math.ceil(enters[t.unit]! + ((t.after ?? 0) + holdSec(t.words)) * fps));
   }
   return need;
 }
@@ -154,7 +159,7 @@ export function lintFilm(film: MotionFilm, fps: number): FilmIssue[] {
     if (units > 1 && enters[1]! < step - 1) issues.push({ kind: "crowded", sceneId: s.id, atSec: round(fromFrame / fps), detail: `${units} elements do not fit ${s.beats} beats at ${s.pace} pace; they fall off the beat` });
     for (const t of textUnits(s)) {
       const end = t.until !== undefined ? (enters[t.until] ?? frames) : frames;
-      const shown = (end - enters[t.unit]!) / fps;
+      const shown = (end - enters[t.unit]!) / fps - (t.after ?? 0);
       if (shown + 1e-6 < holdSec(t.words)) {
         issues.push({ kind: "hold", sceneId: s.id, atSec: round((fromFrame + enters[t.unit]!) / fps), detail: `text of ${t.words} words is on screen ${shown.toFixed(2)} s (needs ${holdSec(t.words).toFixed(2)} s)` });
       }

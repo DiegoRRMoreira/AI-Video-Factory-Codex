@@ -135,6 +135,13 @@ export function contrast(a: string, b: string): number {
   return (x! + 0.05) / (y! + 0.05);
 }
 
+/**
+ * Vurgu renginde yazılacak rakamın rengi: vurgu o zeminde okunuyorsa (4,5:1) vurgu, yoksa yazı rengi. Paletlerin çoğunda
+ * açık zemin ile vurgu arası 2-3:1 (23 Kas, 9:16 film m4: krem zeminde turuncu "48 saat" sayacı 1,75:1, denetçi geçirdi;
+ * 16:9 film m6: sarı kartta mavi rakam 3,1:1, denetçi okunmaz dedi).
+ */
+export const figureOn = (bg: string, accent: string, fg: string) => (contrast(bg, accent) >= 4.5 ? accent : fg);
+
 /** Sahnenin renkleri: zemin, yazı, vurgu ve vurgunun üstündeki yazı. Vurgu zemininde yazı daha okunan uçtan seçilir. */
 export function colorsOf(ground: MotionScene["ground"], p: MotionPalette): { bg: string; fg: string; accent: string; onAccent: string; card: string } {
   const pick = (bg: string, a: string, b: string) => (contrast(bg, a) >= contrast(bg, b) ? a : b);

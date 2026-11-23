@@ -646,7 +646,11 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
   sayı arasındaki tire aralıktır, bölünmez). Izgara kartının rakamı vurgu rengi kartta okunmuyorsa (4,5:1 altı) kartın yazı rengindedir. Düzeltilmiş kopya 10 karede 10, önceki iki
   film 17 ve 14 karede 10. Dördüncü yeni brif (9:16, İngilizce, logolu): başlıksız logo sahnesinin notu dikeyde ~30 px'e
   iniyordu (başlık gibi sığdırılıp 0,42'ye küçültülüyordu); not artık başlığın altında en az 32 px, başlıksızsa kendi
-  yüzüyle en çok 64 px, ayraçta iki satır. Denetçi küçük notu geçirmişti; gözle bulundu.
+  yüzüyle en çok 64 px, ayraçta iki satır. Denetçi küçük notu geçirmişti; gözle bulundu. Beşinci yeni brif (9:16,
+  Türkçe, iki marka rengi) dört kusur çıkardı: 2 vuruşluk sahnede sayaç kesmeden önce inmiyordu ("1.187", "3.088";
+  sahne artık sayış bitip son değer okunacak kadar uzar), açık zeminde turuncu sayaç 1,75:1'di (sayaç ve montaj rakamı
+  vurguyu yalnız okunuyorsa alır), satır içi hap önceki kelimeye yapışıyordu (komşu yanda boşluk) ve şema düğümünün
+  yazısı kenardan kenaraydı (iç boşluk, sığmayan etiket iki satır). Düzeltilmiş kopya 15 karede 10.
 
 ## 17. Pazar Haritası (Ekim 2026)
 
