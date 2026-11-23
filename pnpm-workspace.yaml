@@ -45,5 +45,8 @@ overrides:
   # Aynı zincirde hono'nun kendisi: <4.13.16 csrf/validator/mount/RegExpRouter ara katman atlamaları ve css helper HTML
   # enjeksiyonu. MCP SDK ^4 istiyor; en son 4.x yamaya alındı.
   hono@<4.13.16: 4.13.18
+  # Güvenlik (Dependabot GHSA-7589-6fvf-x4pw): effect <=3.22.0 Schema.TemplateLiteral düzenli ifadesinde ReDoS. Prisma
+  # config (trigger.dev zinciri) 3.21.0'ı tam sürümle istiyor; aynı zincirdeki öteki kopya 3.22.4, ona birleştirildi.
+  effect@<3.22.1: 3.22.4
 patchedDependencies:
   trigger.dev@4.8.3: patches/trigger.dev@4.8.3.patch
