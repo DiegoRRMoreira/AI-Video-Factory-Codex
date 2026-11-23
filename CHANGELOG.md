@@ -2,6 +2,13 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.14 (2026-11-23)
+
+- Motion-graphics films: a counter in a short scene now finishes counting and stays on its final value long enough to read; it could be cut mid-count and show the wrong number.
+- A counter or a montage figure uses the accent colour only when it reads on that background; otherwise it takes the text colour.
+- A highlight box in the middle of a line no longer runs into the word next to it.
+- A diagram node's label keeps clear of the node's border and wraps onto two lines when it does not fit.
+
 ## v0.6.13 (2026-11-23)
 
 - Motion-graphics films: the caption of a logo or particle scene without a title is now drawn at a readable size (it was about 30 px tall in vertical films and 23 px in landscape), and a caption such as "Name · tagline" breaks onto two lines at the dot.
