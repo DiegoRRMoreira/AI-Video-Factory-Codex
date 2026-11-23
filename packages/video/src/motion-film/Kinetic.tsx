@@ -79,7 +79,7 @@ export function Kinetic(p: PartProps) {
 /** Satırın kelimelerinden vurgu ifadesinin içine düşenler (kelime kipinde ifade birkaç kelimeye yayılabilir). */
 export function markedWords(line: string, highlight?: string): boolean[] {
   const words = wordsOf(line);
-  const i = highlight ? line.toLocaleLowerCase().indexOf(highlight.toLocaleLowerCase()) : -1;
+  const i = highlight ? foldedIndex(line, highlight) : -1;
   if (i < 0) return words.map(() => false);
   const end = i + highlight!.length;
   let at = 0;
@@ -88,6 +88,16 @@ export function markedWords(line: string, highlight?: string): boolean[] {
     at = from + w.length;
     return from < end && at > i;
   });
+}
+
+/**
+ * Büyük/küçük harf duyarsız arama, metnin kendi indeksiyle: her karakter tek karakterle küçülür. "İ" küçülünce iki
+ * karakter ("i" + nokta) oluyordu, ondan sonraki her indeks bir kayıyordu (23 Kas, film m7: "İlk önizleme ne kadar
+ * sürdü?" satırında hap "ne kadar" yerine "e kadar sürdü?"yü kapladı).
+ */
+export function foldedIndex(text: string, part: string): number {
+  const fold = (s: string) => Array.from({ length: s.length }, (_, j) => s[j]!.toLowerCase()[0]).join("");
+  return fold(text).indexOf(fold(part));
 }
 
 /** Hap, satır oturduktan sonra açılır (girişten 1,5 giriş süresi sonra, yarım saniyede). */
@@ -118,7 +128,7 @@ const PILL_BLEED = "0.2em";
  * film denetçisi AI Video Factory m5/m7/m8).
  */
 export function Marked({ text, highlight, pill, colors }: { text: string; highlight?: string; pill: number; colors: PartProps["colors"] }): ReactNode {
-  const i = highlight ? text.toLocaleLowerCase().indexOf(highlight.toLocaleLowerCase()) : -1;
+  const i = highlight ? foldedIndex(text, highlight) : -1;
   if (i < 0) return text;
   // Hapın hemen ardındaki noktalama hapın içine alınır: dikeyde hap kayınca nokta tek başına alt satıra düşüyordu; hap
   // kendi içinde kayabilir.

@@ -21,7 +21,7 @@ export function Diagram(p: PartProps) {
   const nodeW = Math.min(place.cellW * 0.82, tall ? 440 : 420);
   const nodeH = Math.min(place.cellH * 0.56, 156);
   // Etiket iki satıra inebilir: en uzun satır, kelime sınırından ikiye bölünmüş hâlinin uzunu.
-  const label = fitSize(g.nodes.map((n) => halves(n.label)), nodeW * 0.86, nodeH * 0.36, heading.em);
+  const label = fitSize(g.nodes.map((n) => { const [a, b] = labelParts(n.label); return b === undefined ? halves(a) : a.length >= b.length ? a : b; }), nodeW * 0.86, nodeH * 0.36, heading.em);
   const beat = beatFrames(p.bpm, fps);
   const tq = enterK(frame, 0, fps);
 
@@ -106,7 +106,7 @@ export function Diagram(p: PartProps) {
               transform: `scale(${0.82 + 0.18 * q})`,
             }}
           >
-            {n.label}
+            <NodeLabel label={n.label} />
           </div>
         );
       })}
@@ -128,6 +128,30 @@ export function labelSpot(s: { x1: number; y1: number; x2: number; y2: number },
   const flip = -cos > 1e-9 ? -1 : 1;
   const off = (w / 2) * Math.abs(sin) + (h / 2) * Math.abs(cos) + gap;
   return { x: (s.x1 + s.x2) / 2 + flip * sin * off, y: (s.y1 + s.y2) / 2 - flip * cos * off };
+}
+
+/**
+ * Ayraçlı etiket ("İzle · Sahneler", "Dinle - Metin") ad ve alt yazı olarak iki satırdır, ayraç düşer: kendiliğinden
+ * kayınca ayraç ilk satırın sonunda asılı kalıyordu (23 Kas, 16:9 film m4: "İzle · / Sahneler").
+ */
+export function labelParts(label: string): [string] | [string, string] {
+  const m = /^(.+?)\s+([·•|–—-])\s+(.+)$/.exec(label);
+  if (!m || /\s[·•|–—-]\s/.test(m[3]!)) return [label];
+  // İki sayı arasındaki tire aralıktır ("31 – 60 sn"), ayraç değil: bölünse tire düşer, anlam değişirdi.
+  if (/[–—-]/.test(m[2]!) && /\d$/.test(m[1]!) && /^\d/.test(m[3]!)) return [label];
+  return [m[1]!, m[3]!];
+}
+
+function NodeLabel({ label }: { label: string }) {
+  const [a, b] = labelParts(label);
+  if (b === undefined) return a;
+  return (
+    <span>
+      {a}
+      <br />
+      <span data-sub="" style={{ fontSize: "0.8em", opacity: 0.8 }}>{b}</span>
+    </span>
+  );
 }
 
 export function halves(label: string): string {

@@ -639,7 +639,12 @@ anlatımsız (müzik + efekt, TTS seçilebilir); brif + logo/ekran + marka renkl
   artık tek sütun); kısa vurgulu çubuğun üstündeki not yandaki uzun çubuğa değiyordu (çubuklarda not artık grafiğin
   üstündeki kendi bandında); kayan kinetik satırlar tek kelimeyle bitiyordu ("Verified on / a"; `text-wrap: balance`).
   Denetçi istemi düğümün col/row değerlerinin konum değil ızgara ipucu olduğunu söyler. Düzeltilmiş kopya 17 karede 10,
-  AVF 16:9 filmi 14 karede 10.
+  AVF 16:9 filmi 14 karede 10. Üçüncü yeni brif (16:9, Türkçe, 10 sahne) üç kusur daha çıkardı: önünde büyük "İ" olan
+  satırda vurgu hapı bir harf kayıyordu ("İ" küçülünce iki karakter olur; arama artık her karakteri tek karakterle
+  küçültür), kart rakamı ikiye bölünüyordu ("31-60 / sn"; kart boyları artık iç genişlikten ve harf genişliğinden) ve
+  ayraçlı düğüm etiketinde ayraç satır sonunda asılı kalıyordu ("İzle · Sahneler" artık ad ve küçük ikinci satır; iki
+  sayı arasındaki tire aralıktır, bölünmez). Izgara kartının rakamı vurgu rengi kartta okunmuyorsa (4,5:1 altı) kartın yazı rengindedir. Düzeltilmiş kopya 10 karede 10, önceki iki
+  film 17 ve 14 karede 10.
 
 ## 17. Pazar Haritası (Ekim 2026)
 

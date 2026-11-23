@@ -283,14 +283,16 @@ describe("görsel denetçiler", () => {
     // Sola yaslı yazı düzenin kendisi (kalibrasyon: bölüm sayacı her denetimde "dengesiz" alıyordu).
     expect(a.system).toContain("(kinetic chapter scenes, and every kinetic scene in this vertical film), where the empty space beside it is the layout, not unbalanced.");
     // Dikeyde ızgara döner, adım başına tek düğümlü zincir tek sütundur (kalibrasyon: m4 "çapraz konumlar yok sayılmış").
-    expect(a.system).toContain("(a diagram node's col and row are grid hints, not positions to check: this vertical film turns the grid, and a chain with one node per step is drawn as a single column)");
+    expect(a.system).toContain("(a diagram node's col and row are grid hints, not positions to check: this vertical film turns the grid, and a chain with one node per step is drawn as a single column; a node label");
+    // Ayraçlı düğüm etiketi iki satırdır, ayraç düşer (kalibrasyon: m4 "orta nokta ayracı yok").
+    expect(a.system).toContain('a node label with a separator, such as "Watch · Scenes", is drawn as the name over a smaller second line and the separator is dropped)');
     expect(a.system).toContain("The verdict follows your own evidence");
     for (const c of FILM_CHECKS) expect(a.system).toContain(`- ${c.id}: ${c.ask}`);
     expect(a.prompt).toBe('Image 1 = m1: spec {"language":"kinetic"}\nAnswer all 7 checks for each of the 1 image(s).');
     const b = await capture((d) => filmCritic(shots, { tall: false, palette, subtitles: true }, d));
     expect(b.system).toContain("(16:9)");
     expect(b.system).toContain("(kinetic chapter scenes), where");
-    expect(b.system).toContain("not positions to check), packet dots");
+    expect(b.system).toContain("not positions to check; a node label with a separator");
     expect(b.system).toContain("; narration subtitles may sit at the bottom");
     // Şemada ders yok; her madde zorunlu.
     const clean = Object.fromEntries(FILM_CHECKS.map((c) => [c.id, { evidence: `looked at ${c.id} closely`, verdict: "pass" as const }]));

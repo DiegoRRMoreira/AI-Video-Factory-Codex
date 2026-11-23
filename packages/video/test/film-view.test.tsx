@@ -22,8 +22,8 @@ vi.mock("../src/PixiParticles.tsx", () => ({ PixiParticles: (p: Record<string, u
 vi.mock("../src/Scene3D.tsx", () => ({ Scene3D: (p: { spec: Record<string, unknown> }) => (gl.three.push(p.spec), <canvas data-three={String(p.spec.preset)} />) }));
 
 const { FilmScene, ILLUSTRATIVE } = await import("../src/motion-film/Film.tsx");
-const { markedWords } = await import("../src/motion-film/Kinetic.tsx");
-const { halves, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
+const { foldedIndex, markedWords } = await import("../src/motion-film/Kinetic.tsx");
+const { halves, labelParts, labelSpot, layoutNodes } = await import("../src/motion-film/Diagram.tsx");
 const { gridShape } = await import("../src/motion-film/Grid.tsx");
 const { fileSrc } = await import("../src/motion-film/context.ts");
 const { calloutPoint } = await import("../src/motion-film/Data.tsx");
@@ -113,6 +113,12 @@ describe("kinetik yazı", () => {
     expect(dot.querySelector("[data-line]")!.textContent).toBe("Open source. Now");
     expect(markedWords("a b", "zz")).toEqual([false, false]);
     expect(markedWords("a b")).toEqual([false, false]);
+    // "İ" küçülünce iki karakter olur: arama metnin kendi indeksinde kalır, hap kaymaz.
+    expect(foldedIndex("İlk önizleme ne kadar sürdü?", "ne kadar")).toBe(13);
+    expect(foldedIndex("İLK", "ilk")).toBe(0);
+    const tr = draw(kinetic("rise", { kinetic: { lines: ["İlk önizleme ne kadar sürdü?"], mode: "rise", highlight: "ne kadar" } }), 60);
+    expect(tr.querySelector("[data-pill]")!.textContent).toBe("ne kadar");
+    expect(markedWords("İzle. Seç.", "seç.")).toEqual([false, true]);
   });
 
   it("bölüm kartı: sayaç ve toplam, bölüm bilgisi yoksa 01/01", () => {
@@ -235,6 +241,26 @@ describe("sistem diyagramı", () => {
     expect(halves("Deploy")).toBe("Deploy");
   });
 
+  it("ayraçlı düğüm etiketi ad ve alt yazı olarak iki satırdır, ayraç düşer", () => {
+    expect(labelParts("İzle · Sahneler")).toEqual(["İzle", "Sahneler"]);
+    expect(labelParts("Dinle - Metin")).toEqual(["Dinle", "Metin"]);
+    expect(labelParts("A · B · C")).toEqual(["A · B · C"]);
+    expect(labelParts(" · x")).toEqual([" · x"]);
+    // Sayılar arasındaki tire aralıktır, bölünmez; sayılar arasındaki nokta ayraçtır.
+    expect(labelParts("31 – 60 sn")).toEqual(["31 – 60 sn"]);
+    expect(labelParts("10 - 20 ms")).toEqual(["10 - 20 ms"]);
+    expect(labelParts("v2 · 3 bölge")).toEqual(["v2", "3 bölge"]);
+    expect(labelParts("Katman 2 - Önbellek")).toEqual(["Katman 2", "Önbellek"]);
+    expect(labelParts("Deploy")).toEqual(["Deploy"]);
+    const [, b, c3] = diagram().diagram!.nodes;
+    const nodes = [{ id: "a", label: "Commit · Kaynaklar", col: 0, row: 0 }, b!, { ...c3!, label: "Yayınla · CI" }];
+    const c = draw(diagram({ diagram: { ...diagram().diagram!, nodes } }), 239);
+    const a = c.querySelector('[data-node="a"]')!;
+    expect(a.textContent).toBe("CommitKaynaklar");
+    expect(a.querySelector("[data-sub]")!.textContent).toBe("Kaynaklar");
+    expect(c.querySelector('[data-node="b"] [data-sub]')).toBeNull();
+  });
+
   it("dikeyde her düğüm kendi satırındaki zincir tek sütuna toplanır; atlayan bağ, ortak satır ya da yatay kare dokunmaz", () => {
     const area = { x: 0, y: 0, w: 400, h: 800 };
     const nodes = [0, 1, 2, 3].map((i) => ({ id: `n${i}`, label: `N${i}`, col: i, row: i }));
@@ -274,6 +300,25 @@ describe("kart ızgarası ve montaj", () => {
     expect(untitled.querySelector("[data-title]")).toBeNull();
     expect(untitled.querySelector("[data-image]")!.getAttribute("src")).toBe("https://example.com/shot.png");
     expect(draw(grid("grid", { grid: { mode: "grid", cards: [{ title: "x", image: 9 }] } }), 200).querySelector("[data-image]")).toBeNull();
+  });
+
+  it("kart rakamı tek satırdır ve kartın iç genişliğine sığacak kadar küçülür", () => {
+    const stat = (c: HTMLElement) => c.querySelector("[data-card] div > div, [data-montage] div > div") as HTMLElement;
+    const cards = (s: string) => draw(grid("grid", { grid: { mode: "grid", cards: [{ title: "Süre aralığı", stat: s }, { title: "b" }, { title: "c" }] } }), 200);
+    const short = stat(cards("12"));
+    expect(short.textContent).toBe("12");
+    expect(short.style.whiteSpace).toBe("nowrap");
+    // Vurgu kart renginde okunmuyorsa rakam kartın yazı rengindedir.
+    expect(short.style.color).toBe(PALETTE.ground);
+    const dark = { ...PALETTE, alt: "#101010", accent: "#ffd23f" };
+    const bright = draw(grid("grid", { grid: { mode: "grid", cards: [{ title: "a", stat: "12" }] } }), 200, { look: { ...LOOK, palette: dark } });
+    expect((bright.querySelector("[data-card] div > div") as HTMLElement).style.color).toBe(dark.accent);
+    expect(parseFloat(stat(cards("31-60 saniye")).style.fontSize)).toBeLessThan(parseFloat(short.style.fontSize));
+    clock.width = 1080;
+    clock.height = 1920;
+    const reel = (s: string) => stat(draw(grid("montage", { grid: { mode: "montage", cards: [{ title: "x", stat: s }] } }), 0));
+    expect(reel("12").style.whiteSpace).toBe("nowrap");
+    expect(parseFloat(reel("1750 kelime!").style.fontSize)).toBeLessThan(parseFloat(reel("12").style.fontSize));
   });
 
   it("montajda her tempo adımında tek kart kareyi doldurur, zemin ile mürekkep arasında döner", () => {
