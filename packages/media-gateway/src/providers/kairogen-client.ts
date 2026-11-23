@@ -14,7 +14,8 @@ function workspaceDir(): string {
   return dir;
 }
 export const KAIROGEN_DIR = join(workspaceDir(), ".data", "kairogen");
-export const kairogenDir = () => resolve(process.env.KAIROGEN_AUTH_DIR ?? KAIROGEN_DIR);
+// Runtime account data must never be bundled into a Studio deployment.
+export const kairogenDir = () => resolve(/* turbopackIgnore: true */ process.env.KAIROGEN_AUTH_DIR ?? KAIROGEN_DIR);
 type Tokens = { access_token: string; refresh_token?: string; expires_in?: number; expires_at?: number };
 let refreshing: Promise<string> | undefined;
 

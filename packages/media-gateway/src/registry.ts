@@ -60,7 +60,7 @@ export function createProvidersFromEnv(
   // Opt-in: credit accounting must be configured explicitly before paid calls are possible.
   if (env.KAIROGEN_ENABLED === "1") {
     const modelsFile = env.KAIROGEN_MODELS_FILE ?? join(env.KAIROGEN_AUTH_DIR ?? kairogenDir(), "models.json");
-    const specs = JSON.parse(readFileSync(modelsFile, "utf8")) as KairogenModelSpec[];
+    const specs = JSON.parse(readFileSync(/* turbopackIgnore: true */ modelsFile, "utf8")) as KairogenModelSpec[];
     if (!Array.isArray(specs) || !specs.length) throw new Error("Kairogen models.json must contain at least one model.");
     providers.push(...specs.map((spec) => new KairogenAdapter(spec)));
   }
