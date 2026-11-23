@@ -102,6 +102,10 @@ describe("kinetik yazı", () => {
     expect(c.querySelectorAll("[data-word]").length).toBe(5);
     expect([...c.querySelectorAll("[data-pill]")].map((e) => e.textContent)).toEqual(["40", "minutes"]);
     expect(markedWords("a b c", "b c")).toEqual([false, true, true]);
+    // Hapın taşması kadar boşluk yalnız vurgusuz komşunun yanına: "40 minutes" tek hap, "now"dan ayrı.
+    const margins = (e: Element) => [(e as HTMLElement).style.marginLeft, (e as HTMLElement).style.marginRight];
+    const mid = draw(kinetic("words", { kinetic: { lines: ["in 40 minutes now"], mode: "words", highlight: "40 minutes" } }), 200);
+    expect([...mid.querySelectorAll("[data-word]")].map(margins)).toEqual([["0px", "0px"], ["0.2em", "0px"], ["0px", "0.2em"], ["0px", "0px"]]);
     // Hapın ardındaki noktalama hapla aynı satırda kalır.
     const dot = draw(kinetic("rise", { kinetic: { lines: ["Open source. Now"], mode: "rise", highlight: "Open source" } }), 60);
     expect(dot.querySelector("[data-pill]")!.textContent).toBe("Open source.");
@@ -235,6 +239,18 @@ describe("kart ızgarası ve montaj", () => {
     expect(second.textContent).toContain("Every build");
     expect(draw(grid("montage"), 239).querySelector("[data-montage]")!.getAttribute("data-montage")).toBe("2");
     expect(draw(grid("montage", { grid: { mode: "montage", cards: [{ title: "x", image: 7 }] } }), 0).querySelector("[data-image]")).toBeNull();
+  });
+
+  it("montaj başlığı kartlar kesilirken üstte sabit etiket kalır; uzun başlık tek satıra sığacak kadar küçülür", () => {
+    const size = (c: HTMLElement) => parseFloat((c.querySelector("[data-title]") as HTMLElement).style.fontSize);
+    const first = draw(grid("montage"), 0);
+    expect(first.querySelector("[data-title]")!.textContent).toBe("All in one");
+    expect(draw(grid("montage"), 239).querySelector("[data-title]")!.textContent).toBe("All in one");
+    expect(draw(grid("montage", { grid: { mode: "montage", cards: [{ title: "x" }] } }), 0).querySelector("[data-title]")).toBeNull();
+    const long = "Every stage of the pipeline checks its own output first";
+    expect(size(draw(grid("montage", { illustrative: true, grid: { mode: "montage", title: long, cards: [{ title: "x" }] } }), 0))).toBeLessThan(size(first));
+    const wide = draw(grid("grid"), 200);
+    expect(size(draw(grid("grid", { grid: { mode: "grid", title: long, cards: [{ title: "x" }] } }), 200))).toBeLessThan(size(wide));
   });
 });
 

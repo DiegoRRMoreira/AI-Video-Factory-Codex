@@ -1,6 +1,6 @@
 import type { MotionGrid } from "@ys/core";
 import { Img } from "remotion";
-import { fileSrc, type PartProps } from "./context.ts";
+import { fileSrc, fitSize, type PartProps } from "./context.ts";
 import { clamp01, contrast, enterK } from "./timing.ts";
 
 /**
@@ -22,7 +22,8 @@ export function gridShape(n: number, tall: boolean): { cols: number; rows: numbe
 function Assemble({ g, p }: { g: MotionGrid; p: PartProps }) {
   const { box, colors, heading, frame, fps } = p;
   const tall = p.height > p.width;
-  const titleSize = Math.round(Math.min(box.h * 0.075, 64));
+  // Başlık tek satıra sığar (60 harflik başlık 64 px'te kutuyu aşıp kartların üstüne kayıyordu).
+  const titleSize = g.title ? fitSize([g.title], p.scene.illustrative ? box.w * 0.76 : box.w, Math.min(box.h * 0.075, 64), p.heading.em) : 0;
   const lead = g.title ? 1 : 0;
   const top = g.title ? titleSize * 1.8 : 0;
   const { cols, rows } = gridShape(g.cards.length, tall);
@@ -62,10 +63,19 @@ function Montage({ g, p }: { g: MotionGrid; p: PartProps }) {
   const bg = i % 2 ? colors.fg : colors.bg;
   const fg = i % 2 ? colors.bg : colors.fg;
   const image = card.image !== undefined ? images[card.image] : undefined;
-  const size = Math.round(Math.min(box.h * 0.22, (box.w / Math.max(4, card.title.length)) * 1.7, p.height > p.width ? 170 : 210));
+  // Başlık montaj boyunca üstte küçük, sabit bir etikettir (kendi tempo adımı yok, kartlar kesilir, o kalır); kart içeriği
+  // altındaki alanda ortalanır. 23 Kas: başlık hiç çizilmiyordu, kare denetimi "Adım Adım Otomasyon yok" dedi.
+  const label = g.title ? fitSize([g.title], p.scene.illustrative ? box.w * 0.76 : box.w, Math.min(box.h * 0.05, 44), heading.em) : 0;
+  const top = g.title ? label * 1.8 : 0;
+  const size = Math.round(Math.min((box.h - top) * 0.22, (box.w / Math.max(4, card.title.length)) * 1.7, p.height > p.width ? 170 : 210));
   return (
     <div data-montage={i} style={{ position: "absolute", inset: 0, background: bg, color: fg }}>
-      <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: size * 0.2, transform: `scale(${1.12 - 0.12 * k})` }}>
+      {g.title && (
+        <div data-title="" style={{ position: "absolute", left: box.x, top: box.y, width: p.scene.illustrative ? box.w * 0.76 : box.w, fontFamily: heading.family, fontWeight: heading.weight, fontSize: label, lineHeight: 1.2, opacity: 0.75, whiteSpace: "nowrap" }}>
+          {g.title}
+        </div>
+      )}
+      <div style={{ position: "absolute", left: box.x, top: box.y + top, width: box.w, height: box.h - top, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: size * 0.2, transform: `scale(${1.12 - 0.12 * k})` }}>
         {image && <Img data-image="" src={fileSrc(image)} style={{ maxWidth: "70%", maxHeight: "50%", objectFit: "contain", borderRadius: 16 }} />}
         {card.stat && <div style={{ fontFamily: heading.family, fontWeight: heading.weight, fontSize: size * 1.2, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: colors.accent }}>{card.stat}</div>}
         <div style={{ fontFamily: heading.family, fontWeight: heading.weight, fontSize: size, lineHeight: 1.05, letterSpacing: "-0.02em" }}>{card.title}</div>

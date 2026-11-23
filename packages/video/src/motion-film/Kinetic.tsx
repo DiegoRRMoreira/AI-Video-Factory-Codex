@@ -47,8 +47,11 @@ export function Kinetic(p: PartProps) {
             <div key={i} style={{ ...font, display: "flex", flexWrap: "wrap", gap: `0 ${size * 0.26}px`, justifyContent: tall ? "flex-start" : "center" }}>
               {words.map(({ w, at, hot }, j) => {
                 const q = enterK(frame, at, fps);
+                // Hap iki yana PILL_BLEED taşar; vurgusuz komşunun yanında o kadar boşluk eklenir, yoksa 0,26 em'lik kelime
+                // aralığı 0,06 em'e iner (23 Kas, gerçek filmde "konu" hapa yapışıktı). Vurgulu komşular tek hapta birleşir.
+                const side = (k2: number) => (hot && words[k2] && !words[k2]!.hot ? PILL_BLEED : "0");
                 return (
-                  <span key={j} data-word="" style={{ display: "inline-block", opacity: q, transform: `translateY(${(1 - q) * 0.25 * size}px) scale(${0.86 + 0.14 * q})` }}>
+                  <span key={j} data-word="" style={{ display: "inline-block", marginLeft: side(j - 1), marginRight: side(j + 1), opacity: q, transform: `translateY(${(1 - q) * 0.25 * size}px) scale(${0.86 + 0.14 * q})` }}>
                     <Marked text={w} highlight={hot ? w : undefined} pill={pillK(frame, done, fps)} colors={colors} />
                   </span>
                 );
@@ -104,10 +107,13 @@ function Line({ text, highlight, q, pill, colors, style }: { text: string; highl
   );
 }
 
-/** Metnin içindeki vurgu sözcüğünü hapa alır (büyük/küçük harf duyarsız; yoksa metin olduğu gibi). */
+/** Hapın metnin iki yanından taşması. */
+const PILL_BLEED = "0.2em";
+
 /**
- * Hap alt uzantıları da kapsar (inset altı −0,16 em): büyük puntoda "Senaryo"nun y'si, "Çıktı"nın Ç çengeli hapın altından
- * taşıyordu (23 Kas, film denetçisi AI Video Factory m5/m7/m8).
+ * Metnin içindeki vurgu sözcüğünü hapa alır (büyük/küçük harf duyarsız; yoksa metin olduğu gibi). Hap alt uzantıları da
+ * kapsar (inset altı −0,16 em): büyük puntoda "Senaryo"nun y'si, "Çıktı"nın Ç çengeli hapın altından taşıyordu (23 Kas,
+ * film denetçisi AI Video Factory m5/m7/m8).
  */
 export function Marked({ text, highlight, pill, colors }: { text: string; highlight?: string; pill: number; colors: PartProps["colors"] }): ReactNode {
   const i = highlight ? text.toLocaleLowerCase().indexOf(highlight.toLocaleLowerCase()) : -1;
@@ -121,7 +127,7 @@ export function Marked({ text, highlight, pill, colors }: { text: string; highli
     <>
       {text.slice(0, i)}
       <span data-pill="" style={{ position: "relative", display: "inline-block", isolation: "isolate", color: pill > 0.5 ? colors.onAccent : undefined }}>
-        <span style={{ position: "absolute", inset: "0.04em -0.2em -0.16em", borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
+        <span style={{ position: "absolute", inset: `0.04em -${PILL_BLEED} -0.16em`, borderRadius: "0.18em", background: colors.accent, transform: `scaleX(${pill})`, transformOrigin: "0 50%", zIndex: -1 }} />
         {mark}
       </span>
       {text.slice(end + tail.length)}
