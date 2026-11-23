@@ -2,6 +2,10 @@
 
 Releases are cut with `pnpm release`. The Studio shows an update banner when a newer GitHub release exists.
 
+## v0.6.9 (2026-11-23)
+
+- Security: the Prisma config in the trigger.dev worker chain pinned `effect` 3.21.0, which has a ReDoS in `Schema.TemplateLiteral` (GHSA-7589-6fvf-x4pw); it now uses 3.22.4, the copy the same chain already had. Development tooling only; the trigger.dev CLI and the Prisma config load were checked.
+
 ## v0.6.8 (2026-11-23)
 
 - Motion-graphics films get a frame check before the render: a film critic looks at every scene after its last element has settled and checks that the listed elements are there and that no text is cut, overlapping or unreadable. A scene passes at 8 out of 10, like the draft review. Without narration, scenes below the bar go back to the director once and the revision is kept only if it checks better; the render waits for your approval while a scene is below the bar.
